@@ -9,13 +9,13 @@
     <tbody>
     {{range .Servizi}}
     <tr>
-      <td><input type="checkbox" name="service_id" value="{{.ID}}"></td>
+      <td><input type="checkbox" name="service_id" value="{{.ID}}" onchange="toggleRiga(this)"></td>
       <td><small>{{.ID}}</small><br>{{.Nome}}</td>
-      <td><input type="text" name="nome" value="{{.Nome}}" style="width:200px"></td>
-      <td><input type="number" name="budget_totale" step="0.01" placeholder="71096.37" style="width:100px"></td>
-      <td><input type="number" name="isee_massimo" step="0.01" value="40000" style="width:100px"></td>
-      <td><input type="date" name="scadenza"></td>
-      <td><select name="engine_type"><option value="mense_rette">mense_rette</option></select></td>
+      <td><input type="text" name="nome" value="{{.Nome}}" disabled style="width:200px"></td>
+      <td><input type="number" name="budget_totale" step="0.01" placeholder="71096.37" disabled style="width:100px"></td>
+      <td><input type="number" name="isee_massimo" step="0.01" value="40000" disabled style="width:100px"></td>
+      <td><input type="date" name="scadenza" disabled></td>
+      <td><select name="engine_type" disabled><option value="mense_rette">mense_rette</option></select></td>
     </tr>
     {{end}}
     </tbody>
@@ -23,4 +23,11 @@
   <button type="submit" class="btn btn-primary">Salva bandi selezionati</button>
 </form>
 <div id="step2-result"></div>
+
+<script>
+function toggleRiga(cb) {
+  const inputs = cb.closest('tr').querySelectorAll('input:not([type=checkbox]), select');
+  inputs.forEach(el => el.disabled = !cb.checked);
+}
+</script>
 {{end}}

@@ -70,7 +70,7 @@ func (h *SetupHandler) PostSetupStep2(w http.ResponseWriter, r *http.Request) {
 	scadenze := r.Form["scadenza"]
 	engines := r.Form["engine_type"]
 
-	var creati int
+	var creati, aggiornati, saltati int
 	for i, svcID := range serviceIDs {
 		if svcID == "" {
 			continue
@@ -83,24 +83,42 @@ func (h *SetupHandler) PostSetupStep2(w http.ResponseWriter, r *http.Request) {
 		if engine == "" {
 			engine = "mense_rette"
 		}
-
-		b := &db.Bando{
-			ServiceID:             svcID,
-			Nome:                  nome,
-			BudgetTotale:          budget,
-			ISEEMassimo:           isee,
-			ScadenzaPresentazione: scad,
-			EngineType:            engine,
-			EngineConfig:          "{}",
-			Attivo:                true,
-			CreatedAt:             time.Now(),
+		if budget <= 0 {
+			saltati++
+			continue
 		}
-		db.InsertBando(h.DB, b)
-		creati++
+
+		existing, err := db.GetBandoByServiceID(h.DB, svcID)
+		if err == nil && existing != nil {
+			existing.Nome = nome
+			existing.BudgetTotale = budget
+			existing.ISEEMassimo = isee
+			existing.ScadenzaPresentazione = scad
+			existing.EngineType = engine
+			existing.Attivo = true
+			db.UpdateBando(h.DB, existing)
+			aggiornati++
+		} else {
+			b := &db.Bando{
+				ServiceID:             svcID,
+				Nome:                  nome,
+				BudgetTotale:          budget,
+				ISEEMassimo:           isee,
+				ScadenzaPresentazione: scad,
+				EngineType:            engine,
+				EngineConfig:          "{}",
+				Attivo:                true,
+				CreatedAt:             time.Now(),
+			}
+			db.InsertBando(h.DB, b)
+			creati++
+		}
 	}
 
 	renderTemplate(w, "setup_step2_result.html", map[string]any{
-		"Creati": creati,
+		"Creati":     creati,
+		"Aggiornati": aggiornati,
+		"Saltati":    saltati,
 	})
 }
 
