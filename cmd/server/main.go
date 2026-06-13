@@ -12,6 +12,8 @@ import (
 	_ "opencity-backend/internal/graduatoria/mense" // registra engine
 )
 
+var AppVersion = "dev"
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -28,7 +30,7 @@ func main() {
 
 	handler := web.NewServer(cfg, dbConn)
 
-	fmt.Fprintf(os.Stderr, "Gestionale OpenCity avviato su :%s\n", cfg.Port)
+	fmt.Fprintf(os.Stderr, "Gestionale OpenCity %s avviato su :%s\n", AppVersion, cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
 		fmt.Fprintf(os.Stderr, "Server: %v\n", err)
 		os.Exit(1)
