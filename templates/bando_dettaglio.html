@@ -20,10 +20,17 @@
 
 <div class="section-header">
   <h2>Graduatorie</h2>
-  <form method="POST" action="/bandi/{{.Bando.ID}}/run">
-    <button type="submit" class="btn btn-primary">Calcola nuova run</button>
+  <form method="POST" action="/bandi/{{.Bando.ID}}/run" onsubmit="avviaCalcolo(this)">
+    <button type="submit" id="btn-calcola" class="btn btn-primary">Calcola nuova run</button>
+    <span id="calcolo-spinner" style="display:none" class="text-muted"> Calcolo in corso (30–60 sec)…</span>
   </form>
 </div>
+<script>
+function avviaCalcolo(form) {
+  document.getElementById('btn-calcola').disabled = true;
+  document.getElementById('calcolo-spinner').style.display = 'inline';
+}
+</script>
 
 {{if not .Runs}}
 <p class="text-muted">Nessuna run calcolata.</p>

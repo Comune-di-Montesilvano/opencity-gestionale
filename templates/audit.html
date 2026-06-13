@@ -17,6 +17,10 @@
     <option value="approva" {{if eq .Filter.Azione "approva"}}selected{{end}}>approva</option>
     <option value="rifiuta" {{if eq .Filter.Azione "rifiuta"}}selected{{end}}>rifiuta</option>
   </select>
+  <select name="bando_id">
+    <option value="">Tutti i bandi</option>
+    {{range .Bandi}}<option value="{{.ID}}" {{if eq .ID $.Filter.BandoID}}selected{{end}}>{{.Nome}}</option>{{end}}
+  </select>
   <button type="submit" class="btn btn-sm">Filtra</button>
 </form>
 
@@ -44,7 +48,7 @@
 {{$prevOffset := sub .Offset .Limit}}
 {{$nextOffset := add .Offset .Limit}}
 <div class="pagination">
-  {{if gt .Offset 0}}<a href="?offset={{$prevOffset}}&operatore={{.Filter.Operatore}}&azione={{.Filter.Azione}}" class="btn btn-sm">← Precedente</a>{{end}}
-  {{if lt (add .Offset .Limit) .Total}}<a href="?offset={{$nextOffset}}&operatore={{.Filter.Operatore}}&azione={{.Filter.Azione}}" class="btn btn-sm">Successiva →</a>{{end}}
+  {{if gt .Offset 0}}<a href="?offset={{$prevOffset}}&operatore={{.Filter.Operatore}}&azione={{.Filter.Azione}}&bando_id={{.Filter.BandoID}}" class="btn btn-sm">← Precedente</a>{{end}}
+  {{if lt (add .Offset .Limit) .Total}}<a href="?offset={{$nextOffset}}&operatore={{.Filter.Operatore}}&azione={{.Filter.Azione}}&bando_id={{.Filter.BandoID}}" class="btn btn-sm">Successiva →</a>{{end}}
 </div>
 {{end}}

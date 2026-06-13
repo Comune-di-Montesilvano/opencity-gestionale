@@ -29,6 +29,7 @@ func (h *AuditHandler) GetAudit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actions, total, _ := db.ListAudit(h.DB, f)
+	bandi, _ := db.ListBandi(h.DB)
 
 	renderTemplate(w, "audit.html", map[string]any{
 		"Op":      op,
@@ -37,5 +38,6 @@ func (h *AuditHandler) GetAudit(w http.ResponseWriter, r *http.Request) {
 		"Filter":  f,
 		"Offset":  f.Offset,
 		"Limit":   f.Limit,
+		"Bandi":   bandi,
 	})
 }
