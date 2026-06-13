@@ -1,0 +1,40 @@
+{{define "dashboard.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Dashboard{{end}}
+
+{{define "content"}}
+<h1>Dashboard</h1>
+{{if not .Items}}
+<div class="alert alert-info">
+  Nessun bando configurato.
+  {{if .Op.IsAdmin}}<a href="/setup">Avvia wizard setup</a>{{end}}
+</div>
+{{else}}
+<div class="card-grid">
+{{range .Items}}
+<div class="card">
+  <div class="card-header">
+    <h3><a href="/bandi/{{.Bando.ID}}">{{.Bando.Nome}}</a></h3>
+    {{if .Bando.Attivo}}<span class="badge badge-green">Attivo</span>{{else}}<span class="badge badge-gray">Inattivo</span>{{end}}
+  </div>
+  <div class="card-body">
+    <p>Budget: €{{printf "%.2f" .Bando.BudgetTotale}} | ISEE max: €{{printf "%.2f" .Bando.ISEEMassimo}}</p>
+    {{if .UltimaRun}}
+    <p>Ultima run: <a href="/bandi/{{.Bando.ID}}/run/{{.UltimaRun.ID}}">{{.UltimaRun.CalcolataDa}} — {{.UltimaRun.CalcolataAt.Format "02/01/2006 15:04"}}</a></p>
+    <p>Ammesse: {{.UltimaRun.NumAmmesse}} | Escluse: {{.UltimaRun.NumEscluse}} | Budget usato: €{{printf "%.2f" .UltimaRun.BudgetUsato}}</p>
+    {{else}}
+    <p class="text-muted">Nessuna run calcolata</p>
+    {{end}}
+  </div>
+  <div class="card-footer">
+    <form method="POST" action="/bandi/{{.Bando.ID}}/run">
+      <button type="submit" class="btn btn-primary">Calcola graduatoria</button>
+    </form>
+  </div>
+</div>
+{{end}}
+</div>
+{{end}}
+{{end}}

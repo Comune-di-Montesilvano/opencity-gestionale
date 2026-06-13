@@ -1,0 +1,50 @@
+{{define "audit.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Audit trail{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Audit trail</h1>
+</div>
+
+<form class="filter-bar" method="GET" action="/audit">
+  <input type="text" name="operatore" placeholder="Operatore" value="{{.Filter.Operatore}}">
+  <select name="azione">
+    <option value="">Tutte le azioni</option>
+    <option value="calcola" {{if eq .Filter.Azione "calcola"}}selected{{end}}>calcola</option>
+    <option value="approva" {{if eq .Filter.Azione "approva"}}selected{{end}}>approva</option>
+    <option value="rifiuta" {{if eq .Filter.Azione "rifiuta"}}selected{{end}}>rifiuta</option>
+  </select>
+  <button type="submit" class="btn btn-sm">Filtra</button>
+</form>
+
+<p class="text-muted">{{.Total}} azioni totali</p>
+
+<table class="table table-sm">
+  <thead>
+    <tr><th>Data</th><th>Operatore</th><th>Azione</th><th>Pratica ID</th><th>Esito</th><th>Messaggio</th><th>Errore</th></tr>
+  </thead>
+  <tbody>
+  {{range .Actions}}
+  <tr class="{{if eq .Esito "errore"}}row-error{{end}}">
+    <td>{{.CreatedAt.Format "02/01/2006 15:04:05"}}</td>
+    <td>{{.Operatore}}</td>
+    <td><span class="badge badge-{{if eq .Azione "approva"}}green{{else if eq .Azione "rifiuta"}}red{{else}}blue{{end}}">{{.Azione}}</span></td>
+    <td>{{if .PraticaID}}<a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.PraticaID}}/detail" target="_blank"><small>{{.PraticaID}}</small></a>{{end}}</td>
+    <td>{{if eq .Esito "ok"}}<span class="badge badge-green">ok</span>{{else}}<span class="badge badge-red">errore</span>{{end}}</td>
+    <td><small>{{.Messaggio}}</small></td>
+    <td><small class="text-danger">{{.ErroreDettaglio}}</small></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+
+{{$prevOffset := sub .Offset .Limit}}
+{{$nextOffset := add .Offset .Limit}}
+<div class="pagination">
+  {{if gt .Offset 0}}<a href="?offset={{$prevOffset}}&operatore={{.Filter.Operatore}}&azione={{.Filter.Azione}}" class="btn btn-sm">← Precedente</a>{{end}}
+  {{if lt (add .Offset .Limit) .Total}}<a href="?offset={{$nextOffset}}&operatore={{.Filter.Operatore}}&azione={{.Filter.Azione}}" class="btn btn-sm">Successiva →</a>{{end}}
+</div>
+{{end}}

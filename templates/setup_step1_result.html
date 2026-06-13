@@ -1,0 +1,26 @@
+{{define "setup_step1_result.html"}}
+<div class="alert alert-success">Connessione a {{.BaseURL}} riuscita. Trovati {{len .Servizi}} servizi.</div>
+
+<form hx-post="/setup/step/2" hx-target="#step2-result">
+  <table class="table">
+    <thead>
+      <tr><th>Seleziona</th><th>Servizio</th><th>Nome bando</th><th>Budget €</th><th>ISEE max €</th><th>Scadenza</th><th>Engine</th></tr>
+    </thead>
+    <tbody>
+    {{range .Servizi}}
+    <tr>
+      <td><input type="checkbox" name="service_id" value="{{.ID}}"></td>
+      <td><small>{{.ID}}</small><br>{{.Nome}}</td>
+      <td><input type="text" name="nome" value="{{.Nome}}" style="width:200px"></td>
+      <td><input type="number" name="budget_totale" step="0.01" placeholder="71096.37" style="width:100px"></td>
+      <td><input type="number" name="isee_massimo" step="0.01" value="40000" style="width:100px"></td>
+      <td><input type="date" name="scadenza"></td>
+      <td><select name="engine_type"><option value="mense_rette">mense_rette</option></select></td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  <button type="submit" class="btn btn-primary">Salva bandi selezionati</button>
+</form>
+<div id="step2-result"></div>
+{{end}}

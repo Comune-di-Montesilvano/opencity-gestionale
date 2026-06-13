@@ -1,0 +1,50 @@
+{{define "bando_dettaglio.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}{{.Bando.Nome}}{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.Bando.Nome}}</h1>
+  {{if .Op.IsAdmin}}<a href="#" class="btn btn-secondary">Modifica</a>{{end}}
+</div>
+<div class="detail-grid">
+  <div><strong>Service ID</strong><br><code>{{.Bando.ServiceID}}</code></div>
+  <div><strong>Budget totale</strong><br>€{{printf "%.2f" .Bando.BudgetTotale}}</div>
+  <div><strong>ISEE massimo</strong><br>€{{printf "%.2f" .Bando.ISEEMassimo}}</div>
+  <div><strong>Scadenza</strong><br>{{.Bando.ScadenzaPresentazione}}</div>
+  <div><strong>Engine</strong><br><code>{{.Bando.EngineType}}</code></div>
+  <div><strong>Stato</strong><br>{{if .Bando.Attivo}}<span class="badge badge-green">Attivo</span>{{else}}<span class="badge badge-gray">Inattivo</span>{{end}}</div>
+</div>
+
+<div class="section-header">
+  <h2>Graduatorie</h2>
+  <form method="POST" action="/bandi/{{.Bando.ID}}/run">
+    <button type="submit" class="btn btn-primary">Calcola nuova run</button>
+  </form>
+</div>
+
+{{if not .Runs}}
+<p class="text-muted">Nessuna run calcolata.</p>
+{{else}}
+<table class="table">
+  <thead>
+    <tr><th>ID</th><th>Calcolata da</th><th>Data</th><th>Ammesse</th><th>Escluse</th><th>Budget usato</th><th></th></tr>
+  </thead>
+  <tbody>
+  {{range .Runs}}
+  <tr>
+    <td>#{{.ID}}</td>
+    <td>{{.CalcolataDa}}</td>
+    <td>{{.CalcolataAt.Format "02/01/2006 15:04"}}</td>
+    <td>{{.NumAmmesse}}</td>
+    <td>{{.NumEscluse}}</td>
+    <td>€{{printf "%.2f" .BudgetUsato}}</td>
+    <td><a href="/bandi/{{$.Bando.ID}}/run/{{.ID}}" class="btn btn-sm">Visualizza</a></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

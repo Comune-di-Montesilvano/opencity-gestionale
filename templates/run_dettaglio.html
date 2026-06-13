@@ -1,0 +1,40 @@
+{{define "run_dettaglio.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Run #{{.Run.ID}} — {{.Bando.Nome}}{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Graduatoria run #{{.Run.ID}}</h1>
+  <span class="text-muted">{{.Bando.Nome}} — calcolata da {{.Run.CalcolataDa}} il {{.Run.CalcolataAt.Format "02/01/2006 15:04"}}</span>
+</div>
+
+<div class="stats-row">
+  <div class="stat"><span class="stat-value">{{.Run.NumAmmesse}}</span><span class="stat-label">Ammesse</span></div>
+  <div class="stat"><span class="stat-value">{{.Run.NumEscluse}}</span><span class="stat-label">Escluse</span></div>
+  <div class="stat"><span class="stat-value">€{{printf "%.2f" .Run.BudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
+</div>
+
+{{range .Grad.PerAnno}}
+<h2>Annualità {{.Annualita}}</h2>
+<div class="anno-grid">
+  <div class="anno-section">
+    <h3>Rette ({{len .Rette}})</h3>
+    <p>Budget usato: €{{printf "%.2f" .BudgetUsatoRette}}</p>
+    <a href="/bandi/{{$.Bando.ID}}/run/{{$.Run.ID}}/{{.Annualita}}/rette" class="btn btn-secondary btn-sm">Visualizza tabella</a>
+    <a href="/bandi/{{$.Bando.ID}}/run/{{$.Run.ID}}/export/{{.Annualita}}/rette" class="btn btn-sm">CSV</a>
+  </div>
+  <div class="anno-section">
+    <h3>Mense ({{len .Mense}})</h3>
+    <p>Budget usato: €{{printf "%.2f" .BudgetUsatoMense}}</p>
+    <a href="/bandi/{{$.Bando.ID}}/run/{{$.Run.ID}}/{{.Annualita}}/mense" class="btn btn-secondary btn-sm">Visualizza tabella</a>
+    <a href="/bandi/{{$.Bando.ID}}/run/{{$.Run.ID}}/export/{{.Annualita}}/mense" class="btn btn-sm">CSV</a>
+  </div>
+</div>
+{{end}}
+
+<h2>Escluse ({{len .Grad.Escluse}})</h2>
+<a href="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/0/escluse" class="btn btn-secondary btn-sm">Visualizza tabella</a>
+<a href="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/export/0/escluse" class="btn btn-sm">CSV</a>
+{{end}}

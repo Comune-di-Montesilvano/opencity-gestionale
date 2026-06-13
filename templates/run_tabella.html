@@ -1,0 +1,133 @@
+{{define "run_tabella.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}{{.Anno}} — {{.Tipo}} — Run #{{.RunID}}{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.Bando.Nome}} — {{.Anno}} — {{.Tipo}}</h1>
+  <div class="page-actions">
+    <a href="/bandi/{{.BandoID}}/run/{{.RunID}}" class="btn btn-secondary btn-sm">← Run</a>
+    <a href="/bandi/{{.BandoID}}/run/{{.RunID}}/export/{{.Anno}}/{{.Tipo}}" class="btn btn-sm">Scarica CSV</a>
+  </div>
+</div>
+
+<div id="batch-controls" style="display:none" class="batch-bar">
+  <span id="batch-count">0 selezionate</span>
+  <button class="btn btn-sm btn-secondary" onclick="selectAll()">Seleziona tutte</button>
+  <button class="btn btn-sm btn-success" onclick="openModal('approva')">✓ Approva selezionate</button>
+  <button class="btn btn-sm btn-danger" onclick="openModal('rifiuta')">✗ Rifiuta selezionate</button>
+</div>
+
+<table class="table table-sm">
+  <thead>
+    <tr>
+      {{if ne .Tipo "escluse"}}<th><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>{{end}}
+      <th>#</th>
+      <th>Richiedente</th>
+      <th>CF Figlio</th>
+      <th>ISEE</th>
+      <th>Corrispettivo netto</th>
+      <th>Rimborso</th>
+      <th>Stato</th>
+      <th>Note</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Righe}}
+  <tr class="{{if .Ammessa}}row-ammessa{{else}}row-esclusa{{end}}">
+    {{if ne $.Tipo "escluse"}}
+    <td>
+      {{if .Ammessa}}<input type="checkbox" class="pratica-check" value="{{.Istanza.ID}}" onchange="updateCount()">{{end}}
+    </td>
+    {{end}}
+    <td>{{.Posizione}}</td>
+    <td><a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">{{.Istanza.RichiedenteCognome}} {{.Istanza.RichiedenteNome}}</a></td>
+    <td>{{if .Istanza.FiglioSelezionatoCF}}{{.Istanza.FiglioSelezionatoCF}}{{else}}<span class="badge badge-yellow">CF mancante</span>{{end}}</td>
+    <td>€{{printf "%.2f" .Istanza.ISEE}}</td>
+    <td>€{{printf "%.2f" .Istanza.Corrispettivo}}</td>
+    <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
+    <td>{{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}</td>
+    <td>{{.NoteEsclusione}}{{if .OriginalID}} → <a href="#pratica-{{.OriginalID}}">{{.OriginalID}}</a>{{end}}</td>
+    <td><a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+
+<!-- Modal bulk action -->
+<div id="modal-overlay" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h3 id="modal-title">Conferma azione</h3>
+    <p id="modal-desc"></p>
+    <div class="form-group">
+      <label>Messaggio per il cittadino</label>
+      <textarea id="modal-message" rows="5" class="form-control" placeholder="Il Comune di Montesilvano comunica..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button id="modal-confirm" class="btn btn-primary" onclick="confirmBatch()">Conferma</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+    </div>
+    <div id="modal-result" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+let currentAction = '';
+
+function updateCount() {
+  const checked = document.querySelectorAll('.pratica-check:checked').length;
+  document.getElementById('batch-count').textContent = checked + ' selezionate';
+  document.getElementById('batch-controls').style.display = checked > 0 ? 'flex' : 'none';
+}
+
+function toggleAll(cb) {
+  document.querySelectorAll('.pratica-check').forEach(c => { c.checked = cb.checked; });
+  updateCount();
+}
+
+function selectAll() {
+  document.querySelectorAll('.pratica-check').forEach(c => { c.checked = true; });
+  document.getElementById('check-all').checked = true;
+  updateCount();
+}
+
+function openModal(action) {
+  currentAction = action;
+  const checked = document.querySelectorAll('.pratica-check:checked');
+  if (checked.length === 0) return;
+  document.getElementById('modal-title').textContent = action === 'approva' ? 'Approva pratiche' : 'Rifiuta pratiche';
+  document.getElementById('modal-desc').textContent = checked.length + ' pratiche selezionate';
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('modal-result').style.display = 'none';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+async function confirmBatch() {
+  const ids = Array.from(document.querySelectorAll('.pratica-check:checked')).map(c => c.value);
+  const msg = document.getElementById('modal-message').value;
+  const url = '/bandi/{{.BandoID}}/run/{{.RunID}}/' + currentAction + '-batch';
+
+  document.getElementById('modal-confirm').disabled = true;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pratica_ids: ids, messaggio: msg})
+  });
+  const data = await res.json();
+
+  const resultEl = document.getElementById('modal-result');
+  resultEl.style.display = 'block';
+  const okCount = (data.ok || []).length;
+  const errCount = Object.keys(data.errori || {}).length;
+  resultEl.innerHTML = '<p class="text-success">' + okCount + ' pratiche elaborate con successo.</p>' +
+    (errCount > 0 ? '<p class="text-danger">' + errCount + ' errori.</p>' : '');
+  document.getElementById('modal-confirm').disabled = false;
+}
+</script>
+{{end}}

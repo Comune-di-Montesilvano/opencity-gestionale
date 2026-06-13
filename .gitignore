@@ -1,0 +1,23 @@
+# Build output
+/data/
+/output/
+*.db
+gestionale
+gestionale.exe
+batch.exe
+*.exe
+
+# Dati reali — non committare (CF, ISEE, IBAN)
+*.csv
+*.json
+!go.sum
+
+# Documenti locali
+*.pdf
+analisi_requisiti_opencity.md
+
+# Claude Code interno
+.claude/
+
+# Env
+.env

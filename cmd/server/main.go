@@ -1,0 +1,36 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+
+	"opencity-backend/internal/config"
+	"opencity-backend/internal/db"
+	"opencity-backend/internal/web"
+
+	_ "opencity-backend/internal/graduatoria/mense" // registra engine
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Configurazione: %v\n", err)
+		os.Exit(1)
+	}
+
+	dbConn, err := db.Open(cfg.DBPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Database: %v\n", err)
+		os.Exit(1)
+	}
+	defer dbConn.Close()
+
+	handler := web.NewServer(cfg, dbConn)
+
+	fmt.Fprintf(os.Stderr, "Gestionale OpenCity avviato su :%s\n", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
+		fmt.Fprintf(os.Stderr, "Server: %v\n", err)
+		os.Exit(1)
+	}
+}

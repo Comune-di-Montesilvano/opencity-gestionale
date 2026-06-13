@@ -1,0 +1,26 @@
+{{define "login.html"}}<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Login — Gestionale OpenCity</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="login-box">
+  <h1>Gestionale OpenCity</h1>
+  <p class="subtitle">Comune di Montesilvano</p>
+  {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+  <form method="POST" action="/login">
+    <div class="form-group">
+      <label for="username">Username OpenCity</label>
+      <input type="text" id="username" name="username" required autofocus>
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Accedi</button>
+  </form>
+</div>
+</body>
+</html>{{end}}
