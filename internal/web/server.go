@@ -30,6 +30,13 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 
 	mux := http.NewServeMux()
 
+	// Health check (non autenticato, usato da Docker e load balancer)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
 	// Pubbliche
 	mux.HandleFunc("GET /login", auth.GetLogin)
 	mux.HandleFunc("POST /login", auth.PostLogin)
@@ -74,5 +81,5 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	// Audit
 	mux.Handle("GET /audit", authMW(http.HandlerFunc(auditH.GetAudit)))
 
-	return mux
+	return middleware.SecurityHeaders(mux)
 }

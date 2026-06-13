@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"opencity-gestionale/internal/config"
 	"opencity-gestionale/internal/db"
@@ -27,6 +28,18 @@ func main() {
 		os.Exit(1)
 	}
 	defer dbConn.Close()
+
+	// Pulizia sessioni scadute all'avvio e ogni 6 ore
+	db.PulisciSessioniScadute(dbConn)
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := db.PulisciSessioniScadute(dbConn); err != nil {
+				fmt.Fprintf(os.Stderr, "cleanup sessioni: %v\n", err)
+			}
+		}
+	}()
 
 	handler := web.NewServer(cfg, dbConn)
 
