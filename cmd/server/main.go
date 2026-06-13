@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"os"
 
-	"opencity-backend/internal/config"
-	"opencity-backend/internal/db"
-	"opencity-backend/internal/web"
+	"opencity-gestionale/internal/config"
+	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/web"
 
-	_ "opencity-backend/internal/graduatoria/mense" // registra engine
+	_ "opencity-gestionale/internal/graduatoria/mense" // registra engine
 )
 
 var AppVersion = "dev"

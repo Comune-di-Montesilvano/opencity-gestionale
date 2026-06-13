@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"opencity-backend/internal/db"
+	"opencity-gestionale/internal/db"
 )
 
 type ctxKey int

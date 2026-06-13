@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"opencity-backend/internal/opencity"
+	"opencity-gestionale/internal/opencity"
 )
 
 // BandoConfig contiene i parametri configurabili di un bando.

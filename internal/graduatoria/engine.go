@@ -6,7 +6,7 @@ import (
 	"math"
 	"sort"
 
-	"opencity-backend/internal/opencity"
+	"opencity-gestionale/internal/opencity"
 )
 
 const (

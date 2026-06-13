@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"opencity-backend/internal/db"
-	"opencity-backend/internal/web/middleware"
+	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/web/middleware"
 )
 
 type AuditHandler struct {

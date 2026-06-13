@@ -3,8 +3,8 @@
 package mense
 
 import (
-	"opencity-backend/internal/graduatoria"
-	"opencity-backend/internal/opencity"
+	"opencity-gestionale/internal/graduatoria"
+	"opencity-gestionale/internal/opencity"
 )
 
 const EngineName = "mense_rette"

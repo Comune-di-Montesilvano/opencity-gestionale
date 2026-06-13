@@ -11,14 +11,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"opencity-backend/internal/db"
-	"opencity-backend/internal/opencity"
+	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/opencity"
 )
 
 type AuthHandler struct {
 	DB             *sql.DB
 	BaseURL        string
 	AdminUsernames []string
+	SecureCookie   bool
 }
 
 func (h *AuthHandler) GetLogin(w http.ResponseWriter, r *http.Request) {
@@ -81,6 +82,7 @@ func (h *AuthHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		Expires:  sess.ScadeAt,
 		HttpOnly: true,
+		Secure:   h.SecureCookie,
 		SameSite: http.SameSiteStrictMode,
 	})
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -96,6 +98,7 @@ func (h *AuthHandler) GetLogout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   h.SecureCookie,
 		SameSite: http.SameSiteStrictMode,
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)

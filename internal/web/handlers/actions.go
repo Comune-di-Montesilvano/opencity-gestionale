@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"opencity-backend/internal/db"
-	"opencity-backend/internal/opencity"
-	"opencity-backend/internal/web/middleware"
+	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/opencity"
+	"opencity-gestionale/internal/web/middleware"
 )
 
 type ActionsHandler struct {

@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 
-	"opencity-backend/internal/config"
-	"opencity-backend/internal/web/handlers"
-	"opencity-backend/internal/web/middleware"
+	"opencity-gestionale/internal/config"
+	"opencity-gestionale/internal/web/handlers"
+	"opencity-gestionale/internal/web/middleware"
 )
 
 func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
@@ -14,6 +14,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 		DB:             dbConn,
 		BaseURL:        cfg.OpenCityBaseURL,
 		AdminUsernames: cfg.AdminUsernames,
+		SecureCookie:   cfg.TrustProxy,
 	}
 	setup := &handlers.SetupHandler{
 		DB:      dbConn,

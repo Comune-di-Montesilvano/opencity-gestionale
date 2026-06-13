@@ -7,11 +7,12 @@ import (
 )
 
 type Config struct {
-	Port             string
-	DBPath           string
-	OpenCityBaseURL  string
-	SecretKey        string
-	AdminUsernames   []string
+	Port            string
+	DBPath          string
+	OpenCityBaseURL string
+	SecretKey       string
+	AdminUsernames  []string
+	TrustProxy      bool // TRUST_PROXY=true → cookie Secure quando dietro reverse proxy HTTPS
 }
 
 func Load() (*Config, error) {
@@ -52,6 +53,7 @@ func Load() (*Config, error) {
 		OpenCityBaseURL: baseURL,
 		SecretKey:       secret,
 		AdminUsernames:  admins,
+		TrustProxy:      os.Getenv("TRUST_PROXY") == "true",
 	}, nil
 }
 

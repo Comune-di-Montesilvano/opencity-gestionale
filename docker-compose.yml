@@ -2,15 +2,18 @@ services:
   gestionale:
     build: .
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "127.0.0.1:${PORT:-8080}:${PORT:-8080}"
     volumes:
       - gestionale_data:/data
+    env_file:
+      - .env
     environment:
       PORT: ${PORT:-8080}
       DB_PATH: /data/gestionale.db
       OPENCITY_BASE_URL: https://service.comune.montesilvano.pe.it
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-apioperator}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
     restart: unless-stopped
 
 volumes:

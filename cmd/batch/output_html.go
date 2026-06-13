@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"opencity-backend/internal/graduatoria"
+	"opencity-gestionale/internal/graduatoria"
 )
 
 const baseURLOperatori = "https://service.comune.montesilvano.pe.it/lang/it/operatori"

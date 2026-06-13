@@ -1,4 +1,4 @@
-module opencity-backend
+module opencity-gestionale
 
 go 1.25.0
 

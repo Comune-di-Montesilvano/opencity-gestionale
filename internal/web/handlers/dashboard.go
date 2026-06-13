@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"net/http"
 
-	"opencity-backend/internal/db"
-	"opencity-backend/internal/web/middleware"
+	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/web/middleware"
 )
 
 type DashboardHandler struct {

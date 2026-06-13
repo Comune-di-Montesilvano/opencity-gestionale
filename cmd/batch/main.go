@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"opencity-backend/internal/graduatoria"
-	_ "opencity-backend/internal/graduatoria/mense" // registra engine mense_rette
-	"opencity-backend/internal/opencity"
+	"opencity-gestionale/internal/graduatoria"
+	_ "opencity-gestionale/internal/graduatoria/mense" // registra engine mense_rette
+	"opencity-gestionale/internal/opencity"
 )
 
 const (
