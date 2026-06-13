@@ -1,0 +1,9 @@
+{{define "500.html"}}{{template "base" .}}{{end}}
+{{define "title"}}Errore interno{{end}}
+{{define "content"}}
+<div class="error-page">
+  <h1>500 — Errore interno del server</h1>
+  <p>Si è verificato un errore imprevisto. Riprovare o contattare l'amministratore.</p>
+  <a href="/dashboard" class="btn btn-primary">Torna alla dashboard</a>
+</div>
+{{end}}

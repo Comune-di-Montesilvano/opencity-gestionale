@@ -65,6 +65,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("GET /bandi/nuovo", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetNuovoBando))))
 	mux.Handle("POST /bandi", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostBando))))
 	mux.Handle("GET /bandi/{id}", authMW(http.HandlerFunc(bandi.GetBando)))
+	mux.Handle("GET /bandi/{id}/edit", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetEditBando))))
 	mux.Handle("POST /bandi/{id}", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PutBando))))
 	mux.Handle("POST /bandi/{id}/disattiva", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.DeleteBando))))
 
@@ -81,5 +82,5 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	// Audit
 	mux.Handle("GET /audit", authMW(http.HandlerFunc(auditH.GetAudit)))
 
-	return middleware.SecurityHeaders(mux)
+	return middleware.Recovery(middleware.SecurityHeaders(mux))
 }

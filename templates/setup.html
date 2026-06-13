@@ -11,7 +11,7 @@
 <div class="wizard">
   <div class="wizard-step">
     <h2>Step 1 — Verifica connessione OpenCity</h2>
-    <p>URL: <code>{{.Op.JWT | printf "%s"}}</code></p>
+    <p>URL: <code>{{.BaseURL}}</code></p>
     <button class="btn btn-primary"
       hx-post="/setup/step/1"
       hx-target="#step1-result"

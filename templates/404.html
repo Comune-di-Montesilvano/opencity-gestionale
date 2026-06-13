@@ -1,0 +1,9 @@
+{{define "404.html"}}{{template "base" .}}{{end}}
+{{define "title"}}Pagina non trovata{{end}}
+{{define "content"}}
+<div class="error-page">
+  <h1>404 — Pagina non trovata</h1>
+  <p>La risorsa richiesta non esiste.</p>
+  <a href="/dashboard" class="btn btn-primary">Torna alla dashboard</a>
+</div>
+{{end}}

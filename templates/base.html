@@ -22,6 +22,7 @@
 </nav>
 {{end}}
 <main class="container">
+{{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
 {{block "content" .}}{{end}}
 </main>
 </body>

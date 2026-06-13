@@ -71,6 +71,13 @@ type RigaGraduatoria struct {
 	OriginalID      string // solo per duplicati: ID dell'istanza tenuta
 }
 
+func (r RigaGraduatoria) CorrispettivoNetto() float64 {
+	if r.Istanza == nil {
+		return 0
+	}
+	return CorrispettivoNetto(r.Istanza)
+}
+
 type GraduatoriaAnnualita struct {
 	Annualita        int
 	Rette            []RigaGraduatoria

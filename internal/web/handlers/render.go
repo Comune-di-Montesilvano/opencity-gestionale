@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"sync"
+
+	"opencity-gestionale/internal/web/middleware"
 )
 
 var (
@@ -37,4 +39,22 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 // ReloadTemplates forza ricarico in sviluppo.
 func ReloadTemplates() {
 	tmplOnce = sync.Once{}
+}
+
+func flashFromRequest(r *http.Request) (string, string) {
+	return r.URL.Query().Get("flash"), r.URL.Query().Get("flashType")
+}
+
+func notFound(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	renderTemplate(w, "404.html", map[string]any{
+		"Op": middleware.FromContext(r.Context()),
+	})
+}
+
+func internalError(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+	renderTemplate(w, "500.html", map[string]any{
+		"Op": middleware.FromContext(r.Context()),
+	})
 }

@@ -24,6 +24,7 @@ func (h *SetupHandler) GetSetup(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "setup.html", map[string]any{
 		"Op":      op,
 		"Virgine": count == 0,
+		"BaseURL": h.BaseURL,
 	})
 }
 

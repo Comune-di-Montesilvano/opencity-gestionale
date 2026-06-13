@@ -24,9 +24,12 @@ func (h *BandiHandler) ListBandi(w http.ResponseWriter, r *http.Request) {
 			visibili = append(visibili, b)
 		}
 	}
+	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "bandi.html", map[string]any{
-		"Op":    op,
-		"Bandi": visibili,
+		"Op":        op,
+		"Bandi":     visibili,
+		"Flash":     flash,
+		"FlashType": flashType,
 	})
 }
 
@@ -62,14 +65,14 @@ func (h *BandiHandler) PostBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/bandi/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	http.Redirect(w, r, "/bandi/"+strconv.FormatInt(id, 10)+"?flash=Bando+creato&flashType=success", http.StatusSeeOther)
 }
 
 func (h *BandiHandler) GetBando(w http.ResponseWriter, r *http.Request) {
 	id := bandoIDFromPath(r)
 	b, err := db.GetBando(h.DB, id)
 	if err != nil {
-		http.NotFound(w, r)
+		notFound(w, r)
 		return
 	}
 	op := middleware.FromContext(r.Context())
@@ -78,10 +81,27 @@ func (h *BandiHandler) GetBando(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runs, _ := db.ListRuns(h.DB, b.ID)
+	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "bando_dettaglio.html", map[string]any{
-		"Op":   op,
+		"Op":        op,
+		"Bando":     b,
+		"Runs":      runs,
+		"Flash":     flash,
+		"FlashType": flashType,
+	})
+}
+
+func (h *BandiHandler) GetEditBando(w http.ResponseWriter, r *http.Request) {
+	id := bandoIDFromPath(r)
+	b, err := db.GetBando(h.DB, id)
+	if err != nil {
+		notFound(w, r)
+		return
+	}
+	op := middleware.FromContext(r.Context())
+	renderTemplate(w, "bando_form.html", map[string]any{
+		"Op":    op,
 		"Bando": b,
-		"Runs": runs,
 	})
 }
 
@@ -108,7 +128,7 @@ func (h *BandiHandler) PutBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore aggiornamento: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/bandi/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	http.Redirect(w, r, "/bandi/"+strconv.FormatInt(id, 10)+"?flash=Bando+aggiornato&flashType=success", http.StatusSeeOther)
 }
 
 func (h *BandiHandler) DeleteBando(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +137,7 @@ func (h *BandiHandler) DeleteBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/bandi", http.StatusSeeOther)
+	http.Redirect(w, r, "/bandi?flash=Bando+disattivato&flashType=success", http.StatusSeeOther)
 }
 
 func bandoIDFromPath(r *http.Request) int64 {
