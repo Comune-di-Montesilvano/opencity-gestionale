@@ -80,7 +80,7 @@ func (h *BandiHandler) GetBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
 		return
 	}
-	runs, _ := db.ListRuns(h.DB, b.ID)
+	runs, _ := db.ListRuns(h.DB, b.ID, !op.IsAdmin())
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "bando_dettaglio.html", map[string]any{
 		"Op":        op,
@@ -123,6 +123,9 @@ func (h *BandiHandler) PutBando(w http.ResponseWriter, r *http.Request) {
 	b.EngineType = r.FormValue("engine_type")
 	if b.EngineType == "" {
 		b.EngineType = "mense_rette"
+	}
+	if ec := strings.TrimSpace(r.FormValue("engine_config")); ec != "" {
+		b.EngineConfig = ec
 	}
 	if err := db.UpdateBando(h.DB, b); err != nil {
 		http.Error(w, "Errore aggiornamento: "+err.Error(), http.StatusInternalServerError)

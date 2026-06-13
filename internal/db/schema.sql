@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS graduatorie_run (
   num_ammesse  INTEGER,
   num_escluse  INTEGER,
   budget_usato REAL,
-  note         TEXT
+  note         TEXT,
+  stato        TEXT NOT NULL DEFAULT 'bozza'
 );
 
 CREATE TABLE IF NOT EXISTS audit_actions (

@@ -21,5 +21,7 @@ func Open(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	// Migration idempotente: aggiunge stato se la colonna non esiste ancora (DB pre-esistenti).
+	_, _ = db.Exec(`ALTER TABLE graduatorie_run ADD COLUMN stato TEXT NOT NULL DEFAULT 'bozza'`)
 	return db, nil
 }

@@ -37,12 +37,13 @@ function avviaCalcolo(form) {
 {{else}}
 <table class="table">
   <thead>
-    <tr><th>ID</th><th>Calcolata da</th><th>Data</th><th>Ammesse</th><th>Escluse</th><th>Budget usato</th><th></th></tr>
+    <tr><th>ID</th><th>Stato</th><th>Calcolata da</th><th>Data</th><th>Ammesse</th><th>Escluse</th><th>Budget usato</th><th></th></tr>
   </thead>
   <tbody>
   {{range .Runs}}
   <tr>
     <td>#{{.ID}}</td>
+    <td>{{if eq .Stato "pubblicata"}}<span class="badge badge-green">Pubblicata</span>{{else}}<span class="badge badge-gray">Bozza</span>{{end}}</td>
     <td>{{.CalcolataDa}}</td>
     <td>{{.CalcolataAt.Format "02/01/2006 15:04"}}</td>
     <td>{{.NumAmmesse}}</td>

@@ -71,14 +71,8 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 	}
 
 	datiJSON, _ := json.Marshal(grad)
-	numAmmesse := 0
-	for _, pa := range grad.PerAnno {
-		numAmmesse += graduatoria.ContaAmmesse(pa.Rette) + graduatoria.ContaAmmesse(pa.Mense)
-	}
-	var budgetUsato float64
-	for _, pa := range grad.PerAnno {
-		budgetUsato += pa.BudgetUsatoRette + pa.BudgetUsatoMense
-	}
+	numAmmesse := grad.TotaleAmmesse()
+	budgetUsato := grad.TotaleBudgetUsato()
 
 	run := &db.GraduatoriaRun{
 		BandoID:     bando.ID,
@@ -127,6 +121,10 @@ func (h *GraduatoriaHandler) GetRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
 		return
 	}
+	if !op.IsAdmin() && run.Stato == "bozza" {
+		http.Error(w, "Graduatoria non ancora pubblicata", http.StatusForbidden)
+		return
+	}
 
 	var grad graduatoria.Graduatoria
 	if err := json.Unmarshal([]byte(run.DatiJSON), &grad); err != nil {
@@ -134,11 +132,14 @@ func (h *GraduatoriaHandler) GetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "run_dettaglio.html", map[string]any{
-		"Op":    op,
-		"Bando": bando,
-		"Run":   run,
-		"Grad":  &grad,
+		"Op":        op,
+		"Bando":     bando,
+		"Run":       run,
+		"Grad":      &grad,
+		"Flash":     flash,
+		"FlashType": flashType,
 	})
 }
 
@@ -255,4 +256,37 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 		cw.Write(engine.CSVRecord(cat, riga))
 	}
 	cw.Flush()
+}
+
+// PostPubblica — pubblica una run (da bozza a pubblicata). Solo admin.
+func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Solo gli amministratori possono pubblicare", http.StatusForbidden)
+		return
+	}
+	bandoID := bandoIDFromPath(r)
+	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
+
+	run, err := db.GetRun(h.DB, runID)
+	if err != nil || run.BandoID != bandoID {
+		http.NotFound(w, r)
+		return
+	}
+	if run.Stato != "bozza" {
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Già+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
+		return
+	}
+	if err := db.PubblicaRun(h.DB, runID); err != nil {
+		http.Error(w, "Errore pubblicazione: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	db.InsertAudit(h.DB, &db.AuditAction{
+		Operatore: op.Username,
+		Azione:    "pubblica",
+		BandoID:   bandoID,
+		RunID:     runID,
+		Esito:     "ok",
+	})
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
 }

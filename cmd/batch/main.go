@@ -9,7 +9,8 @@ import (
 	"strconv"
 
 	"opencity-gestionale/internal/graduatoria"
-	_ "opencity-gestionale/internal/graduatoria/mense" // registra engine mense_rette
+	_ "opencity-gestionale/internal/graduatoria/generic" // registra engine generico
+	_ "opencity-gestionale/internal/graduatoria/mense"   // registra engine mense_rette
 	"opencity-gestionale/internal/opencity"
 )
 

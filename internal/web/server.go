@@ -75,6 +75,9 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("GET /bandi/{id}/run/{runID}/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetRunTabella)))
 	mux.Handle("GET /bandi/{id}/run/{runID}/export/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetExportCSV)))
 
+	// Pubblica run (admin)
+	mux.Handle("POST /bandi/{id}/run/{runID}/pubblica", authMW(middleware.RequireAdmin(http.HandlerFunc(grad.PostPubblica))))
+
 	// Bulk actions
 	mux.Handle("POST /bandi/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))
 	mux.Handle("POST /bandi/{id}/run/{runID}/rifiuta-batch", authMW(http.HandlerFunc(acts.PostRifiutaBatch)))

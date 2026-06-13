@@ -17,12 +17,13 @@ type GraduatoriaRun struct {
 	NumEscluse  int
 	BudgetUsato float64
 	Note        string
+	Stato       string // "bozza" | "pubblicata"
 }
 
 func InsertRun(db *sql.DB, r *GraduatoriaRun) (int64, error) {
 	res, err := db.Exec(
-		`INSERT INTO graduatorie_run (bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, note)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO graduatorie_run (bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, note, stato)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'bozza')`,
 		r.BandoID, r.CalcolataDa, r.CalcolataAt.UTC().Format(time.RFC3339),
 		r.DatiJSON, r.NumTotale, r.NumAmmesse, r.NumEscluse, r.BudgetUsato, r.Note,
 	)
@@ -32,10 +33,16 @@ func InsertRun(db *sql.DB, r *GraduatoriaRun) (int64, error) {
 	return res.LastInsertId()
 }
 
-func ListRuns(db *sql.DB, bandoID int64) ([]*GraduatoriaRun, error) {
-	rows, err := db.Query(
-		`SELECT id, bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, COALESCE(note,'')
-		 FROM graduatorie_run WHERE bando_id = ? ORDER BY id DESC`, bandoID)
+// ListRuns restituisce le run per un bando.
+// Se soloPublicate è true, filtra solo quelle in stato 'pubblicata' (per operatori non-admin).
+func ListRuns(db *sql.DB, bandoID int64, soloPublicate ...bool) ([]*GraduatoriaRun, error) {
+	q := `SELECT id, bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, COALESCE(note,''), COALESCE(stato,'bozza')
+		  FROM graduatorie_run WHERE bando_id = ?`
+	if len(soloPublicate) > 0 && soloPublicate[0] {
+		q += ` AND stato = 'pubblicata'`
+	}
+	q += ` ORDER BY id DESC`
+	rows, err := db.Query(q, bandoID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +60,7 @@ func ListRuns(db *sql.DB, bandoID int64) ([]*GraduatoriaRun, error) {
 
 func GetRun(db *sql.DB, id int64) (*GraduatoriaRun, error) {
 	row := db.QueryRow(
-		`SELECT id, bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, COALESCE(note,'')
+		`SELECT id, bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, COALESCE(note,''), COALESCE(stato,'bozza')
 		 FROM graduatorie_run WHERE id = ?`, id)
 	r, err := scanRun(row)
 	if err == sql.ErrNoRows {
@@ -62,11 +69,16 @@ func GetRun(db *sql.DB, id int64) (*GraduatoriaRun, error) {
 	return r, err
 }
 
+func PubblicaRun(db *sql.DB, id int64) error {
+	_, err := db.Exec(`UPDATE graduatorie_run SET stato = 'pubblicata' WHERE id = ?`, id)
+	return err
+}
+
 func scanRun(s scanner) (*GraduatoriaRun, error) {
 	var r GraduatoriaRun
 	var atStr string
 	err := s.Scan(&r.ID, &r.BandoID, &r.CalcolataDa, &atStr, &r.DatiJSON,
-		&r.NumTotale, &r.NumAmmesse, &r.NumEscluse, &r.BudgetUsato, &r.Note)
+		&r.NumTotale, &r.NumAmmesse, &r.NumEscluse, &r.BudgetUsato, &r.Note, &r.Stato)
 	if err != nil {
 		return nil, err
 	}

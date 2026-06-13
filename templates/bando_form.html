@@ -29,10 +29,22 @@
   </div>
   <div class="form-group">
     <label>Engine</label>
-    <select name="engine_type">
-      <option value="mense_rette" {{if and .Bando (eq .Bando.EngineType "mense_rette")}}selected{{end}}>Rette e mense scolastiche</option>
+    <select name="engine_type" id="engine_type" onchange="toggleEngineConfig()">
+      <option value="mense_rette" {{if and .Bando (eq .Bando.EngineType "mense_rette")}}selected{{end}}>Rette e mense scolastiche (legacy)</option>
+      <option value="generic" {{if and .Bando (eq .Bando.EngineType "generic")}}selected{{end}}>Generico (configurabile)</option>
     </select>
   </div>
+  <div class="form-group" id="engine-config-group" style="{{if and .Bando (eq .Bando.EngineType "generic")}}{{else}}display:none{{end}}">
+    <label>Engine Config (JSON)</label>
+    <textarea name="engine_config" rows="20" style="font-family:monospace;width:100%">{{if .Bando}}{{.Bando.EngineConfig}}{{else}}{}{{end}}</textarea>
+    <small class="text-muted">Mapping campo→path JSON, filtri, ordinamento, tipologie e rimborso.</small>
+  </div>
+  <script>
+  function toggleEngineConfig() {
+    var sel = document.getElementById('engine_type').value;
+    document.getElementById('engine-config-group').style.display = sel === 'generic' ? '' : 'none';
+  }
+  </script>
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">Salva</button>
     <a href="/bandi" class="btn btn-secondary">Annulla</a>

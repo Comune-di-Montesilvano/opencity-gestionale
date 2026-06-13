@@ -48,19 +48,74 @@ docker compose up
 `ServiceEngine` interface in `internal/graduatoria/service.go`. Ogni engine si auto-registra via `func init()`:
 
 ```go
-// internal/graduatoria/mense/engine.go
 func init() { graduatoria.Register(&Engine{}) }
 ```
 
-Il binario deve importare l'engine con blank import per triggerare `init()`:
+Il binario deve importare l'engine con blank import per triggerare `init()`. Sia `cmd/server/main.go` che `cmd/batch/main.go` importano entrambi:
 ```go
-import _ "opencity-backend/internal/graduatoria/mense"
+import _ "opencity-gestionale/internal/graduatoria/generic"
+import _ "opencity-gestionale/internal/graduatoria/mense"
 ```
-Sia `cmd/server/main.go` che `cmd/batch/main.go` lo fanno. **Aggiungere un nuovo engine**: crea `internal/graduatoria/<nome>/engine.go`, implementa `ServiceEngine`, aggiungi blank import in entrambi i binari.
+
+**Engine registrati**:
+- `mense_rette` — engine legacy hardcoded per bando rette/mense FSE+ 2026
+- `generic` — engine configurabile via `engine_config` JSON (qualsiasi bando)
+
+**Aggiungere un nuovo engine**: crea `internal/graduatoria/<nome>/engine.go`, implementa `ServiceEngine`, aggiungi blank import in entrambi i binari.
+
+### Engine generico (`internal/graduatoria/generic/`)
+
+Supporta qualsiasi bando FSE+ tramite configurazione JSON in `bandi.engine_config`. La struttura `EngineConfig` è definita in `internal/graduatoria/config.go`.
+
+**Struttura `EngineConfig`**:
+```json
+{
+  "mapping": {
+    "isee":   { "path": "ordinary_economic_situation_indicator.isee", "tipo": "float" },
+    "tipo":   { "path": "tiporichiesta", "expand": true },
+    "data_presentazione": { "path": "$app:submitted_at", "tipo": "time" }
+  },
+  "espansione": "anni",
+  "filtri": [
+    { "campo": "isee", "op": "<=", "valore": 40000 },
+    { "campo": "corrispettivo_netto", "op": ">", "valore": 0 }
+  ],
+  "deduplicazione": { "attiva": true, "chiave": ["figlio_cf", "annualita", "tipo"] },
+  "ordinamento": [{ "campo": "isee", "dir": "asc" }],
+  "tipologie": [
+    { "nome": "rette", "campo": "tipo", "valore": "rette", "priorita": 1, "budget": { "tipo": "residuo" } }
+  ],
+  "rimborso": { "tipo": "netto", "campo_lordo": "corrispettivo", "campo_deduzione": "beneficio" }
+}
+```
+
+**Sintassi path**:
+- `"foo.bar.baz"` — navigazione oggetto annidato nel payload `data`
+- `"$app:submitted_at"` — campo top-level di `Application` (id, submitted_at, protocol_number, status)
+- `"tipo": "count"` — lunghezza array
+- `"expand": true` — campo relativo a ogni elemento dell'array `espansione`
+
+**Campi derivati**: `corrispettivo_netto = corrispettivo - beneficio` calcolato automaticamente se `rimborso.tipo == "netto"`.
+
+**Budget tipologia**: `"tipo": "residuo"` (tutto il residuo dopo priorità superiori) | `"percentuale"` | `"fisso"`.
+
+Il package `internal/graduatoria/extractor/` espone `Float`, `Str`, `Count`, `Time`, `ArrayElements`, `AppField` per navigazione dot-notation su `json.RawMessage`.
+
+Il tipo `Record` (`internal/graduatoria/record.go`) raccoglie i campi estratti (FloatMap, StringMap, IntMap, TimeMap) e si converte in `*Istanza` via `ToIstanza()` per compatibilità con i template.
 
 ### Graduatoria serializzata in SQLite come JSON blob
 
-`graduatorie_run.dati_json` contiene `json.Marshal(grad)` dove `grad` è `*graduatoria.Graduatoria`. I campi di `Istanza`, `RigaGraduatoria`, `GraduatoriaAnnualita` non hanno tag JSON — vengono serializzati con il nome del campo Go. **Non rinominare quei campi** senza una migrazione dati, altrimenti le run salvate non si deserializzano.
+`graduatorie_run.dati_json` contiene `json.Marshal(grad)` dove `grad` è `*graduatoria.Graduatoria`. I campi di `Istanza`, `RigaGraduatoria`, `GraduatoriaAnnualita`, `GraduatoriaGruppo` non hanno tag JSON — vengono serializzati con il nome del campo Go. **Non rinominare quei campi** senza una migrazione dati, altrimenti le run salvate non si deserializzano.
+
+`Graduatoria` ha due sezioni distinte:
+- `PerAnno []*GraduatoriaAnnualita` — usata dall'engine `mense_rette` (split per annualità + tipo)
+- `Gruppi []*GraduatoriaGruppo` — usata dall'engine `generic` (una voce per tipologia)
+
+I template controllano quale campo è popolato: `{{if .Grad.PerAnno}}` / `{{if .Grad.Gruppi}}`.
+
+### Workflow pubblicazione run
+
+Le run vengono create in stato `'bozza'` (`graduatorie_run.stato`). Solo l'admin può pubblicarle (`POST /bandi/{id}/run/{runID}/pubblica`). Gli operatori non-admin vedono solo le run `'pubblicata'` — `db.ListRuns` accetta un parametro opzionale `soloPublicate bool`.
 
 ### Auth completamente delegata a OpenCity
 
@@ -178,10 +233,12 @@ Escluse: 22 ritirate, 17 duplicati, 5 ISEE=0, 5 corrispettivo netto=0.
 
 ## Schema SQLite (`internal/db/schema.sql`)
 
-- `bandi`: configurazione bando per servizio (budget, ISEE max, engine_type, scadenza)
-- `graduatorie_run`: snapshot `Graduatoria` serializzata come JSON blob in `dati_json`
-- `audit_actions`: ogni approve/reject/calcola con esito e messaggio
+- `bandi`: configurazione bando per servizio (budget, ISEE max, engine_type, engine_config, scadenza)
+- `graduatorie_run`: snapshot `Graduatoria` come JSON blob in `dati_json`; colonna `stato` (`'bozza'`|`'pubblicata'`)
+- `audit_actions`: ogni approve/reject/calcola/pubblica con esito e messaggio
 - `sessioni`: JWT OpenCity + metadati operatore; scade dopo 10 giorni
+
+La colonna `stato` in `graduatorie_run` è aggiunta via `ALTER TABLE` idempotente in `db.Open()` per compatibilità con DB pre-esistenti.
 
 ## Output CLI batch (`output/`)
 

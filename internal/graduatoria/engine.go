@@ -86,9 +86,39 @@ type GraduatoriaAnnualita struct {
 	BudgetUsatoMense float64
 }
 
+// GraduatoriaGruppo rappresenta una tipologia nel risultato dell'engine generico.
+type GraduatoriaGruppo struct {
+	Nome        string
+	Righe       []RigaGraduatoria
+	BudgetUsato float64
+}
+
 type Graduatoria struct {
-	PerAnno []*GraduatoriaAnnualita
+	PerAnno []*GraduatoriaAnnualita // mense_rette engine
+	Gruppi  []*GraduatoriaGruppo    // generic engine
 	Escluse []RigaGraduatoria
+}
+
+func (g *Graduatoria) TotaleAmmesse() int {
+	count := 0
+	for _, pa := range g.PerAnno {
+		count += ContaAmmesse(pa.Rette) + ContaAmmesse(pa.Mense)
+	}
+	for _, gr := range g.Gruppi {
+		count += ContaAmmesse(gr.Righe)
+	}
+	return count
+}
+
+func (g *Graduatoria) TotaleBudgetUsato() float64 {
+	var tot float64
+	for _, pa := range g.PerAnno {
+		tot += pa.BudgetUsatoRette + pa.BudgetUsatoMense
+	}
+	for _, gr := range g.Gruppi {
+		tot += gr.BudgetUsato
+	}
+	return tot
 }
 
 func ParseIstanze(app opencity.Application) ([]*Istanza, error) {
