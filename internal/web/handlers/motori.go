@@ -45,9 +45,10 @@ var campiLogiciStandard = []CampoLogico{
 // CampoLogicoConValore arricchisce CampoLogico con i valori correnti dell'engine_config.
 type CampoLogicoConValore struct {
 	CampoLogico
-	Path   string
-	Tipo   string
-	Expand bool
+	Path     string
+	Tipo     string
+	Expand   bool
+	PDNDPath string
 }
 
 // --- Lista motori ---
@@ -225,6 +226,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 				Path:        path,
 				Tipo:        tipo,
 				Expand:      fm.Expand,
+				PDNDPath:    fm.PDNDPath,
 			})
 		}
 		renderTemplate(w, "motore_wizard_step3.html", map[string]any{
@@ -315,9 +317,10 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			cfg.Mapping[cl.Nome] = graduatoria.FieldMapping{
-				Path:   path,
-				Tipo:   r.FormValue("tipo_" + cl.Nome),
-				Expand: r.FormValue("expand_"+cl.Nome) == "1",
+				Path:     path,
+				Tipo:     r.FormValue("tipo_" + cl.Nome),
+				Expand:   r.FormValue("expand_"+cl.Nome) == "1",
+				PDNDPath: strings.TrimSpace(r.FormValue("pdnd_" + cl.Nome)),
 			}
 		}
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {

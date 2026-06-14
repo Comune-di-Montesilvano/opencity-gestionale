@@ -35,7 +35,7 @@
 
       <table class="table">
         <thead>
-          <tr><th>Campo logico</th><th>Descrizione</th><th>Path JSON</th><th>Tipo</th><th>Array?</th></tr>
+          <tr><th>Campo logico</th><th>Descrizione</th><th>Path JSON</th><th>Tipo</th><th>Array?</th><th title="Path del campo firma PDND (es. ordinary_economic_situation_indicator.meta.signature). Lascia vuoto se il campo non ha certificazione PDND.">Firma PDND</th></tr>
         </thead>
         <tbody>
         {{range .CampiLogici}}
@@ -58,6 +58,11 @@
           </td>
           <td style="text-align:center">
             <input type="checkbox" name="expand_{{.Nome}}" value="1" {{if .Expand}}checked{{end}} title="Espandi array">
+          </td>
+          <td>
+            <input type="text" name="pdnd_{{.Nome}}" value="{{.PDNDPath}}"
+              class="form-control form-control-sm" list="percorsi-json"
+              placeholder="path firma (vuoto = no PDND)">
           </td>
         </tr>
         {{end}}
