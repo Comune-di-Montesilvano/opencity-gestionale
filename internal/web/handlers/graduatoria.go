@@ -259,6 +259,130 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 	cw.Flush()
 }
 
+// GetRunGruppo — tabella righe per un gruppo dell'engine generic.
+func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
+	nome := r.PathValue("nome")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	run, err := db.GetRun(h.DB, runID)
+	if err != nil || run.BandoID != bandoID {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	if !op.IsAdmin() && run.Stato == "bozza" {
+		http.Error(w, "Graduatoria non ancora pubblicata", http.StatusForbidden)
+		return
+	}
+
+	var grad graduatoria.Graduatoria
+	json.Unmarshal([]byte(run.DatiJSON), &grad)
+
+	var righe []graduatoria.RigaGraduatoria
+	for _, g := range grad.Gruppi {
+		if g.Nome == nome {
+			righe = g.Righe
+			break
+		}
+	}
+
+	renderTemplate(w, "run_tabella_gruppo.html", map[string]any{
+		"Op":      op,
+		"Bando":   bando,
+		"Run":     run,
+		"Nome":    nome,
+		"Righe":   righe,
+		"RunID":   runID,
+		"BandoID": bandoID,
+	})
+}
+
+// GetExportCSVGruppo — CSV export per un gruppo dell'engine generic.
+func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
+	nome := r.PathValue("nome")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	run, err := db.GetRun(h.DB, runID)
+	if err != nil || run.BandoID != bandoID {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	var grad graduatoria.Graduatoria
+	json.Unmarshal([]byte(run.DatiJSON), &grad)
+
+	var righe []graduatoria.RigaGraduatoria
+	for _, g := range grad.Gruppi {
+		if g.Nome == nome {
+			righe = g.Righe
+			break
+		}
+	}
+
+	filename := fmt.Sprintf("run%d_%s.csv", runID, nome)
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+	cw.Write([]string{"Posizione", "ID", "CF Richiedente", "CF Figlio", "ISEE", "Rimborso", "Ammessa", "Note"})
+	for _, riga := range righe {
+		ammessa := "no"
+		if riga.Ammessa {
+			ammessa = "si"
+		}
+		isee := ""
+		rimborso := ""
+		cfFiglio := ""
+		cfRich := ""
+		if riga.Istanza != nil {
+			isee = fmt.Sprintf("%.2f", riga.Istanza.ISEE)
+			cfFiglio = riga.Istanza.FiglioSelezionatoCF
+			cfRich = riga.Istanza.RichiedenteCF
+		}
+		if riga.Ammessa {
+			rimborso = fmt.Sprintf("%.2f", riga.ImportoRimborso)
+		}
+		cw.Write([]string{
+			fmt.Sprintf("%d", riga.Posizione),
+			func() string {
+				if riga.Istanza != nil {
+					return riga.Istanza.ID
+				}
+				return ""
+			}(),
+			cfRich,
+			cfFiglio,
+			isee,
+			rimborso,
+			ammessa,
+			riga.NoteEsclusione,
+		})
+	}
+	cw.Flush()
+}
+
 // PostPubblica — pubblica una run (da bozza a pubblicata). Solo admin.
 func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())

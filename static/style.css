@@ -109,10 +109,44 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 /* Pagination */
 .pagination { display: flex; gap: .5rem; margin-top: 1rem; }
 
-/* Wizard */
+/* Wizard (legacy) */
 .wizard { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-.wizard-step { margin-bottom: 1.5rem; }
-.wizard-step h2 { font-size: 15px; margin-bottom: .75rem; }
+
+/* Wizard step indicator */
+.wizard-steps { display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: .5rem; flex-wrap: wrap; }
+.wizard-step { padding: .35rem 1rem; font-size: 12px; font-weight: 500; color: #94a3b8; }
+.wizard-step-active { color: #2563eb; font-weight: 700; }
+
+/* Wizard two-column layout */
+.wizard-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+.wizard-col-side { position: sticky; top: 1rem; }
+
+/* JSON viewer */
+.json-viewer { max-height: 70vh; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+.json-viewer .table { box-shadow: none; border-radius: 0; }
+
+/* Inline rows (filtri, ordinamento) */
+.filtro-row, .ordine-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .4rem; flex-wrap: wrap; }
+.filtro-row .form-control, .ordine-row .form-control { width: auto; flex: 1; min-width: 100px; }
+
+/* Tipologia card row */
+.tipologia-row { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; padding: .75rem; background: #f8fafc; border-radius: 6px; margin-bottom: .5rem; border: 1px solid #e2e8f0; }
+.tipologia-row .form-group { margin-bottom: 0; flex: 1; min-width: 90px; }
+
+/* Form grid */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+
+/* Table actions column */
+.td-actions { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
+
+/* form-control-sm */
+.form-control-sm { padding: .3rem .55rem !important; font-size: 12px !important; }
+
+/* Tab bar */
+.tab-bar { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid #e2e8f0; }
+.tab { padding: .5rem 1.25rem; font-size: 13px; font-weight: 500; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -2px; display: inline-block; }
+.tab:hover { color: #1e3a5f; text-decoration: none; }
+.tab-active { color: #2563eb; border-bottom-color: #2563eb; }
 
 /* Misc */
 .text-muted { color: #94a3b8; }

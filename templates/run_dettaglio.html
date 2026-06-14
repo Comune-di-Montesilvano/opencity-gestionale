@@ -47,8 +47,12 @@
 
 {{if .Grad.Gruppi}}
 {{range .Grad.Gruppi}}
-<h2>{{.Nome}} ({{len .Righe}})</h2>
-<p class="text-muted">Budget usato: €{{printf "%.2f" .BudgetUsato}}</p>
+<div class="anno-section" style="margin-bottom:1rem">
+  <h3>{{.Nome}} ({{len .Righe}})</h3>
+  <p>Budget usato: €{{printf "%.2f" .BudgetUsato}}</p>
+  <a href="/motori/{{$.Bando.ID}}/run/{{$.Run.ID}}/gruppo/{{.Nome}}" class="btn btn-secondary btn-sm">Visualizza tabella</a>
+  <a href="/motori/{{$.Bando.ID}}/run/{{$.Run.ID}}/export/gruppo/{{.Nome}}" class="btn btn-sm">CSV</a>
+</div>
 {{end}}
 {{end}}
 
