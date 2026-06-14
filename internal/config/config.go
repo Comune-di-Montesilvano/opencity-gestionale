@@ -13,6 +13,7 @@ type Config struct {
 	SecretKey       string
 	AdminUsernames  []string
 	TrustProxy      bool // TRUST_PROXY=true → cookie Secure quando dietro reverse proxy HTTPS
+	DevMode         bool // DEV=true → abilita /dev/reload-templates
 }
 
 func Load() (*Config, error) {
@@ -54,6 +55,7 @@ func Load() (*Config, error) {
 		SecretKey:       secret,
 		AdminUsernames:  admins,
 		TrustProxy:      os.Getenv("TRUST_PROXY") == "true",
+		DevMode:         os.Getenv("DEV") == "true",
 	}, nil
 }
 

@@ -94,14 +94,19 @@ function selectAll() {
   updateCount();
 }
 
+const MSG_APPROVA = 'Il Comune di Montesilvano comunica che la Sua domanda è stata accolta e il rimborso verrà erogato secondo le modalità indicate nel bando.';
+const MSG_RIFIUTA = 'Il Comune di Montesilvano comunica che la Sua domanda non può essere accolta per esaurimento delle risorse disponibili.';
+
 function openModal(action) {
   currentAction = action;
   const checked = document.querySelectorAll('.pratica-check:checked');
   if (checked.length === 0) return;
   document.getElementById('modal-title').textContent = action === 'approva' ? 'Approva pratiche' : 'Rifiuta pratiche';
   document.getElementById('modal-desc').textContent = checked.length + ' pratiche selezionate';
+  document.getElementById('modal-message').value = action === 'approva' ? MSG_APPROVA : MSG_RIFIUTA;
   document.getElementById('modal-overlay').style.display = 'flex';
   document.getElementById('modal-result').style.display = 'none';
+  document.getElementById('modal-confirm').disabled = false;
 }
 
 function closeModal() {
@@ -126,8 +131,10 @@ async function confirmBatch() {
   const okCount = (data.ok || []).length;
   const errCount = Object.keys(data.errori || {}).length;
   resultEl.innerHTML = '<p class="text-success">' + okCount + ' pratiche elaborate con successo.</p>' +
-    (errCount > 0 ? '<p class="text-danger">' + errCount + ' errori.</p>' : '');
+    (errCount > 0 ? '<p class="text-danger">' + errCount + ' errori.</p>' : '') +
+    (okCount > 0 ? '<p class="text-muted" style="font-size:12px">Ricarico pagina...</p>' : '');
   document.getElementById('modal-confirm').disabled = false;
+  if (okCount > 0) { setTimeout(() => location.reload(), 2000); }
 }
 </script>
 {{end}}

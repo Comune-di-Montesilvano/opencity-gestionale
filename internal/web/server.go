@@ -81,5 +81,14 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	// Audit
 	mux.Handle("GET /audit", authMW(http.HandlerFunc(auditH.GetAudit)))
 
+	// Dev only
+	if cfg.DevMode {
+		mux.HandleFunc("GET /dev/reload-templates", func(w http.ResponseWriter, r *http.Request) {
+			handlers.ReloadTemplates()
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write([]byte("template ricaricati"))
+		})
+	}
+
 	return middleware.Recovery(middleware.SecurityHeaders(mux))
 }
