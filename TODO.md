@@ -12,12 +12,14 @@
 ### Gestionale
 
 - [ ] **Paginazione runs**: `ListRuns` ritorna tutte le run senza paging — aggiungere `LIMIT/OFFSET` + paginazione UI per bandi con molte run
+- [ ] **Wizard mapping step 3**: mostrare campo `PDNDPath` per ogni campo mappato (path della firma PDND, es. `ordinary_economic_situation_indicator.meta.signature`)
+- [ ] **Istruttoria — link pratica OpenCity**: nella dashboard istruttoria, aggiungere link diretto alla pratica su OpenCity per ogni riga
 
 ---
 
 ## Sicurezza
 
-- [ ] Rate limiting su `POST /login` — prevenire brute force credenziali OpenCity
+- [x] Rate limiting su `POST /login` — implementato, max 5 tentativi/IP in 15 min → HTTP 429
 
 ---
 
@@ -31,19 +33,8 @@
 
 ## Testing
 
-- [ ] Unit test `internal/graduatoria/engine_test.go`: `CalcolaConConfig` con fixture JSON (5-10 istanze anonimizzate)
-- [ ] Unit test `internal/graduatoria/checks_test.go`: `BonusNidiCoerente`, `IseeScaduto`, `IseeDaVerificare`
 - [ ] Integration test handler login: mock OpenCity con `httptest.NewServer` che ritorna JWT fisso
-
----
-
-## Futuri engine (multi-servizio)
-
-- [ ] **Libri di testo** (`aeffaacf-adad-461b-83f0-ee3d95d87f31`, 629 istanze)
-- [ ] **Centri estivi** (`05a37702-0710-43eb-8165-3a11fc766f49`, 161 istanze)
-- [ ] **Rimborso viaggio riabilitazione** (`10987e1d-afa3-4b53-83fb-ef2c2db04cdb`, 7 istanze)
-
-Per ogni engine: implementare `ServiceEngine` interface, registrare via `init()` in entrambi i binari.
+- [ ] Test istruttoria: unit test `FlagMotivi` con record PDND/non-PDND e filtri_flag custom
 
 ---
 
@@ -51,19 +42,20 @@ Per ogni engine: implementare `ServiceEngine` interface, registrare via `init()`
 
 ✅ Completato e compilante:
 
-- CLI batch: fetch → calcola → CSV + HTML prospetto operatori
-- `internal/graduatoria`: engine `mense_rette` legacy, engine `generic` configurabile, ServiceEngine interface, checks, CSV helpers
-- `internal/opencity/client.go`: Login/NewClient/Approve/Reject/GetUser/FetchServices
-- `internal/db`: SQLite WAL, schema embedded, CRUD bandi/runs/audit/sessioni, pulizia sessioni scadute
+- `internal/graduatoria/cf`: helper puri CF italiano — EtaAnni, AnnoBirth, Sesso, ComuneNascita, Valido (checksum Agenzia Entrate)
+- `internal/graduatoria`: engine `generic` universale con `EngineConfig.Modalita` (fondi/posti/ammissione/lista_attesa), 26+ operatori PassaFiltro (numerico/stringa/booleano/data/CF), VerificaConfig, PDNDPath in FieldMapping
+- `internal/graduatoria/generic`: dispatch per modalità, buildGraduatoria* per ogni tipo, EstraiRecords esportato
+- `internal/db`: tabella `istruttorie` con UpsertIstruttoria, BatchSetStato, CountPending, ListEscluse, GetIstruttoriaStats
+- `internal/opencity/client.go`: Login/NewClient/Approve/Reject/GetUser/FetchServices/FetchAllApplications
 - `internal/config`: env vars con validazione
-- Web server: router Go 1.22+, middleware auth/admin/recovery/security-headers
-- Motori wizard (6 step): connessione servizio → mapping campi → filtri → tipologie/ordinamento/dedup → rimborso → test+attiva
-- Engine generico: `EngineConfig` JSON, filtri, deduplicazione, espansione per-anno, mapping dot-notation
-- Workflow pubblicazione run: bozza → pubblicata (solo admin), operatori vedono solo pubblicate
+- Web server: router Go 1.22+, middleware auth/admin/rate-limit/recovery/security-headers
+- Motori wizard (7 step adattivi): connessione servizio → tipo bando → mapping campi → filtri + istruttoria → tipologie (skip ammissione/lista_attesa) → rimborso (solo fondi) → test+attiva
+- Istruttoria pre-calcolo: `/motori/{id}/istruttoria` dashboard, scansiona app, approva/escludi batch, calcolo bloccato se pending
+- Workflow pubblicazione run: bozza → pubblicata (solo admin)
 - Documento stampabile: `/stampa` con colonne configurabili, CF oscurato, `@media print` CSS
 - Dashboard: mostra solo motori attivi, ultima run per operatore
-- Audit trail: insert su ogni azione, view con filtri operatore/azione/bando
+- Audit trail: insert su ogni azione (calcola/approva/rifiuta/pubblica/istruttoria_*), view con filtri
 - Bulk approve/reject: HTMX modal, JSON response, audit logging
-- Template HTML: 20+ template con pattern `base.html` + block
+- Template HTML: 25+ template con pattern `base.html` + block
 - Dockerfile multi-stage distroless + docker-compose + GitHub Actions CI/CD (test → build → GHCR → release)
-- `.env` locale, `.env.example`, `.gitignore`
+- Test: 66 subtests PassaFiltro, 5 test engine (4 modalità + dedup), test CF, test DB CRUD
