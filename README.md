@@ -6,13 +6,16 @@ Sviluppato per il **Comune di Montesilvano** — adattabile a qualsiasi ente che
 
 ## Funzionalità
 
-- **Calcolo graduatorie** — fetch istanze da OpenCity API v2, calcolo con algoritmo configurabile (budget, ISEE, de-duplicazione per figlio/anno/tipo)
-- **Multi-bando** — ogni servizio OpenCity ha il suo bando con parametri indipendenti
+- **Wizard motore di calcolo** — configura un nuovo bando in 6 step guidati: connetti servizio OpenCity → mappa campi → filtri → tipologie/ordinamento/deduplicazione → rimborso → test e attiva
+- **Engine generico configurabile** — qualsiasi bando FSE+ configurabile via JSON (mapping campi, filtri, de-duplicazione per figlio/anno/tipo, budget per tipologia)
+- **Calcolo graduatorie** — fetch istanze da OpenCity API v2, calcolo con algoritmo configurabile
+- **Documento stampabile** — genera prospetto graduatoria anonimizzato (CF oscurato) con colonne configurabili, stampa direttamente da browser → PDF
 - **Bulk approve/reject** — approva o rifiuta pratiche in massa con messaggio personalizzato direttamente su OpenCity
-- **Audit trail** — ogni azione (calcolo, approvazione, rifiuto) tracciata con operatore, esito e messaggio
+- **Audit trail** — ogni azione (calcolo, approvazione, rifiuto, pubblicazione) tracciata con operatore, esito e messaggio
 - **Auth delegata a OpenCity** — le credenziali sono quelle del portale operatori, nessuna gestione password separata
 - **Export CSV** — graduatorie esportabili con separatore `;` compatibile con Excel italiano
 - **CLI batch** — modalità non interattiva per produzione CSV + prospetto HTML operatori
+- **Workflow pubblicazione** — le graduatorie nascono in bozza (visibili solo agli admin), vengono pubblicate quando pronte
 
 ## Stack
 
@@ -37,10 +40,8 @@ Sviluppato per il **Comune di Montesilvano** — adattabile a qualsiasi ente che
 git clone https://github.com/Comune-di-Montesilvano/opencity-gestionale.git
 cd opencity-gestionale
 
-DB_PATH=./dev.db \
-OPENCITY_BASE_URL=https://service.comune.montesilvano.pe.it \
-SECRET_KEY=devdevdevdevdevdevdevdevdevdevdev \
-ADMIN_USERNAMES=tuousername \
+cp .env.example .env
+# modifica .env con le credenziali reali
 go run ./cmd/server
 ```
 
@@ -57,6 +58,7 @@ docker compose up -d
 ### CLI batch (CSV + HTML)
 
 ```bash
+# richiede OPENCITY_USERNAME e OPENCITY_PASSWORD in .env
 go run ./cmd/batch
 # output in ./output/
 ```
@@ -71,6 +73,22 @@ go run ./cmd/batch
 | `DB_PATH` | `gestionale.db` | Path file SQLite |
 | `PORT` | `8080` | Porta HTTP |
 | `TRUST_PROXY` | `false` | `true` se dietro reverse proxy HTTPS (abilita cookie `Secure`) |
+| `OPENCITY_USERNAME` | — | Solo per `cmd/batch`: username operatore API |
+| `OPENCITY_PASSWORD` | — | Solo per `cmd/batch`: password operatore API |
+
+## Prima configurazione
+
+Al primo avvio il database è vuoto. Accedi con un account admin e vai su `/motori/nuovo`:
+
+1. **Connetti servizio** — verifica connettività verso OpenCity, carica lista servizi disponibili
+2. **Configura** — nome motore, budget totale, ISEE massimo
+3. **Mappa campi** — visualizza il JSON reale delle istanze (campo → valore) e mappa i campi logici
+4. **Filtri** — aggiungi criteri di esclusione automatica (es. ISEE > 40000)
+5. **Tipologie** — definisci le categorie di rimborso con priorità e budget
+6. **Rimborso** — scegli modalità netto/lordo e campi sorgente
+7. **Test + Attiva** — esegui il motore su una istanza campione, poi attiva
+
+Il motore è disponibile agli operatori non appena attivato.
 
 ## Deploy in produzione
 
@@ -82,28 +100,20 @@ cp .env.example .env
 chmod 600 .env
 # Modifica .env
 
-./deploy.sh  # docker compose pull && up -d
+docker compose up -d
 ```
 
-Per aggiornare: crea un tag Git → CI pubblica nuova immagine su GHCR → `./deploy.sh` sul server.
+Per aggiornare: crea un tag Git → CI pubblica nuova immagine su GHCR → pull sul server.
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 # attendi CI (~2 min)
-ssh server "cd /opt/gestionale && ./deploy.sh"
+ssh server "cd /opt/gestionale && docker compose pull && docker compose up -d"
 ```
-
-## Prima configurazione (setup wizard)
-
-Al primo avvio il database è vuoto. Il wizard è accessibile da `/setup` dopo il login con un account admin:
-
-1. **Verifica connessione** — testa la connettività verso OpenCity e carica la lista servizi disponibili
-2. **Configura bandi** — per ogni servizio: nome, budget totale, ISEE massimo, scadenza, engine di calcolo
-3. **Salva** → redirect alla dashboard
 
 ## Aggiungere un nuovo engine di calcolo
 
-Ogni tipologia di bando ha il suo engine. Per aggiungerne uno:
+L'engine `generic` copre la maggior parte dei bandi FSE+. Se serve logica custom:
 
 1. Crea `internal/graduatoria/<nome>/engine.go`
 2. Implementa `graduatoria.ServiceEngine` (`Name`, `Calcola`, `CSVHeaders`, `CSVRecord`)
@@ -112,9 +122,10 @@ Ogni tipologia di bando ha il suo engine. Per aggiungerne uno:
 
 Engine disponibili:
 
-| Engine | Servizio |
-|--------|---------|
-| `mense_rette` | Rimborso spese rette e mense scolastiche (FSE+ Abruzzo 2021-2027) |
+| Engine | Uso |
+|--------|-----|
+| `generic` | Qualsiasi bando FSE+ — configurabile via wizard senza codice |
+| `mense_rette` | Engine legacy hardcoded per rette e mense FSE+ Abruzzo 2026 |
 
 ## Licenza
 

@@ -1,8 +1,0 @@
-{{define "setup_step2_result.html"}}
-<div class="alert alert-success">
-  {{if .Creati}}{{.Creati}} bandi creati. {{end}}
-  {{if .Aggiornati}}{{.Aggiornati}} bandi aggiornati. {{end}}
-  {{if .Saltati}}<span class="text-warning">{{.Saltati}} saltati (budget mancante).</span>{{end}}
-</div>
-<a href="/dashboard" class="btn btn-primary">Vai alla dashboard →</a>
-{{end}}

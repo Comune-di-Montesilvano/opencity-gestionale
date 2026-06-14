@@ -113,9 +113,37 @@ Il tipo `Record` (`internal/graduatoria/record.go`) raccoglie i campi estratti (
 
 I template controllano quale campo è popolato: `{{if .Grad.PerAnno}}` / `{{if .Grad.Gruppi}}`.
 
+### Wizard motore (`internal/web/handlers/motori.go`)
+
+Creare un motore di calcolo richiede 6 step via wizard (`/motori/wizard/*`). Ogni step salva subito in DB — il wizard è riprendibile da bozza.
+
+| Step | Route | Cosa fa |
+|------|-------|---------|
+| 1 | `GET /motori/nuovo` | Connette servizio OpenCity (HTMX fetch lista servizi) |
+| 2 | `POST /motori/wizard/crea` + `GET /motori/{id}/wizard/2` | Seleziona servizio, nome, budget, ISEE max |
+| 3 | `GET/POST /motori/{id}/wizard/3` | Mapping campi (flat JSON viewer → datalist) |
+| 4 | `GET/POST /motori/{id}/wizard/4` | Filtri (righe add/remove) |
+| 5 | `GET/POST /motori/{id}/wizard/5` | Tipologie + ordinamento + deduplicazione |
+| 6 | `GET/POST /motori/{id}/wizard/6` | Rimborso netto/lordo |
+| finale | `GET /motori/{id}/wizard/fine` | Test engine (HTMX) + attiva → `stato_motore = 'attivo'` |
+
+`saveEngineConfig` in `motori.go` serializza la `EngineConfig` corrente e la salva in `bandi.engine_config`. I motori attivi appaiono in `/motori` per tutti gli operatori con accesso al servizio.
+
 ### Workflow pubblicazione run
 
-Le run vengono create in stato `'bozza'` (`graduatorie_run.stato`). Solo l'admin può pubblicarle (`POST /bandi/{id}/run/{runID}/pubblica`). Gli operatori non-admin vedono solo le run `'pubblicata'` — `db.ListRuns` accetta un parametro opzionale `soloPublicate bool`.
+Le run vengono create in stato `'bozza'` (`graduatorie_run.stato`). Solo l'admin può pubblicarle (`POST /motori/{id}/run/{runID}/pubblica`). Gli operatori non-admin vedono solo le run `'pubblicata'` — `db.ListRuns` accetta un parametro opzionale `soloPublicate bool`.
+
+### Documento stampabile (`templates/run_stampa.html`)
+
+`GET /motori/{id}/run/{runID}/stampa` — pagina con form checkbox colonne + tabella anonimizzata. Colonne configurabili via query param `?col=posizione&col=protocollo&col=cf&col=isee&col=importo&col=ammessa`.
+
+FuncMap aggiuntive in `handlers/render.go`:
+- `cfOscurato(cf)` → `"RSS***01Z"` (primi 3 + `***` + ultimi 3)
+- `protocolloBreve(id)` → `"…" + ultimi 8 char`
+- `hasCol(cols []string, col string) bool` — controlla se colonna selezionata
+- `join(s []string, sep string) string`
+
+Il template gestisce entrambi i layout: `{{if .Grad.Gruppi}}` per engine generic, `{{if .Grad.PerAnno}}` per engine mense_rette (Rette e Mense come blocchi separati). CSS `@media print` in `static/style.css` nasconde `.no-print` e `.navbar`.
 
 ### Auth completamente delegata a OpenCity
 
@@ -147,7 +175,35 @@ Pattern usato in tutti i template:
 
 ### Router Go 1.22+
 
-`net/http` stdlib con pattern `METHOD /path/{param}`. Parametri via `r.PathValue("param")`. Nessun router esterno. `PUT` e `DELETE` non supportati nativamente dai form HTML — usare `POST /bandi/{id}/disattiva` al posto di `DELETE`.
+`net/http` stdlib con pattern `METHOD /path/{param}`. Parametri via `r.PathValue("param")`. Nessun router esterno. `PUT` e `DELETE` non supportati nativamente dai form HTML — usare `POST /motori/{id}/archivia` al posto di `DELETE`.
+
+Route principali (da `internal/web/server.go`):
+```
+GET  /motori                              lista motori
+GET  /motori/nuovo                        wizard step 1
+POST /motori/wizard/connetti              HTMX: lista servizi OpenCity
+POST /motori/wizard/crea                  crea motore bozza
+GET  /motori/{id}/wizard/{step}           wizard step N
+POST /motori/{id}/wizard/{step}           salva step N
+POST /motori/{id}/wizard/test             HTMX: test engine
+POST /motori/{id}/wizard/attiva           attiva motore
+GET  /motori/{id}                         dettaglio motore
+POST /motori/{id}/duplica                 duplica
+POST /motori/{id}/archivia                archivia
+POST /motori/{id}/run                     calcola graduatoria
+GET  /motori/{id}/run/{runID}             dettaglio run
+GET  /motori/{id}/run/{runID}/{anno}/{tipo}  tabella per anno/tipo
+GET  /motori/{id}/run/{runID}/gruppo/{nome}  tabella per gruppo (generic)
+GET  /motori/{id}/run/{runID}/export/{anno}/{tipo}  CSV
+GET  /motori/{id}/run/{runID}/export/gruppo/{nome}  CSV gruppo
+POST /motori/{id}/run/{runID}/pubblica    pubblica run (admin only)
+GET  /motori/{id}/run/{runID}/stampa      documento stampabile
+POST /motori/{id}/run/{runID}/approva-batch
+POST /motori/{id}/run/{runID}/rifiuta-batch
+GET  /audit                               audit trail
+```
+
+`bandoIDFromPath(r)` e `parseFloat(s)` in `handlers/helpers.go` — usati da graduatoria e motori handler.
 
 ## OpenCity API — Istanza Montesilvano
 
