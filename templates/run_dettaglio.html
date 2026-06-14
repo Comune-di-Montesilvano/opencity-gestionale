@@ -19,6 +19,10 @@
 </form>
 {{end}}
 
+<div style="margin-bottom:1rem">
+  <a href="/motori/{{.Bando.ID}}/run/{{.Run.ID}}/stampa" class="btn btn-secondary" target="_blank">Stampa documento graduatoria</a>
+</div>
+
 <div class="stats-row">
   <div class="stat"><span class="stat-value">{{.Run.NumAmmesse}}</span><span class="stat-label">Ammesse</span></div>
   <div class="stat"><span class="stat-value">{{.Run.NumEscluse}}</span><span class="stat-label">Escluse</span></div>

@@ -1,0 +1,171 @@
+{{define "run_stampa.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Graduatoria — {{.Bando.Nome}}{{end}}
+
+{{define "content"}}
+<!-- Controlli (nascosti in stampa) -->
+<div class="no-print" style="margin-bottom:1.5rem">
+  <div class="page-header">
+    <h1>Documento graduatoria</h1>
+    <a href="/motori/{{.Bando.ID}}/run/{{.Run.ID}}" class="btn btn-secondary btn-sm">← Run</a>
+  </div>
+
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;background:#fff;padding:1rem;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:1rem">
+    <div>
+      <strong style="font-size:12px;text-transform:uppercase;color:#475569;display:block;margin-bottom:.4rem">Colonne da includere</strong>
+      <div style="display:flex;flex-wrap:wrap;gap:.75rem">
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="posizione" {{if hasCol .Colonne "posizione"}}checked{{end}}> Posizione
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="protocollo" {{if hasCol .Colonne "protocollo"}}checked{{end}}> N. Protocollo
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="cf" {{if hasCol .Colonne "cf"}}checked{{end}}> CF richiedente (oscurato)
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="cf_figlio" {{if hasCol .Colonne "cf_figlio"}}checked{{end}}> CF figlio (oscurato)
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="isee" {{if hasCol .Colonne "isee"}}checked{{end}}> ISEE
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="importo" {{if hasCol .Colonne "importo"}}checked{{end}}> Importo assegnato
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="ammessa" {{if hasCol .Colonne "ammessa"}}checked{{end}}> Stato
+        </label>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="note" {{if hasCol .Colonne "note"}}checked{{end}}> Note
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button type="submit" class="btn btn-secondary btn-sm">Aggiorna</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Stampa / Salva PDF</button>
+    </div>
+  </form>
+</div>
+
+<!-- Documento stampabile -->
+<div class="stampa-doc">
+  <div class="stampa-header">
+    <h1>Comune di Montesilvano</h1>
+    <h2>{{.Bando.Nome}}</h2>
+    <p>Graduatoria run #{{.Run.ID}} — calcolata il {{.Run.CalcolataAt.Format "02/01/2006 15:04"}} da {{.Run.CalcolataDa}}</p>
+    <p>Ammesse: {{.Run.NumAmmesse}} | Budget assegnato: €{{printf "%.2f" .Run.BudgetUsato}}</p>
+  </div>
+
+  {{if .Grad.Gruppi}}
+  {{range .Grad.Gruppi}}
+  <div class="stampa-sezione">
+    <h3>{{.Nome}} — {{len .Righe}} istanze (budget: €{{printf "%.2f" .BudgetUsato}})</h3>
+    <table class="stampa-table">
+      <thead>
+        <tr>
+          {{if hasCol $.Colonne "posizione"}}<th>#</th>{{end}}
+          {{if hasCol $.Colonne "protocollo"}}<th>Protocollo</th>{{end}}
+          {{if hasCol $.Colonne "cf"}}<th>CF richiedente</th>{{end}}
+          {{if hasCol $.Colonne "cf_figlio"}}<th>CF figlio</th>{{end}}
+          {{if hasCol $.Colonne "isee"}}<th>ISEE (€)</th>{{end}}
+          {{if hasCol $.Colonne "importo"}}<th>Importo (€)</th>{{end}}
+          {{if hasCol $.Colonne "ammessa"}}<th>Stato</th>{{end}}
+          {{if hasCol $.Colonne "note"}}<th>Note</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Righe}}
+      <tr{{if not .Ammessa}} class="stampa-esclusa"{{end}}>
+        {{if hasCol $.Colonne "posizione"}}<td>{{.Posizione}}</td>{{end}}
+        {{if hasCol $.Colonne "protocollo"}}<td>{{if .Istanza}}{{protocolloBreve .Istanza.ID}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "cf"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.RichiedenteCF}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "cf_figlio"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.FiglioSelezionatoCF}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "isee"}}<td>{{if .Istanza}}{{printf "%.2f" .Istanza.ISEE}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "importo"}}<td>{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "ammessa"}}<td>{{if .Ammessa}}✓{{else}}✗{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "note"}}<td>{{.NoteEsclusione}}</td>{{end}}
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+  {{end}}
+
+  {{if .Grad.PerAnno}}
+  {{range .Grad.PerAnno}}
+  <div class="stampa-sezione">
+    <h3>Annualità {{.Annualita}}</h3>
+    {{$colonne := $.Colonne}}
+
+    {{if .Rette}}
+    <h4>Rette ({{len .Rette}})</h4>
+    <table class="stampa-table">
+      <thead>
+        <tr>
+          {{if hasCol $colonne "posizione"}}<th>#</th>{{end}}
+          {{if hasCol $colonne "protocollo"}}<th>Protocollo</th>{{end}}
+          {{if hasCol $colonne "cf"}}<th>CF richiedente</th>{{end}}
+          {{if hasCol $colonne "cf_figlio"}}<th>CF figlio</th>{{end}}
+          {{if hasCol $colonne "isee"}}<th>ISEE (€)</th>{{end}}
+          {{if hasCol $colonne "importo"}}<th>Importo (€)</th>{{end}}
+          {{if hasCol $colonne "ammessa"}}<th>Stato</th>{{end}}
+          {{if hasCol $colonne "note"}}<th>Note</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Rette}}
+      <tr{{if not .Ammessa}} class="stampa-esclusa"{{end}}>
+        {{if hasCol $colonne "posizione"}}<td>{{.Posizione}}</td>{{end}}
+        {{if hasCol $colonne "protocollo"}}<td>{{if .Istanza}}{{protocolloBreve .Istanza.ID}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "cf"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.RichiedenteCF}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "cf_figlio"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.FiglioSelezionatoCF}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "isee"}}<td>{{if .Istanza}}{{printf "%.2f" .Istanza.ISEE}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "importo"}}<td>{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
+        {{if hasCol $colonne "ammessa"}}<td>{{if .Ammessa}}✓{{else}}✗{{end}}</td>{{end}}
+        {{if hasCol $colonne "note"}}<td>{{.NoteEsclusione}}</td>{{end}}
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{end}}
+
+    {{if .Mense}}
+    <h4>Mense ({{len .Mense}})</h4>
+    <table class="stampa-table">
+      <thead>
+        <tr>
+          {{if hasCol $colonne "posizione"}}<th>#</th>{{end}}
+          {{if hasCol $colonne "protocollo"}}<th>Protocollo</th>{{end}}
+          {{if hasCol $colonne "cf"}}<th>CF richiedente</th>{{end}}
+          {{if hasCol $colonne "cf_figlio"}}<th>CF figlio</th>{{end}}
+          {{if hasCol $colonne "isee"}}<th>ISEE (€)</th>{{end}}
+          {{if hasCol $colonne "importo"}}<th>Importo (€)</th>{{end}}
+          {{if hasCol $colonne "ammessa"}}<th>Stato</th>{{end}}
+          {{if hasCol $colonne "note"}}<th>Note</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Mense}}
+      <tr{{if not .Ammessa}} class="stampa-esclusa"{{end}}>
+        {{if hasCol $colonne "posizione"}}<td>{{.Posizione}}</td>{{end}}
+        {{if hasCol $colonne "protocollo"}}<td>{{if .Istanza}}{{protocolloBreve .Istanza.ID}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "cf"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.RichiedenteCF}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "cf_figlio"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.FiglioSelezionatoCF}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "isee"}}<td>{{if .Istanza}}{{printf "%.2f" .Istanza.ISEE}}{{end}}</td>{{end}}
+        {{if hasCol $colonne "importo"}}<td>{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
+        {{if hasCol $colonne "ammessa"}}<td>{{if .Ammessa}}✓{{else}}✗{{end}}</td>{{end}}
+        {{if hasCol $colonne "note"}}<td>{{.NoteEsclusione}}</td>{{end}}
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{end}}
+
+  </div>
+  {{end}}
+  {{end}}
+</div>
+{{end}}

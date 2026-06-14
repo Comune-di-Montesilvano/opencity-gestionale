@@ -259,6 +259,49 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 	cw.Flush()
 }
 
+// GetStampa — pagina stampabile con colonne configurabili per una run.
+func (h *GraduatoriaHandler) GetStampa(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	run, err := db.GetRun(h.DB, runID)
+	if err != nil || run.BandoID != bandoID {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	if !op.IsAdmin() && run.Stato == "bozza" {
+		http.Error(w, "Graduatoria non ancora pubblicata", http.StatusForbidden)
+		return
+	}
+
+	var grad graduatoria.Graduatoria
+	json.Unmarshal([]byte(run.DatiJSON), &grad)
+
+	// Colonne selezionate da query param (default se assenti).
+	colParam := r.URL.Query()["col"]
+	if len(colParam) == 0 {
+		colParam = []string{"posizione", "protocollo", "cf", "isee", "importo", "ammessa"}
+	}
+
+	renderTemplate(w, "run_stampa.html", map[string]any{
+		"Op":      op,
+		"Bando":   bando,
+		"Run":     run,
+		"Grad":    &grad,
+		"Colonne": colParam,
+	})
+}
+
 // GetRunGruppo — tabella righe per un gruppo dell'engine generic.
 func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())

@@ -14,23 +14,23 @@ type DashboardHandler struct {
 
 func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
-	bandi, _ := db.ListBandi(h.DB)
+	motori, _ := db.ListMotori(h.DB, "attivo")
 
-	type bandoConRun struct {
-		Bando    *db.Bando
+	type motoreConRun struct {
+		Motore    *db.Bando
 		UltimaRun *db.GraduatoriaRun
 	}
-	var items []bandoConRun
-	for _, b := range bandi {
-		if !op.IsAdmin() && !op.CanAccessService(b.ServiceID) {
+	var items []motoreConRun
+	for _, m := range motori {
+		if !op.IsAdmin() && !op.CanAccessService(m.ServiceID) {
 			continue
 		}
-		runs, _ := db.ListRuns(h.DB, b.ID)
+		runs, _ := db.ListRuns(h.DB, m.ID, !op.IsAdmin())
 		var ultima *db.GraduatoriaRun
 		if len(runs) > 0 {
 			ultima = runs[0]
 		}
-		items = append(items, bandoConRun{Bando: b, UltimaRun: ultima})
+		items = append(items, motoreConRun{Motore: m, UltimaRun: ultima})
 	}
 
 	renderTemplate(w, "dashboard.html", map[string]any{

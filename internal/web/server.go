@@ -70,6 +70,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("GET /motori/{id}/run/{runID}/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetRunTabella)))
 	mux.Handle("GET /motori/{id}/run/{runID}/export/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetExportCSV)))
 	mux.Handle("POST /motori/{id}/run/{runID}/pubblica", authMW(middleware.RequireAdmin(http.HandlerFunc(grad.PostPubblica))))
+	mux.Handle("GET /motori/{id}/run/{runID}/stampa", authMW(http.HandlerFunc(grad.GetStampa)))
 	mux.Handle("GET /motori/{id}/run/{runID}/gruppo/{nome}", authMW(http.HandlerFunc(grad.GetRunGruppo)))
 	mux.Handle("GET /motori/{id}/run/{runID}/export/gruppo/{nome}", authMW(http.HandlerFunc(grad.GetExportCSVGruppo)))
 
