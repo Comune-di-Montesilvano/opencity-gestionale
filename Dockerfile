@@ -10,6 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 RUN mkdir /data
 
 FROM gcr.io/distroless/static:nonroot
+WORKDIR /
 COPY --from=builder --chown=65532:65532 /app/gestionale /gestionale
 COPY --from=builder --chown=65532:65532 /app/static /static
 COPY --from=builder --chown=65532:65532 /app/templates /templates

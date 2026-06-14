@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 )
 
 var (
-	tmplOnce  sync.Once
+	tmplMu    sync.Mutex
 	tmplCache *template.Template
 )
 
@@ -41,17 +42,31 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func loadTemplates() *template.Template {
-	tmplOnce.Do(func() {
-		tmplCache = template.Must(
-			template.New("").Funcs(funcMap).ParseGlob(filepath.Join("templates", "*.html")),
-		)
-	})
-	return tmplCache
+func loadTemplates() (*template.Template, error) {
+	tmplMu.Lock()
+	defer tmplMu.Unlock()
+	if tmplCache != nil {
+		return tmplCache, nil
+	}
+	// Prova prima ./templates (dev locale), poi /templates (Docker distroless).
+	glob := filepath.Join("templates", "*.html")
+	if m, _ := filepath.Glob(glob); len(m) == 0 {
+		glob = "/templates/*.html"
+	}
+	t, err := template.New("").Funcs(funcMap).ParseGlob(glob)
+	if err != nil {
+		return nil, fmt.Errorf("template parse (%s): %w", glob, err)
+	}
+	tmplCache = t
+	return tmplCache, nil
 }
 
 func renderTemplate(w http.ResponseWriter, name string, data any) {
-	t := loadTemplates()
+	t, err := loadTemplates()
+	if err != nil {
+		http.Error(w, "Errore caricamento template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, "Errore template: "+err.Error(), http.StatusInternalServerError)
@@ -60,7 +75,9 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 
 // ReloadTemplates forza ricarico in sviluppo.
 func ReloadTemplates() {
-	tmplOnce = sync.Once{}
+	tmplMu.Lock()
+	tmplCache = nil
+	tmplMu.Unlock()
 }
 
 func flashFromRequest(r *http.Request) (string, string) {
