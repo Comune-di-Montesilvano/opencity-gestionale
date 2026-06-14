@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"opencity-gestionale/internal/graduatoria"
 	_ "opencity-gestionale/internal/graduatoria/generic" // registra engine generico
@@ -17,11 +19,44 @@ import (
 const (
 	baseURL   = "https://service.comune.montesilvano.pe.it"
 	serviceID = "5756cd98-7fe6-4818-bad8-69a2c843b546"
-	username  = "apioperator"
-	password  = "REDACTED"
 )
 
+func loadDotEnv() {
+	f, err := os.Open(".env")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		if os.Getenv(strings.TrimSpace(k)) == "" {
+			os.Setenv(strings.TrimSpace(k), strings.TrimSpace(v))
+		}
+	}
+}
+
+func mustEnv(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		fmt.Fprintf(os.Stderr, "Variabile d'ambiente mancante: %s\n", key)
+		os.Exit(1)
+	}
+	return v
+}
+
 func main() {
+	loadDotEnv()
+	username := mustEnv("OPENCITY_USERNAME")
+	password := mustEnv("OPENCITY_PASSWORD")
+
 	fmt.Fprintln(os.Stderr, "Autenticazione...")
 	jwt, err := opencity.Login(baseURL, username, password)
 	if err != nil {
