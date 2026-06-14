@@ -35,7 +35,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 
 	// Pubbliche
 	mux.HandleFunc("GET /login", auth.GetLogin)
-	mux.HandleFunc("POST /login", auth.PostLogin)
+	mux.Handle("POST /login", middleware.LoginRateLimit(http.HandlerFunc(auth.PostLogin)))
 	mux.HandleFunc("GET /logout", auth.GetLogout)
 
 	// Statici

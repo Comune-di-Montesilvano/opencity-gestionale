@@ -1,10 +1,5 @@
 # TODO — Gestionale OpenCity
 
-## Bug noti
-
-- [ ] `render.go`: cache template con `sync.Once` non si ricarica in sviluppo — aggiungere route `GET /dev/reload-templates` gated su `DEV=true` env oppure rimuovere cache in dev
-- [ ] Audit paginazione: link "Precedente/Successiva" non porta i filtri attivi (operatore, azione, bando_id) — correggere URL costruzione in `audit.html`
-
 ---
 
 ## Feature pending
@@ -13,7 +8,6 @@
 
 - [ ] **Progress streaming**: `confirmBatch()` in `run_tabella.html` aspetta risposta JSON finale — per N > 50 pratiche aggiungere polling HTMX o SSE
 - [ ] **Stato pratiche già processate**: checkbox visibili anche per pratiche già approvate — filtrare per `Istanza.Status != "accept"` (campo già presente in struct)
-- [ ] **Messaggio precompilato**: textarea del modal vuota — precompilare con testo standard (costante per engine o campo `engine_config`)
 
 ### Gestionale
 
@@ -24,8 +18,6 @@
 ## Sicurezza
 
 - [ ] Rate limiting su `POST /login` — prevenire brute force credenziali OpenCity
-- [ ] Cookie `Secure: true` in produzione quando `TRUST_PROXY=true` (header `X-Forwarded-Proto: https`)
-- [ ] Verificare completezza header in `middleware/security.go`: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`
 
 ---
 

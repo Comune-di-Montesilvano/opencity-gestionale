@@ -13,6 +13,7 @@ import (
 
 	"opencity-gestionale/internal/db"
 	"opencity-gestionale/internal/opencity"
+	"opencity-gestionale/internal/web/middleware"
 )
 
 type AuthHandler struct {
@@ -38,6 +39,7 @@ func (h *AuthHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 
 	jwt, err := opencity.Login(h.BaseURL, username, password)
 	if err != nil {
+		middleware.RecordLoginFailure(r)
 		http.Redirect(w, r, "/login?error=Credenziali+non+valide", http.StatusSeeOther)
 		return
 	}
