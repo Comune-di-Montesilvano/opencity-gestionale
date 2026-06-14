@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"opencity-gestionale/internal/config"
@@ -16,7 +18,32 @@ import (
 
 var AppVersion = "dev"
 
+func loadDotEnv() {
+	f, err := os.Open(".env")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
+}
+
 func main() {
+	loadDotEnv()
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Configurazione: %v\n", err)
