@@ -33,11 +33,34 @@
   <div><strong>Creato</strong><br>{{.Motore.CreatedAt.Format "02/01/2006"}}</div>
 </div>
 
+{{if .Config.Verifica.Attiva}}
+<div class="anno-section" style="margin-bottom:1.5rem">
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+      <strong>Istruttoria pre-calcolo</strong>
+      {{if gt .IstruttoriaStats.DaVerificare 0}}
+      <span class="badge" style="background:#fef2f2;color:#dc2626;margin-left:.5rem">{{.IstruttoriaStats.DaVerificare}} da verificare</span>
+      {{else}}
+      <span class="badge badge-green" style="margin-left:.5rem">Completata</span>
+      {{end}}
+    </div>
+    <a href="/motori/{{.Motore.ID}}/istruttoria" class="btn btn-secondary btn-sm">Gestisci istruttoria</a>
+  </div>
+</div>
+{{end}}
+
 <div class="section-header">
   <h2>Graduatorie</h2>
   <form method="POST" action="/motori/{{.Motore.ID}}/run" onsubmit="avviaCalcolo(this)">
+    {{if and .Config.Verifica.Attiva (gt .IstruttoriaStats.DaVerificare 0)}}
+    <button type="submit" id="btn-calcola" class="btn btn-primary" disabled title="Completa l'istruttoria prima di calcolare">
+      Calcola nuova run
+    </button>
+    <span class="text-muted" style="font-size:.85rem"> — istruttoria incompleta</span>
+    {{else}}
     <button type="submit" id="btn-calcola" class="btn btn-primary">Calcola nuova run</button>
     <span id="calcolo-spinner" style="display:none" class="text-muted"> Calcolo in corso (30–60 sec)…</span>
+    {{end}}
   </form>
 </div>
 <script>

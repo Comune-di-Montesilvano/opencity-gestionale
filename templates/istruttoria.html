@@ -1,0 +1,145 @@
+{{define "istruttoria.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Istruttoria — {{.Bando.Nome}}{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Istruttoria</h1>
+  <span class="text-muted">{{.Bando.Nome}}</span>
+  <a href="/motori/{{.Bando.ID}}" class="btn btn-secondary btn-sm">← Motore</a>
+</div>
+
+{{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
+
+{{if not .Config.Verifica.Attiva}}
+<div class="alert alert-error">
+  Istruttoria non abilitata per questo bando. Abilita la sezione "Istruttoria" nel wizard step 4.
+</div>
+{{else}}
+
+<div class="stats-row" style="margin-bottom:1rem">
+  <div class="stat">
+    <span class="stat-value" style="{{if gt .Stats.DaVerificare 0}}color:#dc2626{{end}}">{{.Stats.DaVerificare}}</span>
+    <span class="stat-label">Da verificare</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value" style="color:#16a34a">{{.Stats.Approvate}}</span>
+    <span class="stat-label">Approvate</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value" style="color:#6b7280">{{.Stats.Escluse}}</span>
+    <span class="stat-label">Escluse</span>
+  </div>
+</div>
+
+{{if gt .Stats.DaVerificare 0}}
+<div class="alert alert-error" style="margin-bottom:1rem">
+  Calcolo graduatoria bloccato — {{.Stats.DaVerificare}} domande da verificare.
+</div>
+{{else}}
+<div class="alert alert-success" style="margin-bottom:1rem">
+  Istruttoria completata — puoi procedere al calcolo graduatoria.
+</div>
+{{end}}
+
+<div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap">
+  <form method="POST" action="/motori/{{.Bando.ID}}/istruttoria/scansiona" style="display:inline">
+    <button type="submit" class="btn btn-secondary" onclick="return confirm('Scansionare tutte le domande? Le domande già smarcate non vengono modificate.')">
+      Scansiona domande
+    </button>
+  </form>
+  <div style="display:flex;gap:.4rem">
+    <a href="/motori/{{.Bando.ID}}/istruttoria" class="btn btn-sm {{if eq .StatoFilter ""}}btn-primary{{else}}btn-secondary{{end}}">Tutte</a>
+    <a href="/motori/{{.Bando.ID}}/istruttoria?stato=da_verificare" class="btn btn-sm {{if eq .StatoFilter "da_verificare"}}btn-primary{{else}}btn-secondary{{end}}">Da verificare</a>
+    <a href="/motori/{{.Bando.ID}}/istruttoria?stato=approvata" class="btn btn-sm {{if eq .StatoFilter "approvata"}}btn-primary{{else}}btn-secondary{{end}}">Approvate</a>
+    <a href="/motori/{{.Bando.ID}}/istruttoria?stato=esclusa" class="btn btn-sm {{if eq .StatoFilter "esclusa"}}btn-primary{{else}}btn-secondary{{end}}">Escluse</a>
+  </div>
+</div>
+
+{{if .Istruttorie}}
+<form method="POST" action="/motori/{{.Bando.ID}}/istruttoria/batch" id="batch-form">
+<table class="table">
+  <thead>
+    <tr>
+      <th style="width:32px"><input type="checkbox" id="select-all" onclick="toggleAll(this)"></th>
+      <th>Pratica ID</th>
+      <th>Motivi</th>
+      <th>Stato</th>
+      <th>Operatore</th>
+      <th>Nota</th>
+      <th>Azioni rapide</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Istruttorie}}
+  <tr>
+    <td><input type="checkbox" name="ids" value="{{.ID}}" class="row-check"></td>
+    <td style="font-family:monospace;font-size:.8em">{{.PraticaID}}</td>
+    <td>
+      {{range .Motivi}}<span class="badge badge-gray" style="margin-right:.2rem">{{.}}</span>{{end}}
+    </td>
+    <td>
+      {{if eq .Stato "da_verificare"}}<span class="badge" style="background:#fef2f2;color:#dc2626">Da verificare</span>
+      {{else if eq .Stato "approvata"}}<span class="badge badge-green">Approvata</span>
+      {{else}}<span class="badge badge-gray">Esclusa</span>{{end}}
+    </td>
+    <td>{{.Operatore}}</td>
+    <td style="font-size:.85em;color:#64748b">{{.Nota}}</td>
+    <td style="white-space:nowrap">
+      {{if eq .Stato "da_verificare"}}
+      <button type="button" class="btn btn-sm btn-secondary"
+        onclick="azioneRapida({{.ID}}, 'approvata')">✓ Approva</button>
+      <button type="button" class="btn btn-sm btn-danger"
+        onclick="azioneRapida({{.ID}}, 'esclusa')">✗ Escludi</button>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-top:1rem">
+  <strong style="font-size:.85rem">Azione batch sulle domande selezionate</strong>
+  <div style="display:flex;gap:.75rem;align-items:flex-end;margin-top:.5rem;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <label style="font-size:.8rem;display:block;margin-bottom:.25rem">Nota (opzionale)</label>
+      <textarea name="nota" class="form-control form-control-sm" rows="2" placeholder="Motivazione della decisione…"></textarea>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button type="submit" name="stato" value="approvata" class="btn btn-secondary">✓ Approva selezionate</button>
+      <button type="submit" name="stato" value="esclusa" class="btn btn-danger"
+        onclick="return confirm('Escludere le domande selezionate dalla graduatoria?')">✗ Escludi selezionate</button>
+    </div>
+  </div>
+</div>
+</form>
+{{else}}
+<p class="text-muted">
+  {{if .StatoFilter}}Nessuna domanda con stato "{{.StatoFilter}}".
+  {{else}}Nessuna domanda flaggata. Premi "Scansiona domande" per avviare la rilevazione.{{end}}
+</p>
+{{end}}
+
+{{end}}
+
+<script>
+function toggleAll(cb) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+}
+function azioneRapida(id, stato) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/motori/{{.Bando.ID}}/istruttoria/batch`;
+  const inp = document.createElement('input');
+  inp.type = 'hidden'; inp.name = 'ids'; inp.value = id;
+  const st = document.createElement('input');
+  st.type = 'hidden'; st.name = 'stato'; st.value = stato;
+  form.appendChild(inp);
+  form.appendChild(st);
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+{{end}}

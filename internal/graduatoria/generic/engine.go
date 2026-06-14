@@ -241,9 +241,22 @@ func popolaCampo(rec *graduatoria.Record, nome string, fm graduatoria.FieldMappi
 			return fmt.Errorf("impossibile parsare %q come time", val)
 		}
 		rec.StringMap[nome] = val
-		return nil
+	} else {
+		if err := popolaCampoRaw(rec, nome, fm, data); err != nil {
+			return err
+		}
 	}
-	return popolaCampoRaw(rec, nome, fm, data)
+	// Se il campo ha un PDNDPath, estrai la firma di certificazione come __cert_{nome}
+	if fm.PDNDPath != "" {
+		sig, _ := extractor.Str(data, fm.PDNDPath)
+		rec.StringMap["__cert_"+nome] = sig
+	}
+	return nil
+}
+
+// EstraiRecords è la versione esportata di estraiRecord, usata dall'istruttoria.
+func EstraiRecords(app opencity.Application, cfg graduatoria.EngineConfig) ([]*graduatoria.Record, error) {
+	return estraiRecord(app, cfg)
 }
 
 func popolaCampoRaw(rec *graduatoria.Record, nome string, fm graduatoria.FieldMapping, data json.RawMessage) error {

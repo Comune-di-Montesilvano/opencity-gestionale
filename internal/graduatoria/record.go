@@ -9,6 +9,27 @@ import (
 	"opencity-gestionale/internal/graduatoria/cf"
 )
 
+// FlagMotivi controlla il record contro i criteri di verifica e restituisce
+// la lista dei motivi per cui la domanda deve essere esaminata manualmente.
+// Restituisce nil se la domanda non ha anomalie.
+func (r *Record) FlagMotivi(cfg VerificaConfig) []string {
+	var motivi []string
+	for _, f := range cfg.FiltriFlag {
+		if r.PassaFiltro(FiltroConfig{Campo: f.Campo, Op: f.Op, Valore: f.Valore}) {
+			motivi = append(motivi, f.Motivo)
+		}
+	}
+	if cfg.VerificaCertificazione {
+		for key, val := range r.StringMap {
+			if strings.HasPrefix(key, "__cert_") && val == "" {
+				fieldName := strings.TrimPrefix(key, "__cert_")
+				motivi = append(motivi, "Campo \""+fieldName+"\" non certificato PDND")
+			}
+		}
+	}
+	return motivi
+}
+
 // Record è il record estratto da un'istanza OpenCity tramite engine generico.
 // I campi sono indicizzati per nome logico (come definito in EngineConfig.Mapping).
 type Record struct {

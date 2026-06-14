@@ -83,6 +83,71 @@
     <a href="/motori/{{.Motore.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
     <button type="submit" class="btn btn-primary">Salva e continua →</button>
   </div>
+
+  <hr style="margin:2rem 0">
+
+  <h2>Istruttoria — verifica manuale pre-calcolo</h2>
+  <p class="text-muted">Le domande che soddisfano questi criteri vengono flaggate per revisione manuale. Il calcolo graduatoria è bloccato finché non sono tutte smarcate.</p>
+
+  <div style="margin-bottom:1rem">
+    <label style="display:flex;align-items:center;gap:.5rem;font-weight:600">
+      <input type="checkbox" name="verifica_attiva" value="1" {{if .Verifica.Attiva}}checked{{end}}>
+      Abilita fase istruttoria per questo bando
+    </label>
+  </div>
+
+  <div style="margin-bottom:.75rem">
+    <label style="display:flex;align-items:center;gap:.5rem">
+      <input type="checkbox" name="verifica_certificazione" value="1" {{if .Verifica.VerificaCertificazione}}checked{{end}}>
+      Flag automatico per campi con PDND Path non valorizzato (dati non certificati)
+    </label>
+  </div>
+
+  <div id="flag-container">
+  {{range $i, $f := .Verifica.FiltriFlag}}
+  <div class="filtro-row flag-row" style="align-items:center;gap:.5rem;display:flex;flex-wrap:wrap;margin-bottom:.4rem">
+    <select name="flag_campo" class="form-control form-control-sm" style="flex:1;min-width:120px">
+      <option value="">— campo —</option>
+      {{range $.CampiMappati}}
+      <option value="{{.}}" {{if eq . $f.Campo}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+    <select name="flag_op" class="form-control form-control-sm" style="flex:1;min-width:120px" onchange="aggiornaValoreFlag(this)">
+      <optgroup label="Numerico">
+        <option value="<="   {{if eq $f.Op "<="}}selected{{end}}>≤</option>
+        <option value=">="   {{if eq $f.Op ">="}}selected{{end}}>≥</option>
+        <option value="=="   {{if eq $f.Op "=="}}selected{{end}}>==</option>
+        <option value="!="   {{if eq $f.Op "!="}}selected{{end}}>≠</option>
+        <option value="<"    {{if eq $f.Op "<"}}selected{{end}}>&lt;</option>
+        <option value=">"    {{if eq $f.Op ">"}}selected{{end}}>&gt;</option>
+        <option value="tra"  {{if eq $f.Op "tra"}}selected{{end}}>tra (min,max)</option>
+      </optgroup>
+      <optgroup label="Stringa">
+        <option value="contiene"    {{if eq $f.Op "contiene"}}selected{{end}}>contiene</option>
+        <option value="inizia_con"  {{if eq $f.Op "inizia_con"}}selected{{end}}>inizia con</option>
+        <option value="finisce_con" {{if eq $f.Op "finisce_con"}}selected{{end}}>finisce con</option>
+        <option value="in"          {{if eq $f.Op "in"}}selected{{end}}>in lista</option>
+        <option value="non_in"      {{if eq $f.Op "non_in"}}selected{{end}}>non in lista</option>
+        <option value="vuoto"       {{if eq $f.Op "vuoto"}}selected{{end}}>vuoto</option>
+        <option value="non_vuoto"   {{if eq $f.Op "non_vuoto"}}selected{{end}}>non vuoto</option>
+      </optgroup>
+      <optgroup label="Booleano">
+        <option value="vero"  {{if eq $f.Op "vero"}}selected{{end}}>vero</option>
+        <option value="falso" {{if eq $f.Op "falso"}}selected{{end}}>falso</option>
+      </optgroup>
+      <optgroup label="CF">
+        <option value="cf_valido"  {{if eq $f.Op "cf_valido"}}selected{{end}}>CF valido</option>
+        <option value="cf_eta_max" {{if eq $f.Op "cf_eta_max"}}selected{{end}}>CF età max</option>
+        <option value="cf_sesso"   {{if eq $f.Op "cf_sesso"}}selected{{end}}>CF sesso</option>
+      </optgroup>
+    </select>
+    <input type="text" name="flag_valore" value="{{$f.Valore}}" class="form-control form-control-sm" placeholder="valore" style="flex:1;min-width:80px">
+    <input type="text" name="flag_motivo" value="{{$f.Motivo}}" class="form-control form-control-sm" placeholder="Motivo (es. ISEE non certificato PDND)" style="flex:2;min-width:180px">
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.flag-row').remove()">✕</button>
+  </div>
+  {{end}}
+  </div>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltroFlag()" style="margin-top:.4rem">+ Aggiungi criterio istruttoria</button>
 </form>
 
 <template id="filtro-tmpl">
@@ -132,7 +197,60 @@
   </div>
 </template>
 
+<template id="flag-tmpl">
+  <div class="filtro-row flag-row" style="align-items:center;gap:.5rem;display:flex;flex-wrap:wrap;margin-bottom:.4rem">
+    <select name="flag_campo" class="form-control form-control-sm" style="flex:1;min-width:120px">
+      <option value="">— campo —</option>
+      {{range .CampiMappati}}<option value="{{.}}">{{.}}</option>{{end}}
+    </select>
+    <select name="flag_op" class="form-control form-control-sm" style="flex:1;min-width:120px" onchange="aggiornaValoreFlag(this)">
+      <optgroup label="Numerico">
+        <option value="<=">&le;</option><option value=">=">&ge;</option>
+        <option value="==">=</option><option value="!=">≠</option>
+        <option value="<">&lt;</option><option value=">">&gt;</option>
+        <option value="tra">tra (min,max)</option>
+      </optgroup>
+      <optgroup label="Stringa">
+        <option value="contiene">contiene</option>
+        <option value="inizia_con">inizia con</option>
+        <option value="finisce_con">finisce con</option>
+        <option value="in">in lista</option>
+        <option value="non_in">non in lista</option>
+        <option value="vuoto">vuoto</option>
+        <option value="non_vuoto">non vuoto</option>
+      </optgroup>
+      <optgroup label="Booleano">
+        <option value="vero">vero</option>
+        <option value="falso">falso</option>
+      </optgroup>
+      <optgroup label="CF">
+        <option value="cf_valido">CF valido</option>
+        <option value="cf_eta_max">CF età max</option>
+        <option value="cf_sesso">CF sesso</option>
+      </optgroup>
+    </select>
+    <input type="text" name="flag_valore" class="form-control form-control-sm" placeholder="valore" style="flex:1;min-width:80px">
+    <input type="text" name="flag_motivo" class="form-control form-control-sm" placeholder="Motivo (es. ISEE non certificato PDND)" style="flex:2;min-width:180px">
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.flag-row').remove()">✕</button>
+  </div>
+</template>
+
 <script>
+function aggiungiFiltroFlag() {
+  const tmpl = document.getElementById('flag-tmpl').content.cloneNode(true);
+  document.getElementById('flag-container').appendChild(tmpl);
+}
+function aggiornaValoreFlag(sel) {
+  const input = sel.closest('.flag-row').querySelector('input[name="flag_valore"]');
+  if (NO_VALUE_OPS.has(sel.value)) {
+    input.value = '';
+    input.disabled = true;
+    input.placeholder = '—';
+  } else {
+    input.disabled = false;
+    input.placeholder = 'valore';
+  }
+}
 function aggiungiFiltro() {
   const tmpl = document.getElementById('filtro-tmpl').content.cloneNode(true);
   document.getElementById('filtri-container').appendChild(tmpl);

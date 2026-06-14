@@ -21,6 +21,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	grad := &handlers.GraduatoriaHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 	acts := &handlers.ActionsHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 	auditH := &handlers.AuditHandler{DB: dbConn}
+	istr := &handlers.IstruttoriaHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 
 	authMW := middleware.Auth(dbConn)
 
@@ -73,6 +74,11 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("GET /motori/{id}/run/{runID}/stampa", authMW(http.HandlerFunc(grad.GetStampa)))
 	mux.Handle("GET /motori/{id}/run/{runID}/gruppo/{nome}", authMW(http.HandlerFunc(grad.GetRunGruppo)))
 	mux.Handle("GET /motori/{id}/run/{runID}/export/gruppo/{nome}", authMW(http.HandlerFunc(grad.GetExportCSVGruppo)))
+
+	// Istruttoria pre-calcolo
+	mux.Handle("GET /motori/{id}/istruttoria", authMW(http.HandlerFunc(istr.GetIstruttoria)))
+	mux.Handle("POST /motori/{id}/istruttoria/scansiona", authMW(http.HandlerFunc(istr.PostScansiona)))
+	mux.Handle("POST /motori/{id}/istruttoria/batch", authMW(http.HandlerFunc(istr.PostIstruttoriaBatch)))
 
 	// Bulk actions
 	mux.Handle("POST /motori/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))

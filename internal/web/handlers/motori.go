@@ -241,6 +241,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"Op":           op,
 			"Motore":       bando,
 			"Filtri":       cfg.Filtri,
+			"Verifica":     cfg.Verifica,
 			"CampiMappati": campiMappati(cfg),
 		})
 
@@ -341,6 +342,42 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		cfg.Filtri = filtri
+
+		// Filtri istruttoria (verifica manuale pre-calcolo)
+		fCampi := r.Form["flag_campo"]
+		fOps := r.Form["flag_op"]
+		fValori := r.Form["flag_valore"]
+		fMotivi := r.Form["flag_motivo"]
+		var filtriFlag []graduatoria.FiltroFlagConfig
+		for i := range fCampi {
+			if fCampi[i] == "" {
+				continue
+			}
+			var valore any
+			if i < len(fValori) {
+				valore = parseFilterValue(fValori[i])
+			}
+			motivo := ""
+			if i < len(fMotivi) {
+				motivo = fMotivi[i]
+			}
+			op2 := ""
+			if i < len(fOps) {
+				op2 = fOps[i]
+			}
+			filtriFlag = append(filtriFlag, graduatoria.FiltroFlagConfig{
+				Campo:  fCampi[i],
+				Op:     op2,
+				Valore: valore,
+				Motivo: motivo,
+			})
+		}
+		cfg.Verifica = graduatoria.VerificaConfig{
+			Attiva:                 r.FormValue("verifica_attiva") == "1",
+			FiltriFlag:             filtriFlag,
+			VerificaCertificazione: r.FormValue("verifica_certificazione") == "1",
+		}
+
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -501,13 +538,18 @@ func (h *MotoriHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runs, _ := db.ListRuns(h.DB, bando.ID, !op.IsAdmin())
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+	istrStats, _ := db.GetIstruttoriaStats(h.DB, int(bando.ID))
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "motore_dettaglio.html", map[string]any{
-		"Op":        op,
-		"Motore":    bando,
-		"Runs":      runs,
-		"Flash":     flash,
-		"FlashType": flashType,
+		"Op":               op,
+		"Motore":           bando,
+		"Runs":             runs,
+		"Config":           ecfg,
+		"IstruttoriaStats": istrStats,
+		"Flash":            flash,
+		"FlashType":        flashType,
 	})
 }
 

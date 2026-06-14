@@ -39,6 +39,18 @@ CREATE TABLE IF NOT EXISTS audit_actions (
   created_at       TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS istruttorie (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  bando_id      INTEGER NOT NULL,
+  pratica_id    TEXT NOT NULL,
+  motivi_json   TEXT NOT NULL DEFAULT '[]',
+  stato         TEXT NOT NULL DEFAULT 'da_verificare',
+  nota          TEXT,
+  operatore     TEXT,
+  aggiornato_il TEXT,
+  UNIQUE(bando_id, pratica_id)
+);
+
 CREATE TABLE IF NOT EXISTS sessioni (
   id           TEXT PRIMARY KEY,
   operatore    TEXT NOT NULL,

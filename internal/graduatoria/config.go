@@ -11,12 +11,14 @@ type EngineConfig struct {
 	Modalita       string                  `json:"modalita"` // "fondi"|"posti"|"ammissione"|"lista_attesa"
 	Tipologie      []TipologiaConfig       `json:"tipologie"`
 	Rimborso       RimborsoConfig          `json:"rimborso"`
+	Verifica       VerificaConfig          `json:"verifica"`
 }
 
 type FieldMapping struct {
-	Path   string `json:"path"`
-	Tipo   string `json:"tipo"`   // "float" | "int" | "string" | "count" | "time"
-	Expand bool   `json:"expand"` // true = relativo a elemento array espansione
+	Path     string `json:"path"`
+	Tipo     string `json:"tipo"`              // "float" | "int" | "string" | "count" | "time"
+	Expand   bool   `json:"expand"`            // true = relativo a elemento array espansione
+	PDNDPath string `json:"pdnd_path,omitempty"` // path del campo firma/signature PDND (es. meta.signature)
 }
 
 type FiltroConfig struct {
@@ -53,4 +55,24 @@ type RimborsoConfig struct {
 	Tipo           string `json:"tipo"`            // "netto" | "lordo"
 	CampoLordo     string `json:"campo_lordo"`
 	CampoDeduzione string `json:"campo_deduzione"`
+}
+
+// VerificaConfig definisce i criteri di istruttoria pre-calcolo.
+// Se Attiva=true, il calcolo graduatoria è bloccato finché tutte le
+// domande flaggate non sono state smarcate dagli operatori.
+type VerificaConfig struct {
+	Attiva                 bool               `json:"attiva"`
+	FiltriFlag             []FiltroFlagConfig  `json:"filtri_flag"`
+	// VerificaCertificazione=true: flag automatico per ogni campo con PDNDPath configurato
+	// ma con firma vuota (dato non proveniente da PDND/fonte certificata).
+	VerificaCertificazione bool               `json:"verifica_certificazione"`
+}
+
+// FiltroFlagConfig è un filtro che, se soddisfatto, flagga la domanda
+// per verifica manuale. Motivo è la label mostrata all'operatore.
+type FiltroFlagConfig struct {
+	Campo  string `json:"campo"`
+	Op     string `json:"op"`
+	Valore any    `json:"valore,omitempty"`
+	Motivo string `json:"motivo"`
 }

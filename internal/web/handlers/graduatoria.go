@@ -56,6 +56,31 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// Istruttoria: blocca calcolo se ci sono domande da_verificare, filtra escluse.
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+	if ecfg.Verifica.Attiva {
+		pending, _ := db.CountPending(h.DB, int(bandoID))
+		if pending > 0 {
+			http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Istruttoria+incompleta:+%d+domande+da+verificare&flashType=error", bandoID, pending), http.StatusSeeOther)
+			return
+		}
+		escluse, _ := db.ListEscluse(h.DB, int(bandoID))
+		if len(escluse) > 0 {
+			excludeSet := make(map[string]bool, len(escluse))
+			for _, id := range escluse {
+				excludeSet[id] = true
+			}
+			filtered := apps[:0]
+			for _, app := range apps {
+				if !excludeSet[app.ID] {
+					filtered = append(filtered, app)
+				}
+			}
+			apps = filtered
+		}
+	}
+
 	cfg := graduatoria.BandoConfig{
 		BudgetTotale: bando.BudgetTotale,
 		ISEEMassimo:  bando.ISEEMassimo,
