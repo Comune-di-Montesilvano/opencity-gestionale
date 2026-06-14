@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 
 	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/graduatoria"
 	"opencity-gestionale/internal/web/middleware"
 )
 
@@ -17,8 +19,10 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 	motori, _ := db.ListMotori(h.DB, "attivo")
 
 	type motoreConRun struct {
-		Motore    *db.Bando
-		UltimaRun *db.GraduatoriaRun
+		Motore           *db.Bando
+		UltimaRun        *db.GraduatoriaRun
+		IstruttoriaStats db.IstruttoriaStats
+		VerificaAttiva   bool
 	}
 	var items []motoreConRun
 	for _, m := range motori {
@@ -30,7 +34,18 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		if len(runs) > 0 {
 			ultima = runs[0]
 		}
-		items = append(items, motoreConRun{Motore: m, UltimaRun: ultima})
+		var ecfg graduatoria.EngineConfig
+		json.Unmarshal([]byte(m.EngineConfig), &ecfg)
+		var istStats db.IstruttoriaStats
+		if ecfg.Verifica.Attiva {
+			istStats, _ = db.GetIstruttoriaStats(h.DB, int(m.ID))
+		}
+		items = append(items, motoreConRun{
+			Motore:           m,
+			UltimaRun:        ultima,
+			IstruttoriaStats: istStats,
+			VerificaAttiva:   ecfg.Verifica.Attiva,
+		})
 	}
 
 	renderTemplate(w, "dashboard.html", map[string]any{

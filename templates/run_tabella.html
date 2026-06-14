@@ -44,14 +44,14 @@
     </td>
     {{end}}
     <td>{{.Posizione}}</td>
-    <td><a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">{{.Istanza.RichiedenteCognome}} {{.Istanza.RichiedenteNome}}</a></td>
+    <td><a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">{{.Istanza.RichiedenteCognome}} {{.Istanza.RichiedenteNome}}</a></td>
     <td>{{if .Istanza.FiglioSelezionatoCF}}{{.Istanza.FiglioSelezionatoCF}}{{else}}<span class="badge badge-yellow">CF mancante</span>{{end}}</td>
     <td>€{{printf "%.2f" .Istanza.ISEE}}</td>
     <td>€{{printf "%.2f" (.CorrispettivoNetto)}}</td>
     <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
     <td>{{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}</td>
     <td>{{.NoteEsclusione}}{{if .OriginalID}} → <a href="#pratica-{{.OriginalID}}">{{.OriginalID}}</a>{{end}}</td>
-    <td><a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a></td>
+    <td><a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a></td>
   </tr>
   {{end}}
   </tbody>

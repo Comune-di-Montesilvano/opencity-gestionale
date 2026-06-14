@@ -243,18 +243,25 @@ func valutaTra(r *Record, f FiltroConfig) bool {
 
 // ToIstanza converte il Record in Istanza per compatibilità con i template.
 // I campi non mappati restano al valore zero.
+// I nomi dei campi corrispondono alle chiavi standard usate in EngineConfig.Mapping.
 func (r *Record) ToIstanza() *Istanza {
 	ist := &Istanza{
 		ID:        r.AppID,
 		Status:    r.AppStatus,
 		ISEE:      r.FloatMap["isee"],
-		Corrispettivo:     r.FloatMap["corrispettivo"],
-		BeneficioRicevuto: r.FloatMap["beneficio"],
+		Corrispettivo:       r.FloatMap["corrispettivo"],
+		BeneficioRicevuto:   r.FloatMap["beneficio"],
 		FiglioSelezionatoCF: r.StringMap["figlio_cf"],
 		RichiedenteCF:       r.StringMap["richiedente_cf"],
-		TipoRichiesta: r.StringMap["tipo"],
-		NumFigli:      r.IntMap["num_figli"],
-		Annualita:     r.IntMap["annualita"],
+		RichiedenteNome:     r.StringMap["richiedente_nome"],
+		RichiedenteCognome:  r.StringMap["richiedente_cognome"],
+		TipoRichiesta:       r.StringMap["tipo"],
+		NumFigli:            r.IntMap["num_figli"],
+		Annualita:           r.IntMap["annualita"],
+		ProtocolNumber:      r.StringMap["protocollo"],
+		IBAN:                r.StringMap["iban"],
+		IBANIntestatario:    r.StringMap["iban_intestatario"],
+		IBANCheck:           r.StringMap["iban_check"],
 	}
 	if t, ok := r.TimeMap["data_presentazione"]; ok {
 		ist.SubmittedAt = t.Format(time.RFC3339)

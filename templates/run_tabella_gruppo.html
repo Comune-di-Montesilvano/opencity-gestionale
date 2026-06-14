@@ -43,7 +43,7 @@
     <td>{{.Posizione}}</td>
     <td>
       {{if .Istanza}}
-      <a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">
+      <a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">
         {{if .Istanza.RichiedenteCF}}{{.Istanza.RichiedenteCF}}{{else}}{{.Istanza.ID}}{{end}}
       </a>
       {{end}}
@@ -55,7 +55,7 @@
     <td>{{.NoteEsclusione}}</td>
     <td>
       {{if .Istanza}}
-      <a href="https://service.comune.montesilvano.pe.it/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a>
+      <a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a>
       {{end}}
     </td>
   </tr>

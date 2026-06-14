@@ -201,14 +201,15 @@ func (h *GraduatoriaHandler) GetRunTabella(w http.ResponseWriter, r *http.Reques
 	}
 
 	renderTemplate(w, "run_tabella.html", map[string]any{
-		"Op":     op,
-		"Bando":  bando,
-		"Run":    run,
-		"Anno":   anno,
-		"Tipo":   tipo,
-		"Righe":  righe,
-		"RunID":  runID,
+		"Op":      op,
+		"Bando":   bando,
+		"Run":     run,
+		"Anno":    anno,
+		"Tipo":    tipo,
+		"Righe":   righe,
+		"RunID":   runID,
 		"BandoID": bandoID,
+		"BaseURL": h.BaseURL,
 	})
 }
 
@@ -350,6 +351,7 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 		"Righe":   righe,
 		"RunID":   runID,
 		"BandoID": bandoID,
+		"BaseURL": h.BaseURL,
 	})
 }
 
@@ -460,4 +462,70 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 		Esito:     "ok",
 	})
 	http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
+}
+
+// GetExportIBAN — CSV ammesse con IBAN per ufficio ragioneria (ordini bonifici).
+// Richiede che il bando abbia "iban" nel mapping; se assente la colonna sarà vuota.
+func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	run, err := db.GetRun(h.DB, runID)
+	if err != nil || run.BandoID != bandoID {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	var grad graduatoria.Graduatoria
+	json.Unmarshal([]byte(run.DatiJSON), &grad)
+
+	filename := fmt.Sprintf("run%d_iban_bonifici.csv", runID)
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+	cw.Write([]string{
+		"Posizione", "Protocollo", "CF Richiedente", "Cognome", "Nome",
+		"CF Figlio", "Annualità", "Tipologia", "Importo (€)", "IBAN", "Intestatario IBAN",
+	})
+
+	pos := 0
+	for _, g := range grad.Gruppi {
+		for _, riga := range g.Righe {
+			if !riga.Ammessa || riga.Istanza == nil {
+				continue
+			}
+			pos++
+			ist := riga.Istanza
+			annualita := ""
+			if ist.Annualita != 0 {
+				annualita = fmt.Sprintf("%d", ist.Annualita)
+			}
+			cw.Write([]string{
+				fmt.Sprintf("%d", pos),
+				ist.ProtocolNumber,
+				ist.RichiedenteCF,
+				ist.RichiedenteCognome,
+				ist.RichiedenteNome,
+				ist.FiglioSelezionatoCF,
+				annualita,
+				g.Nome,
+				fmt.Sprintf("%.2f", riga.ImportoRimborso),
+				ist.IBAN,
+				ist.IBANIntestatario,
+			})
+		}
+	}
+	cw.Flush()
 }

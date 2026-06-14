@@ -19,8 +19,9 @@
 </form>
 {{end}}
 
-<div style="margin-bottom:1rem">
+<div style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap">
   <a href="/motori/{{.Bando.ID}}/run/{{.Run.ID}}/stampa" class="btn btn-secondary" target="_blank">Stampa documento graduatoria</a>
+  <a href="/motori/{{.Bando.ID}}/run/{{.Run.ID}}/export/iban" class="btn btn-secondary">CSV bonifici (IBAN)</a>
 </div>
 
 <div class="stats-row">

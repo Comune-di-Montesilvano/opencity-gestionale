@@ -22,6 +22,9 @@
   <div class="card-header">
     <h3><a href="/motori/{{.Motore.ID}}">{{.Motore.Nome}}</a></h3>
     <span class="badge badge-green">Attivo</span>
+    {{if and .VerificaAttiva (gt .IstruttoriaStats.DaVerificare 0)}}
+    <span class="badge" style="background:#fef2f2;color:#dc2626">{{.IstruttoriaStats.DaVerificare}} da verificare</span>
+    {{end}}
   </div>
   <div class="card-body">
     <p>Budget: €{{printf "%.2f" .Motore.BudgetTotale}} | ISEE max: €{{printf "%.2f" .Motore.ISEEMassimo}}</p>
@@ -33,9 +36,13 @@
     {{end}}
   </div>
   <div class="card-footer">
+    {{if and .VerificaAttiva (gt .IstruttoriaStats.DaVerificare 0)}}
+    <a href="/motori/{{.Motore.ID}}/istruttoria" class="btn btn-secondary btn-sm">Gestisci istruttoria</a>
+    {{else}}
     <form method="POST" action="/motori/{{.Motore.ID}}/run" onsubmit="this.querySelector('button').disabled=true">
       <button type="submit" class="btn btn-primary btn-sm">Calcola nuova run</button>
     </form>
+    {{end}}
   </div>
 </div>
 {{end}}
