@@ -120,6 +120,33 @@ func (c *Client) FetchAllApplications(serviceID string, onProgress func(fetched,
 	return all, nil
 }
 
+// FetchSampleApplication recupera la prima applicazione di un servizio (per il viewer JSON nel wizard).
+func (c *Client) FetchSampleApplication(serviceID string) (*Application, error) {
+	params := url.Values{
+		"version":    {"2"},
+		"service_id": {serviceID},
+		"limit":      {"1"},
+		"offset":     {"0"},
+	}
+	resp, err := c.get("/lang/api/applications", params)
+	if err != nil {
+		return nil, fmt.Errorf("fetch sample: %w", err)
+	}
+	defer resp.Body.Close()
+	var page PagedResponse
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		return nil, fmt.Errorf("fetch sample decode: %w", err)
+	}
+	if len(page.Data) == 0 {
+		return nil, fmt.Errorf("nessuna istanza disponibile per questo servizio")
+	}
+	var app Application
+	if err := json.Unmarshal(page.Data[0], &app); err != nil {
+		return nil, fmt.Errorf("unmarshal sample: %w", err)
+	}
+	return &app, nil
+}
+
 // Approve accetta una pratica su OpenCity con il messaggio fornito.
 func (c *Client) Approve(applicationID, message string) error {
 	return c.transition(applicationID, "accept", message)

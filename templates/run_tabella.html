@@ -8,8 +8,8 @@
 <div class="page-header">
   <h1>{{.Bando.Nome}} — {{.Anno}} — {{.Tipo}}</h1>
   <div class="page-actions">
-    <a href="/bandi/{{.BandoID}}/run/{{.RunID}}" class="btn btn-secondary btn-sm">← Run</a>
-    <a href="/bandi/{{.BandoID}}/run/{{.RunID}}/export/{{.Anno}}/{{.Tipo}}" class="btn btn-sm">Scarica CSV</a>
+    <a href="/motori/{{.BandoID}}/run/{{.RunID}}" class="btn btn-secondary btn-sm">← Run</a>
+    <a href="/motori/{{.BandoID}}/run/{{.RunID}}/export/{{.Anno}}/{{.Tipo}}" class="btn btn-sm">Scarica CSV</a>
   </div>
 </div>
 
@@ -111,7 +111,7 @@ function closeModal() {
 async function confirmBatch() {
   const ids = Array.from(document.querySelectorAll('.pratica-check:checked')).map(c => c.value);
   const msg = document.getElementById('modal-message').value;
-  const url = '/bandi/{{.BandoID}}/run/{{.RunID}}/' + currentAction + '-batch';
+  const url = '/motori/{{.BandoID}}/run/{{.RunID}}/' + currentAction + '-batch';
 
   document.getElementById('modal-confirm').disabled = true;
   const res = await fetch(url, {

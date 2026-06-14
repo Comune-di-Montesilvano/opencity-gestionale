@@ -1,0 +1,36 @@
+{{define "motore_wizard.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Nuovo motore — Step 1{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Nuovo motore di calcolo</h1>
+  <a href="/motori" class="btn btn-secondary">Annulla</a>
+</div>
+
+<div class="wizard-steps">
+  <span class="wizard-step wizard-step-active">1. Servizio</span>
+  <span class="wizard-step">2. Mapping</span>
+  <span class="wizard-step">3. Filtri</span>
+  <span class="wizard-step">4. Tipologie</span>
+  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step">Fine</span>
+</div>
+
+<div class="card" style="max-width:520px">
+  <h2>Connetti al servizio OpenCity</h2>
+  <p class="text-muted">Carica la lista dei servizi disponibili con le tue credenziali OpenCity.</p>
+  <button class="btn btn-primary"
+    hx-post="/motori/wizard/connetti"
+    hx-target="#servizi-result"
+    hx-swap="innerHTML"
+    hx-indicator="#connetti-spinner">
+    Carica servizi
+  </button>
+  <span id="connetti-spinner" class="htmx-indicator text-muted"> Caricamento…</span>
+</div>
+
+<div id="servizi-result" style="margin-top:1.5rem"></div>
+{{end}}

@@ -1,0 +1,45 @@
+{{if .Errore}}
+<div class="alert alert-error">Errore caricamento servizi: {{.Errore}}</div>
+{{else}}
+<form method="POST" action="/motori/wizard/crea">
+  <h3>Seleziona il servizio</h3>
+  <table class="table">
+    <thead>
+      <tr><th></th><th>Nome servizio</th><th>ID</th></tr>
+    </thead>
+    <tbody>
+    {{range .Servizi}}
+    <tr>
+      <td><input type="radio" name="service_id" value="{{.ID}}" required></td>
+      <td>{{.Nome}}</td>
+      <td><code style="font-size:.75em">{{.ID}}</code></td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:1.5rem">Parametri base</h3>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Nome motore</label>
+      <input type="text" name="nome" class="form-control" placeholder="es. Rette e mense 2024/2025">
+    </div>
+    <div class="form-group">
+      <label>Budget totale (€)</label>
+      <input type="number" name="budget_totale" class="form-control" step="0.01" min="0" placeholder="71096.37">
+    </div>
+    <div class="form-group">
+      <label>ISEE massimo (€)</label>
+      <input type="number" name="isee_massimo" class="form-control" step="0.01" min="0" placeholder="40000">
+    </div>
+    <div class="form-group">
+      <label>Scadenza presentazione</label>
+      <input type="date" name="scadenza" class="form-control">
+    </div>
+  </div>
+
+  <div class="form-actions" style="margin-top:1rem">
+    <button type="submit" class="btn btn-primary">Crea bozza motore →</button>
+  </div>
+</form>
+{{end}}

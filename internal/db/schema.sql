@@ -5,9 +5,10 @@ CREATE TABLE IF NOT EXISTS bandi (
   budget_totale REAL,
   isee_massimo  REAL,
   scadenza_presentazione TEXT,
-  engine_type   TEXT NOT NULL DEFAULT 'mense_rette',
+  engine_type   TEXT NOT NULL DEFAULT 'generic',
   engine_config TEXT NOT NULL DEFAULT '{}',
   attivo        INTEGER NOT NULL DEFAULT 1,
+  stato_motore  TEXT NOT NULL DEFAULT 'bozza',
   created_at    TEXT NOT NULL
 );
 

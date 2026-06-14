@@ -1,0 +1,49 @@
+{{if .Errore}}
+<div class="alert alert-error"><strong>Errore:</strong> {{.Errore}}</div>
+{{else}}
+<div class="test-result">
+  <div class="stats-row" style="margin-bottom:1rem">
+    <div class="stat"><span class="stat-value">{{.NumIstanze}}</span><span class="stat-label">Istanze totali</span></div>
+    <div class="stat"><span class="stat-value">{{.Grad.TotaleAmmesse}}</span><span class="stat-label">Ammesse</span></div>
+    <div class="stat"><span class="stat-value">{{len .Grad.Escluse}}</span><span class="stat-label">Escluse</span></div>
+    <div class="stat"><span class="stat-value">€{{printf "%.2f" .Grad.TotaleBudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
+  </div>
+
+  {{if .Grad.Gruppi}}
+  <h4>Gruppi</h4>
+  <table class="table table-sm">
+    <thead><tr><th>Gruppo</th><th>Ammesse</th><th>Budget usato</th></tr></thead>
+    <tbody>
+    {{range .Grad.Gruppi}}
+    <tr>
+      <td>{{.Nome}}</td>
+      <td>{{len .Righe}}</td>
+      <td>€{{printf "%.2f" .BudgetUsato}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
+  {{if .Grad.PerAnno}}
+  {{range .Grad.PerAnno}}
+  <h4>Anno {{.Annualita}}</h4>
+  <p>Rette: {{len .Rette}} — Mense: {{len .Mense}} — Budget rette: €{{printf "%.2f" .BudgetUsatoRette}} — Budget mense: €{{printf "%.2f" .BudgetUsatoMense}}</p>
+  {{end}}
+  {{end}}
+
+  {{if .Grad.Escluse}}
+  <h4>Escluse ({{len .Grad.Escluse}})</h4>
+  <div style="max-height:200px;overflow-y:auto">
+    <table class="table table-sm">
+      <thead><tr><th>ID</th><th>Motivo</th></tr></thead>
+      <tbody>
+      {{range .Grad.Escluse}}
+      <tr><td>{{.Istanza.ID}}</td><td>{{.NoteEsclusione}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+</div>
+{{end}}

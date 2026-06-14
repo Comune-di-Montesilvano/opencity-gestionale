@@ -1,0 +1,84 @@
+{{define "motore_wizard_step3.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}{{.Motore.Nome}} — Step 3: Filtri{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.Motore.Nome}}</h1>
+</div>
+
+<div class="wizard-steps">
+  <span class="wizard-step">1. Servizio</span>
+  <span class="wizard-step">2. Mapping</span>
+  <span class="wizard-step wizard-step-active">3. Filtri</span>
+  <span class="wizard-step">4. Tipologie</span>
+  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step">Fine</span>
+</div>
+
+<form method="POST" action="/motori/{{.Motore.ID}}/wizard/3">
+  <h2>Filtri di ammissibilità</h2>
+  <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria.</p>
+
+  <div id="filtri-container">
+  {{range $i, $f := .Filtri}}
+  <div class="filtro-row" data-idx="{{$i}}">
+    <select name="filtro_campo" class="form-control form-control-sm">
+      <option value="">— campo —</option>
+      {{range $.CampiMappati}}
+      <option value="{{.}}" {{if eq . $f.Campo}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+    <select name="filtro_op" class="form-control form-control-sm">
+      <option value="<=" {{if eq $f.Op "<="}}selected{{end}}>≤</option>
+      <option value=">=" {{if eq $f.Op ">="}}selected{{end}}>≥</option>
+      <option value="==" {{if eq $f.Op "=="}}selected{{end}}>=</option>
+      <option value="!=" {{if eq $f.Op "!="}}selected{{end}}>≠</option>
+      <option value="<"  {{if eq $f.Op "<"}}selected{{end}}>&lt;</option>
+      <option value=">"  {{if eq $f.Op ">"}}selected{{end}}>&gt;</option>
+    </select>
+    <input type="text" name="filtro_valore" value="{{$f.Valore}}" class="form-control form-control-sm" placeholder="valore">
+    <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
+  </div>
+  {{end}}
+  </div>
+
+  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltro()" style="margin-top:.5rem">+ Aggiungi filtro</button>
+
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
+    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+  </div>
+</form>
+
+<template id="filtro-tmpl">
+  <div class="filtro-row">
+    <select name="filtro_campo" class="form-control form-control-sm">
+      <option value="">— campo —</option>
+      {{range .CampiMappati}}<option value="{{.}}">{{.}}</option>{{end}}
+    </select>
+    <select name="filtro_op" class="form-control form-control-sm">
+      <option value="<=">&le;</option>
+      <option value=">=">&ge;</option>
+      <option value="==">=</option>
+      <option value="!=">≠</option>
+      <option value="<">&lt;</option>
+      <option value=">">&gt;</option>
+    </select>
+    <input type="text" name="filtro_valore" class="form-control form-control-sm" placeholder="valore">
+    <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
+  </div>
+</template>
+
+<script>
+function aggiungiFiltro() {
+  const tmpl = document.getElementById('filtro-tmpl').content.cloneNode(true);
+  document.getElementById('filtri-container').appendChild(tmpl);
+}
+function rimuoviFiltro(btn) {
+  btn.closest('.filtro-row').remove();
+}
+</script>
+{{end}}

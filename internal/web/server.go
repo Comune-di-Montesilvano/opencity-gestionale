@@ -16,12 +16,8 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 		AdminUsernames: cfg.AdminUsernames,
 		SecureCookie:   cfg.TrustProxy,
 	}
-	setup := &handlers.SetupHandler{
-		DB:      dbConn,
-		BaseURL: cfg.OpenCityBaseURL,
-	}
 	dashboard := &handlers.DashboardHandler{DB: dbConn}
-	bandi := &handlers.BandiHandler{DB: dbConn}
+	motori := &handlers.MotoriHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 	grad := &handlers.GraduatoriaHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 	acts := &handlers.ActionsHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 	auditH := &handlers.AuditHandler{DB: dbConn}
@@ -55,32 +51,29 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	})))
 	mux.Handle("GET /dashboard", authMW(http.HandlerFunc(dashboard.GetDashboard)))
 
-	// Setup wizard (admin only)
-	mux.Handle("GET /setup", authMW(middleware.RequireAdmin(http.HandlerFunc(setup.GetSetup))))
-	mux.Handle("POST /setup/step/1", authMW(middleware.RequireAdmin(http.HandlerFunc(setup.PostSetupStep1))))
-	mux.Handle("POST /setup/step/2", authMW(middleware.RequireAdmin(http.HandlerFunc(setup.PostSetupStep2))))
-
-	// Bandi
-	mux.Handle("GET /bandi", authMW(http.HandlerFunc(bandi.ListBandi)))
-	mux.Handle("GET /bandi/nuovo", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetNuovoBando))))
-	mux.Handle("POST /bandi", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostBando))))
-	mux.Handle("GET /bandi/{id}", authMW(http.HandlerFunc(bandi.GetBando)))
-	mux.Handle("GET /bandi/{id}/edit", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetEditBando))))
-	mux.Handle("POST /bandi/{id}", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PutBando))))
-	mux.Handle("POST /bandi/{id}/disattiva", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.DeleteBando))))
+	// Motori — lista e wizard (admin only per modifica)
+	mux.Handle("GET /motori", authMW(http.HandlerFunc(motori.GetLista)))
+	mux.Handle("GET /motori/nuovo", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.GetNuovo))))
+	mux.Handle("POST /motori/wizard/connetti", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostConnettiServizi))))
+	mux.Handle("POST /motori/wizard/crea", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostCreaMotore))))
+	mux.Handle("GET /motori/{id}/wizard/{step}", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.GetWizardStep))))
+	mux.Handle("POST /motori/{id}/wizard/{step}", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostWizardStep))))
+	mux.Handle("POST /motori/{id}/wizard/test", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostTestEngine))))
+	mux.Handle("POST /motori/{id}/wizard/attiva", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostAttivaMotore))))
+	mux.Handle("GET /motori/{id}", authMW(http.HandlerFunc(motori.GetDettaglio)))
+	mux.Handle("POST /motori/{id}/duplica", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostDuplica))))
+	mux.Handle("POST /motori/{id}/archivia", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostArchivia))))
 
 	// Graduatorie
-	mux.Handle("POST /bandi/{id}/run", authMW(http.HandlerFunc(grad.PostCalcola)))
-	mux.Handle("GET /bandi/{id}/run/{runID}", authMW(http.HandlerFunc(grad.GetRun)))
-	mux.Handle("GET /bandi/{id}/run/{runID}/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetRunTabella)))
-	mux.Handle("GET /bandi/{id}/run/{runID}/export/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetExportCSV)))
-
-	// Pubblica run (admin)
-	mux.Handle("POST /bandi/{id}/run/{runID}/pubblica", authMW(middleware.RequireAdmin(http.HandlerFunc(grad.PostPubblica))))
+	mux.Handle("POST /motori/{id}/run", authMW(http.HandlerFunc(grad.PostCalcola)))
+	mux.Handle("GET /motori/{id}/run/{runID}", authMW(http.HandlerFunc(grad.GetRun)))
+	mux.Handle("GET /motori/{id}/run/{runID}/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetRunTabella)))
+	mux.Handle("GET /motori/{id}/run/{runID}/export/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetExportCSV)))
+	mux.Handle("POST /motori/{id}/run/{runID}/pubblica", authMW(middleware.RequireAdmin(http.HandlerFunc(grad.PostPubblica))))
 
 	// Bulk actions
-	mux.Handle("POST /bandi/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))
-	mux.Handle("POST /bandi/{id}/run/{runID}/rifiuta-batch", authMW(http.HandlerFunc(acts.PostRifiutaBatch)))
+	mux.Handle("POST /motori/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))
+	mux.Handle("POST /motori/{id}/run/{runID}/rifiuta-batch", authMW(http.HandlerFunc(acts.PostRifiutaBatch)))
 
 	// Audit
 	mux.Handle("GET /audit", authMW(http.HandlerFunc(auditH.GetAudit)))

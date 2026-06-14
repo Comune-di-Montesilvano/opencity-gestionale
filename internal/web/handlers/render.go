@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"opencity-gestionale/internal/web/middleware"
@@ -15,8 +16,9 @@ var (
 )
 
 var funcMap = template.FuncMap{
-	"add": func(a, b int) int { return a + b },
-	"sub": func(a, b int) int { return a - b },
+	"add":  func(a, b int) int { return a + b },
+	"sub":  func(a, b int) int { return a - b },
+	"join": func(s []string, sep string) string { return strings.Join(s, sep) },
 }
 
 func loadTemplates() *template.Template {

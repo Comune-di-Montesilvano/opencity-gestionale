@@ -59,6 +59,7 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 	cfg := graduatoria.BandoConfig{
 		BudgetTotale: bando.BudgetTotale,
 		ISEEMassimo:  bando.ISEEMassimo,
+		ExtraJSON:    []byte(bando.EngineConfig),
 	}
 	if bando.ScadenzaPresentazione != "" {
 		cfg.Scadenza, _ = time.Parse("2006-01-02", bando.ScadenzaPresentazione)
@@ -98,7 +99,7 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 		Esito:     "ok",
 	})
 
-	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d", bandoID, runID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d", bandoID, runID), http.StatusSeeOther)
 }
 
 // GetRun — visualizza dettaglio run (indice annualità)
@@ -274,7 +275,7 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if run.Stato != "bozza" {
-		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Già+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d?flash=Già+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
 		return
 	}
 	if err := db.PubblicaRun(h.DB, runID); err != nil {
@@ -288,5 +289,5 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 		RunID:     runID,
 		Esito:     "ok",
 	})
-	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
 }

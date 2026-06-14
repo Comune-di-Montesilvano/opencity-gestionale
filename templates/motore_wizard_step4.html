@@ -1,0 +1,134 @@
+{{define "motore_wizard_step4.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}{{.Motore.Nome}} — Step 4: Tipologie{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.Motore.Nome}}</h1>
+</div>
+
+<div class="wizard-steps">
+  <span class="wizard-step">1. Servizio</span>
+  <span class="wizard-step">2. Mapping</span>
+  <span class="wizard-step">3. Filtri</span>
+  <span class="wizard-step wizard-step-active">4. Tipologie</span>
+  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step">Fine</span>
+</div>
+
+<form method="POST" action="/motori/{{.Motore.ID}}/wizard/4">
+
+  <!-- Tipologie -->
+  <h2>Tipologie</h2>
+  <p class="text-muted">Definisci le categorie di istanze (es. "rette", "mense"). Ogni tipologia può avere un budget dedicato e una priorità.</p>
+
+  <div id="tipologie-container">
+  {{range $i, $t := .Tipologie}}
+  <div class="tipologia-row card-row">
+    <div class="form-group">
+      <label>Nome</label>
+      <input type="text" name="tip_nome" value="{{$t.Nome}}" class="form-control form-control-sm" placeholder="es. rette">
+    </div>
+    <div class="form-group">
+      <label>Campo</label>
+      <select name="tip_campo" class="form-control form-control-sm">
+        <option value="">— campo —</option>
+        {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $t.Campo}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Valore</label>
+      <input type="text" name="tip_valore" value="{{$t.Valore}}" class="form-control form-control-sm" placeholder="es. rette">
+    </div>
+    <div class="form-group">
+      <label>Priorità</label>
+      <input type="number" name="tip_priorita" value="{{$t.Priorita}}" class="form-control form-control-sm" min="1" placeholder="1">
+    </div>
+    <div class="form-group">
+      <label>Budget tipo</label>
+      <select name="tip_budget_tipo" class="form-control form-control-sm">
+        <option value="percentuale" {{if eq $t.Budget.Tipo "percentuale"}}selected{{end}}>% del totale</option>
+        <option value="fisso" {{if eq $t.Budget.Tipo "fisso"}}selected{{end}}>Importo fisso</option>
+        <option value="residuo" {{if eq $t.Budget.Tipo "residuo"}}selected{{end}}>Residuo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Budget valore</label>
+      <input type="number" name="tip_budget_valore" value="{{$t.Budget.Valore}}" class="form-control form-control-sm" step="0.01" min="0" placeholder="50">
+    </div>
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-row').remove()">✕</button>
+  </div>
+  {{end}}
+  </div>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiTipologia()">+ Aggiungi tipologia</button>
+
+  <!-- Ordinamento -->
+  <h2 style="margin-top:2rem">Ordinamento</h2>
+  <p class="text-muted">Ordine di scorrimento della graduatoria (es. ISEE crescente, poi numero figli decrescente).</p>
+
+  <div id="ordini-container">
+  {{range $i, $o := .Ordinamento}}
+  <div class="ordine-row">
+    <select name="ord_campo" class="form-control form-control-sm">
+      <option value="">— campo —</option>
+      {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $o.Campo}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    <select name="ord_dir" class="form-control form-control-sm">
+      <option value="asc" {{if eq $o.Dir "asc"}}selected{{end}}>Crescente ↑</option>
+      <option value="desc" {{if eq $o.Dir "desc"}}selected{{end}}>Decrescente ↓</option>
+    </select>
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.ordine-row').remove()">✕</button>
+  </div>
+  {{end}}
+  </div>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiOrdine()">+ Aggiungi criterio</button>
+
+  <!-- Deduplicazione -->
+  <h2 style="margin-top:2rem">Deduplicazione</h2>
+  <p class="text-muted">Se attiva, mantiene una sola istanza per chiave (es. figlio + anno + tipo). La più recente vince.</p>
+
+  <div class="form-group" style="display:flex;align-items:center;gap:.75rem">
+    <input type="checkbox" name="dedup_attiva" value="1" id="dedup-attiva" {{if .Deduplicazione.Attiva}}checked{{end}}>
+    <label for="dedup-attiva" style="margin:0">Attiva deduplicazione</label>
+  </div>
+  <div class="form-group">
+    <label>Chiave dedup (campi separati da virgola)</label>
+    <input type="text" name="dedup_chiave" value="{{join .Deduplicazione.Chiave ","}}" class="form-control" placeholder="es. figlio_cf,annualita,tipo">
+  </div>
+
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a href="/motori/{{.Motore.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
+    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+  </div>
+</form>
+
+<script>
+function aggiungiTipologia() {
+  const campi = {{range .CampiMappati}}'{{.}}',{{end}};
+  const opzioni = campi.map(c => `<option value="${c}">${c}</option>`).join('');
+  const html = `<div class="tipologia-row card-row">
+    <div class="form-group"><label>Nome</label><input type="text" name="tip_nome" class="form-control form-control-sm" placeholder="es. rette"></div>
+    <div class="form-group"><label>Campo</label><select name="tip_campo" class="form-control form-control-sm"><option value="">— campo —</option>${opzioni}</select></div>
+    <div class="form-group"><label>Valore</label><input type="text" name="tip_valore" class="form-control form-control-sm" placeholder="es. rette"></div>
+    <div class="form-group"><label>Priorità</label><input type="number" name="tip_priorita" class="form-control form-control-sm" min="1" value="1"></div>
+    <div class="form-group"><label>Budget tipo</label><select name="tip_budget_tipo" class="form-control form-control-sm"><option value="percentuale">% del totale</option><option value="fisso">Importo fisso</option><option value="residuo">Residuo</option></select></div>
+    <div class="form-group"><label>Budget valore</label><input type="number" name="tip_budget_valore" class="form-control form-control-sm" step="0.01" min="0" value="0"></div>
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-row').remove()">✕</button>
+  </div>`;
+  document.getElementById('tipologie-container').insertAdjacentHTML('beforeend', html);
+}
+
+function aggiungiOrdine() {
+  const campi = [{{range .CampiMappati}}'{{.}}',{{end}}];
+  const opzioni = campi.map(c => `<option value="${c}">${c}</option>`).join('');
+  const html = `<div class="ordine-row">
+    <select name="ord_campo" class="form-control form-control-sm"><option value="">— campo —</option>${opzioni}</select>
+    <select name="ord_dir" class="form-control form-control-sm"><option value="asc">Crescente ↑</option><option value="desc">Decrescente ↓</option></select>
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.ordine-row').remove()">✕</button>
+  </div>`;
+  document.getElementById('ordini-container').insertAdjacentHTML('beforeend', html);
+}
+</script>
+{{end}}
