@@ -29,26 +29,6 @@
   <div class="stat"><span class="stat-value">€{{printf "%.2f" .Run.BudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
 </div>
 
-{{if .Grad.PerAnno}}
-{{range .Grad.PerAnno}}
-<h2>Annualità {{.Annualita}}</h2>
-<div class="anno-grid">
-  <div class="anno-section">
-    <h3>Rette ({{len .Rette}})</h3>
-    <p>Budget usato: €{{printf "%.2f" .BudgetUsatoRette}}</p>
-    <a href="/motori/{{$.Bando.ID}}/run/{{$.Run.ID}}/{{.Annualita}}/rette" class="btn btn-secondary btn-sm">Visualizza tabella</a>
-    <a href="/motori/{{$.Bando.ID}}/run/{{$.Run.ID}}/export/{{.Annualita}}/rette" class="btn btn-sm">CSV</a>
-  </div>
-  <div class="anno-section">
-    <h3>Mense ({{len .Mense}})</h3>
-    <p>Budget usato: €{{printf "%.2f" .BudgetUsatoMense}}</p>
-    <a href="/motori/{{$.Bando.ID}}/run/{{$.Run.ID}}/{{.Annualita}}/mense" class="btn btn-secondary btn-sm">Visualizza tabella</a>
-    <a href="/motori/{{$.Bando.ID}}/run/{{$.Run.ID}}/export/{{.Annualita}}/mense" class="btn btn-sm">CSV</a>
-  </div>
-</div>
-{{end}}
-{{end}}
-
 {{if .Grad.Gruppi}}
 {{range .Grad.Gruppi}}
 <div class="anno-section" style="margin-bottom:1rem">

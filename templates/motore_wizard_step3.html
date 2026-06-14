@@ -2,7 +2,7 @@
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 3: Filtri{{end}}
+{{define "title"}}{{.Motore.Nome}} — Step 3: Mapping{{end}}
 
 {{define "content"}}
 <div class="page-header">
@@ -11,74 +11,94 @@
 
 <div class="wizard-steps">
   <span class="wizard-step">1. Servizio</span>
-  <span class="wizard-step">2. Mapping</span>
-  <span class="wizard-step wizard-step-active">3. Filtri</span>
-  <span class="wizard-step">4. Tipologie</span>
-  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step">2. Tipo bando</span>
+  <span class="wizard-step wizard-step-active">3. Mapping</span>
+  <span class="wizard-step">4. Filtri</span>
+  <span class="wizard-step">5. Tipologie</span>
+  <span class="wizard-step">6. Rimborso</span>
   <span class="wizard-step">Fine</span>
 </div>
 
-<form method="POST" action="/motori/{{.Motore.ID}}/wizard/3">
-  <h2>Filtri di ammissibilità</h2>
-  <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria.</p>
+<div class="wizard-layout">
 
-  <div id="filtri-container">
-  {{range $i, $f := .Filtri}}
-  <div class="filtro-row" data-idx="{{$i}}">
-    <select name="filtro_campo" class="form-control form-control-sm">
-      <option value="">— campo —</option>
-      {{range $.CampiMappati}}
-      <option value="{{.}}" {{if eq . $f.Campo}}selected{{end}}>{{.}}</option>
+  <div class="wizard-col-main">
+    <form method="POST" action="/motori/{{.Motore.ID}}/wizard/3">
+
+      <h2>Mapping campi logici → JSON</h2>
+      <p class="text-muted">Per ogni campo logico, indica il percorso nel JSON dell'istanza. Usa il viewer a destra per navigare la struttura. Lascia vuoto per non mappare.</p>
+
+      {{if .CampiFlat}}
+      <datalist id="percorsi-json">
+        {{range .CampiFlat}}<option value="{{.Path}}">{{end}}
+      </datalist>
       {{end}}
-    </select>
-    <select name="filtro_op" class="form-control form-control-sm">
-      <option value="<=" {{if eq $f.Op "<="}}selected{{end}}>≤</option>
-      <option value=">=" {{if eq $f.Op ">="}}selected{{end}}>≥</option>
-      <option value="==" {{if eq $f.Op "=="}}selected{{end}}>=</option>
-      <option value="!=" {{if eq $f.Op "!="}}selected{{end}}>≠</option>
-      <option value="<"  {{if eq $f.Op "<"}}selected{{end}}>&lt;</option>
-      <option value=">"  {{if eq $f.Op ">"}}selected{{end}}>&gt;</option>
-    </select>
-    <input type="text" name="filtro_valore" value="{{$f.Valore}}" class="form-control form-control-sm" placeholder="valore">
-    <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
-  </div>
-  {{end}}
+
+      <table class="table">
+        <thead>
+          <tr><th>Campo logico</th><th>Descrizione</th><th>Path JSON</th><th>Tipo</th><th>Array?</th></tr>
+        </thead>
+        <tbody>
+        {{range .CampiLogici}}
+        <tr>
+          <td><strong>{{.Nome}}</strong></td>
+          <td class="text-muted" style="font-size:.85em">{{.Desc}}</td>
+          <td>
+            <input type="text" name="path_{{.Nome}}" value="{{.Path}}"
+              class="form-control form-control-sm" list="percorsi-json"
+              placeholder="{{if .PathDefault}}{{.PathDefault}}{{else}}data.campo{{end}}">
+          </td>
+          <td>
+            <select name="tipo_{{.Nome}}" class="form-control form-control-sm">
+              <option value="float"  {{if eq .Tipo "float"}}selected{{end}}>float</option>
+              <option value="string" {{if eq .Tipo "string"}}selected{{end}}>string</option>
+              <option value="int"    {{if eq .Tipo "int"}}selected{{end}}>int</option>
+              <option value="time"   {{if eq .Tipo "time"}}selected{{end}}>time</option>
+              <option value="count"  {{if eq .Tipo "count"}}selected{{end}}>count</option>
+            </select>
+          </td>
+          <td style="text-align:center">
+            <input type="checkbox" name="expand_{{.Nome}}" value="1" {{if .Expand}}checked{{end}} title="Espandi array">
+          </td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+
+      <div class="form-group">
+        <label>Campo di espansione array</label>
+        <input type="text" name="espansione" value="{{.Espansione}}" class="form-control" placeholder="es. anni">
+        <small class="text-muted">Nome del campo logico che punta all'array da espandere in righe separate.</small>
+      </div>
+
+      <div class="form-actions">
+        <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
+        <button type="submit" class="btn btn-primary">Salva e continua →</button>
+      </div>
+    </form>
   </div>
 
-  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltro()" style="margin-top:.5rem">+ Aggiungi filtro</button>
-
-  <div class="form-actions" style="margin-top:1.5rem">
-    <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
-    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+  <div class="wizard-col-side">
+    <h3>Struttura istanza campione</h3>
+    {{if .ErrCampione}}
+    <div class="alert alert-error">{{.ErrCampione}}</div>
+    {{else if not .CampiFlat}}
+    <p class="text-muted">Nessun dato disponibile.</p>
+    {{else}}
+    <div class="json-viewer">
+      <table class="table table-sm">
+        <thead><tr><th>Percorso</th><th>Valore</th></tr></thead>
+        <tbody>
+        {{range .CampiFlat}}
+        <tr>
+          <td><code style="font-size:.75em">{{.Path}}</code></td>
+          <td style="font-size:.82em;color:#555;max-width:220px;word-break:break-word">{{.Value}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
   </div>
-</form>
 
-<template id="filtro-tmpl">
-  <div class="filtro-row">
-    <select name="filtro_campo" class="form-control form-control-sm">
-      <option value="">— campo —</option>
-      {{range .CampiMappati}}<option value="{{.}}">{{.}}</option>{{end}}
-    </select>
-    <select name="filtro_op" class="form-control form-control-sm">
-      <option value="<=">&le;</option>
-      <option value=">=">&ge;</option>
-      <option value="==">=</option>
-      <option value="!=">≠</option>
-      <option value="<">&lt;</option>
-      <option value=">">&gt;</option>
-    </select>
-    <input type="text" name="filtro_valore" class="form-control form-control-sm" placeholder="valore">
-    <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
-  </div>
-</template>
-
-<script>
-function aggiungiFiltro() {
-  const tmpl = document.getElementById('filtro-tmpl').content.cloneNode(true);
-  document.getElementById('filtri-container').appendChild(tmpl);
-}
-function rimuoviFiltro(btn) {
-  btn.closest('.filtro-row').remove();
-}
-</script>
+</div>
 {{end}}

@@ -25,13 +25,6 @@
   </table>
   {{end}}
 
-  {{if .Grad.PerAnno}}
-  {{range .Grad.PerAnno}}
-  <h4>Anno {{.Annualita}}</h4>
-  <p>Rette: {{len .Rette}} — Mense: {{len .Mense}} — Budget rette: €{{printf "%.2f" .BudgetUsatoRette}} — Budget mense: €{{printf "%.2f" .BudgetUsatoMense}}</p>
-  {{end}}
-  {{end}}
-
   {{if .Grad.Escluse}}
   <h4>Escluse ({{len .Grad.Escluse}})</h4>
   <div style="max-height:200px;overflow-y:auto">

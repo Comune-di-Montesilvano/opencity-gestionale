@@ -1,0 +1,68 @@
+{{define "motore_wizard_step6.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}{{.Motore.Nome}} — Step 6: Rimborso{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.Motore.Nome}}</h1>
+</div>
+
+<div class="wizard-steps">
+  <span class="wizard-step">1. Servizio</span>
+  <span class="wizard-step">2. Tipo bando</span>
+  <span class="wizard-step">3. Mapping</span>
+  <span class="wizard-step">4. Filtri</span>
+  <span class="wizard-step">5. Tipologie</span>
+  <span class="wizard-step wizard-step-active">6. Rimborso</span>
+  <span class="wizard-step">Fine</span>
+</div>
+
+<form method="POST" action="/motori/{{.Motore.ID}}/wizard/6" style="max-width:560px">
+  <h2>Calcolo rimborso</h2>
+  <p class="text-muted">Definisci come si calcola l'importo da rimborsare per ogni istanza ammessa.</p>
+
+  <div class="form-group">
+    <label>Tipo calcolo</label>
+    <div style="display:flex;gap:1.5rem;margin-top:.25rem">
+      <label style="display:flex;align-items:center;gap:.4rem">
+        <input type="radio" name="rimborso_tipo" value="netto"
+          {{if eq .Rimborso.Tipo "netto"}}checked{{end}}
+          {{if not .Rimborso.Tipo}}checked{{end}}>
+        Netto (lordo − deduzione)
+      </label>
+      <label style="display:flex;align-items:center;gap:.4rem">
+        <input type="radio" name="rimborso_tipo" value="lordo"
+          {{if eq .Rimborso.Tipo "lordo"}}checked{{end}}>
+        Lordo (solo campo lordo)
+      </label>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Campo importo lordo</label>
+    <select name="rimborso_campo_lordo" class="form-control">
+      <option value="">— non impostato —</option>
+      {{range .CampiMappati}}
+      <option value="{{.}}" {{if eq . $.Rimborso.CampoLordo}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Campo deduzione <span class="text-muted">(es. bonus già percepito)</span></label>
+    <select name="rimborso_campo_deduzione" class="form-control">
+      <option value="">— nessuna deduzione —</option>
+      {{range .CampiMappati}}
+      <option value="{{.}}" {{if eq . $.Rimborso.CampoDeduzione}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </div>
+
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a href="/motori/{{.Motore.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+  </div>
+</form>
+{{end}}

@@ -194,18 +194,21 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	switch step {
 	case "2":
-		// Fetch istanza campione per il viewer JSON.
+		renderTemplate(w, "motore_wizard_step2.html", map[string]any{
+			"Op":       op,
+			"Motore":   bando,
+			"Modalita": cfg.Modalita,
+		})
+
+	case "3":
 		client := opencity.NewClient(h.BaseURL, op.JWT)
 		var flatFields []extractor.FieldPreview
 		var errCampione string
-		app, err := client.FetchSampleApplication(bando.ServiceID)
-		if err != nil {
-			errCampione = err.Error()
+		if app, err2 := client.FetchSampleApplication(bando.ServiceID); err2 != nil {
+			errCampione = err2.Error()
 		} else {
 			flatFields = extractor.FlattenJSON(app.Data)
 		}
-
-		// Prepopola campi logici con valori correnti.
 		var campi []CampoLogicoConValore
 		for _, cl := range campiLogiciStandard {
 			fm := cfg.Mapping[cl.Nome]
@@ -224,36 +227,44 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 				Expand:      fm.Expand,
 			})
 		}
-
-		renderTemplate(w, "motore_wizard_step2.html", map[string]any{
-			"Op":           op,
-			"Motore":       bando,
-			"CampiLogici":  campi,
-			"CampiFlat":    flatFields,
-			"ErrCampione":  errCampione,
-			"Espansione":   cfg.Espansione,
+		renderTemplate(w, "motore_wizard_step3.html", map[string]any{
+			"Op":          op,
+			"Motore":      bando,
+			"CampiLogici": campi,
+			"CampiFlat":   flatFields,
+			"ErrCampione": errCampione,
+			"Espansione":  cfg.Espansione,
 		})
 
-	case "3":
-		renderTemplate(w, "motore_wizard_step3.html", map[string]any{
+	case "4":
+		renderTemplate(w, "motore_wizard_step4.html", map[string]any{
 			"Op":           op,
 			"Motore":       bando,
 			"Filtri":       cfg.Filtri,
 			"CampiMappati": campiMappati(cfg),
 		})
 
-	case "4":
-		renderTemplate(w, "motore_wizard_step4.html", map[string]any{
+	case "5":
+		if cfg.Modalita == "ammissione" || cfg.Modalita == "lista_attesa" {
+			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/fine", bando.ID), http.StatusSeeOther)
+			return
+		}
+		renderTemplate(w, "motore_wizard_step5.html", map[string]any{
 			"Op":             op,
 			"Motore":         bando,
+			"Modalita":       cfg.Modalita,
 			"Tipologie":      cfg.Tipologie,
 			"Ordinamento":    cfg.Ordinamento,
 			"Deduplicazione": cfg.Deduplicazione,
 			"CampiMappati":   campiMappati(cfg),
 		})
 
-	case "5":
-		renderTemplate(w, "motore_wizard_step5.html", map[string]any{
+	case "6":
+		if cfg.Modalita != "fondi" {
+			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/fine", bando.ID), http.StatusSeeOther)
+			return
+		}
+		renderTemplate(w, "motore_wizard_step6.html", map[string]any{
 			"Op":           op,
 			"Motore":       bando,
 			"Rimborso":     cfg.Rimborso,
@@ -287,7 +298,14 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	switch step {
 	case "2":
-		// Aggiorna mapping e espansione.
+		cfg.Modalita = strings.TrimSpace(r.FormValue("modalita"))
+		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
+			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/3", bando.ID), http.StatusSeeOther)
+
+	case "3":
 		cfg.Espansione = strings.TrimSpace(r.FormValue("espansione"))
 		for _, cl := range campiLogiciStandard {
 			path := strings.TrimSpace(r.FormValue("path_" + cl.Nome))
@@ -305,26 +323,21 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/3", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/4", bando.ID), http.StatusSeeOther)
 
-	case "3":
-		// Leggi filtri come array paralleli.
-		campi := r.Form["filtro_campo"]
+	case "4":
+		campos := r.Form["filtro_campo"]
 		ops := r.Form["filtro_op"]
 		valori := r.Form["filtro_valore"]
 		var filtri []graduatoria.FiltroConfig
-		for i := range campi {
-			if i >= len(ops) || i >= len(valori) {
-				break
-			}
-			if campi[i] == "" {
+		for i := range campos {
+			if i >= len(ops) || i >= len(valori) || campos[i] == "" {
 				continue
 			}
-			val := parseFilterValue(valori[i])
 			filtri = append(filtri, graduatoria.FiltroConfig{
-				Campo:  campi[i],
+				Campo:  campos[i],
 				Op:     ops[i],
-				Valore: val,
+				Valore: parseFilterValue(valori[i]),
 			})
 		}
 		cfg.Filtri = filtri
@@ -332,10 +345,9 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/4", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/5", bando.ID), http.StatusSeeOther)
 
-	case "4":
-		// Tipologie.
+	case "5":
 		nomi := r.Form["tip_nome"]
 		campiTip := r.Form["tip_campo"]
 		valoriTip := r.Form["tip_valore"]
@@ -344,7 +356,7 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 		budgetValore := r.Form["tip_budget_valore"]
 		var tipologie []graduatoria.TipologiaConfig
 		for i := range nomi {
-			if i >= len(campiTip) || nomi[i] == "" {
+			if nomi[i] == "" {
 				continue
 			}
 			bv, _ := strconv.ParseFloat(budgetValore[safeIdx(budgetValore, i)], 64)
@@ -354,15 +366,13 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 				Campo:    campiTip[safeIdx(campiTip, i)],
 				Valore:   valoriTip[safeIdx(valoriTip, i)],
 				Priorita: pr,
-				Budget: graduatoria.BudgetConfig{
+				Limite: graduatoria.LimiteConfig{
 					Tipo:   budgetTipo[safeIdx(budgetTipo, i)],
 					Valore: bv,
 				},
 			})
 		}
 		cfg.Tipologie = tipologie
-
-		// Ordinamento.
 		ordCampi := r.Form["ord_campo"]
 		ordDir := r.Form["ord_dir"]
 		var ordini []graduatoria.OrdineConfig
@@ -377,23 +387,19 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			ordini = append(ordini, graduatoria.OrdineConfig{Campo: ordCampi[i], Dir: dir})
 		}
 		cfg.Ordinamento = ordini
-
-		// Deduplicazione.
 		cfg.Deduplicazione.Attiva = r.FormValue("dedup_attiva") == "1"
-		chiaveRaw := strings.TrimSpace(r.FormValue("dedup_chiave"))
-		if chiaveRaw != "" {
+		if chiaveRaw := strings.TrimSpace(r.FormValue("dedup_chiave")); chiaveRaw != "" {
 			cfg.Deduplicazione.Chiave = splitTrim(chiaveRaw, ",")
 		} else {
 			cfg.Deduplicazione.Chiave = nil
 		}
-
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/5", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/6", bando.ID), http.StatusSeeOther)
 
-	case "5":
+	case "6":
 		cfg.Rimborso = graduatoria.RimborsoConfig{
 			Tipo:           r.FormValue("rimborso_tipo"),
 			CampoLordo:     r.FormValue("rimborso_campo_lordo"),

@@ -13,7 +13,6 @@ import (
 	"opencity-gestionale/internal/web"
 
 	_ "opencity-gestionale/internal/graduatoria/generic" // registra engine generico
-	_ "opencity-gestionale/internal/graduatoria/mense"   // registra engine mense_rette
 )
 
 var AppVersion = "dev"

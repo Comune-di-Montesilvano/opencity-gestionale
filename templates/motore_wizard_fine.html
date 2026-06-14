@@ -11,23 +11,23 @@
 
 <div class="wizard-steps">
   <span class="wizard-step">1. Servizio</span>
-  <span class="wizard-step">2. Mapping</span>
-  <span class="wizard-step">3. Filtri</span>
-  <span class="wizard-step">4. Tipologie</span>
-  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step">2. Tipo bando</span>
+  <span class="wizard-step">3. Mapping</span>
+  <span class="wizard-step">4. Filtri</span>
+  <span class="wizard-step">5. Tipologie</span>
+  <span class="wizard-step">6. Rimborso</span>
   <span class="wizard-step wizard-step-active">Fine</span>
 </div>
 
 <div class="wizard-layout">
   <div class="wizard-col-main">
 
-    <!-- Riepilogo config -->
     <div class="card" style="margin-bottom:1.5rem">
       <h3>Riepilogo configurazione</h3>
       <div class="detail-grid">
         <div><strong>Servizio</strong><br><code style="font-size:.8em">{{.Motore.ServiceID}}</code></div>
+        <div><strong>Modalità</strong><br><span class="badge badge-gray">{{if .Config.Modalita}}{{.Config.Modalita}}{{else}}fondi{{end}}</span></div>
         <div><strong>Budget</strong><br>€{{printf "%.2f" .Motore.BudgetTotale}}</div>
-        <div><strong>ISEE max</strong><br>€{{printf "%.2f" .Motore.ISEEMassimo}}</div>
         <div><strong>Scadenza</strong><br>{{.Motore.ScadenzaPresentazione}}</div>
       </div>
 
@@ -50,17 +50,18 @@
       {{if .Config.Tipologie}}
       <h4 style="margin-top:1rem">Tipologie ({{len .Config.Tipologie}})</h4>
       <ul style="margin:0;padding-left:1.2rem">
-        {{range .Config.Tipologie}}<li>{{.Nome}} (priorità {{.Priorita}}, budget {{.Budget.Tipo}} {{.Budget.Valore}})</li>{{end}}
+        {{range .Config.Tipologie}}<li>{{.Nome}} (priorità {{.Priorita}}, limite {{.Limite.Tipo}} {{.Limite.Valore}})</li>{{end}}
       </ul>
       {{end}}
 
       {{with .Config.Rimborso}}
+      {{if .Tipo}}
       <h4 style="margin-top:1rem">Rimborso</h4>
       <p style="margin:0">Tipo: {{.Tipo}} — Lordo: {{.CampoLordo}}{{if .CampoDeduzione}} — Deduzione: {{.CampoDeduzione}}{{end}}</p>
       {{end}}
+      {{end}}
     </div>
 
-    <!-- Test engine -->
     <div class="card" style="margin-bottom:1.5rem">
       <h3>Test calcolo</h3>
       <p class="text-muted">Verifica il risultato prima di attivare il motore. Il test non salva nulla.</p>
@@ -75,15 +76,18 @@
       <div id="test-result" style="margin-top:1rem"></div>
     </div>
 
-    <!-- Attiva motore -->
     <form method="POST" action="/motori/{{.Motore.ID}}/wizard/attiva" class="card">
       <h3>Attiva motore</h3>
       <div class="form-group">
         <label>Nome definitivo</label>
-        <input type="text" name="nome" value="{{.Motore.Nome}}" class="form-control" required placeholder="es. Rette e mense 2024/2025">
+        <input type="text" name="nome" value="{{.Motore.Nome}}" class="form-control" required>
       </div>
       <div class="form-actions">
+        {{if eq .Config.Modalita "fondi"}}
+        <a href="/motori/{{.Motore.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
+        {{else}}
         <a href="/motori/{{.Motore.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+        {{end}}
         <button type="submit" class="btn btn-primary">Attiva motore ✓</button>
         <a href="/motori" class="btn btn-secondary">Salva come bozza</a>
       </div>

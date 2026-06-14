@@ -2,7 +2,7 @@
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 2: Mapping{{end}}
+{{define "title"}}{{.Motore.Nome}} — Step 2: Tipo bando{{end}}
 
 {{define "content"}}
 <div class="page-header">
@@ -12,93 +12,62 @@
 
 <div class="wizard-steps">
   <span class="wizard-step">1. Servizio</span>
-  <span class="wizard-step wizard-step-active">2. Mapping</span>
-  <span class="wizard-step">3. Filtri</span>
-  <span class="wizard-step">4. Tipologie</span>
-  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step wizard-step-active">2. Tipo bando</span>
+  <span class="wizard-step">3. Mapping</span>
+  <span class="wizard-step">4. Filtri</span>
+  <span class="wizard-step">5. Tipologie</span>
+  <span class="wizard-step">6. Rimborso</span>
   <span class="wizard-step">Fine</span>
 </div>
 
-<div class="wizard-layout">
+<form method="POST" action="/motori/{{.Motore.ID}}/wizard/2" style="max-width:740px">
+  <h2>Tipo di bando</h2>
+  <p class="text-muted">Seleziona come l'engine assegna le risorse. Determina quali step del wizard saranno attivi.</p>
 
-  <!-- Colonna sinistra: form mapping -->
-  <div class="wizard-col-main">
-    <form method="POST" action="/motori/{{.Motore.ID}}/wizard/2">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem">
 
-      <h2>Mapping campi logici → JSON</h2>
-      <p class="text-muted">Per ogni campo logico, indica il percorso nel JSON dell'istanza (usa il viewer a destra). Lascia vuoto per non mappare.</p>
+    <label class="card-radio {{if eq .Modalita "fondi"}}card-radio-selected{{end}}" style="cursor:pointer;padding:1.25rem;border:2px solid {{if eq .Modalita "fondi"}}#2563eb{{else}}#e2e8f0{{end}};border-radius:10px">
+      <input type="radio" name="modalita" value="fondi" {{if eq .Modalita "fondi"}}checked{{end}} style="display:none" onchange="this.form.submit()">
+      <div style="font-size:1.75rem;margin-bottom:.5rem">💰</div>
+      <strong>Assegnazione fondi</strong>
+      <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Rimborso € per ogni istanza ammessa, fino a esaurimento budget. Supporta rimborso parziale.</p>
+    </label>
 
-      {{if .CampiFlat}}
-      <datalist id="percorsi-json">
-        {{range .CampiFlat}}<option value="{{.Path}}">{{end}}
-      </datalist>
-      {{end}}
+    <label class="card-radio {{if eq .Modalita "posti"}}card-radio-selected{{end}}" style="cursor:pointer;padding:1.25rem;border:2px solid {{if eq .Modalita "posti"}}#2563eb{{else}}#e2e8f0{{end}};border-radius:10px">
+      <input type="radio" name="modalita" value="posti" {{if eq .Modalita "posti"}}checked{{end}} style="display:none" onchange="this.form.submit()">
+      <div style="font-size:1.75rem;margin-bottom:.5rem">🎫</div>
+      <strong>Posti limitati</strong>
+      <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Primi N ammessi, senza rimborso monetario. Es. trasporto scolastico, centri estivi.</p>
+    </label>
 
-      <table class="table">
-        <thead>
-          <tr><th>Campo logico</th><th>Descrizione</th><th>Path JSON</th><th>Tipo</th><th>Array?</th></tr>
-        </thead>
-        <tbody>
-        {{range .CampiLogici}}
-        <tr>
-          <td><strong>{{.Nome}}</strong></td>
-          <td class="text-muted" style="font-size:.85em">{{.Desc}}</td>
-          <td>
-            <input type="text" name="path_{{.Nome}}" value="{{.Path}}"
-              class="form-control form-control-sm" list="percorsi-json"
-              placeholder="{{if .PathDefault}}{{.PathDefault}}{{else}}data.campo.sottocampo{{end}}">
-          </td>
-          <td>
-            <select name="tipo_{{.Nome}}" class="form-control form-control-sm">
-              <option value="float" {{if eq .Tipo "float"}}selected{{end}}>float</option>
-              <option value="string" {{if eq .Tipo "string"}}selected{{end}}>string</option>
-              <option value="int" {{if eq .Tipo "int"}}selected{{end}}>int</option>
-              <option value="time" {{if eq .Tipo "time"}}selected{{end}}>time</option>
-              <option value="count" {{if eq .Tipo "count"}}selected{{end}}>count</option>
-            </select>
-          </td>
-          <td style="text-align:center">
-            <input type="checkbox" name="expand_{{.Nome}}" value="1" {{if .Expand}}checked{{end}} title="Espandi array">
-          </td>
-        </tr>
-        {{end}}
-        </tbody>
-      </table>
+    <label class="card-radio {{if eq .Modalita "ammissione"}}card-radio-selected{{end}}" style="cursor:pointer;padding:1.25rem;border:2px solid {{if eq .Modalita "ammissione"}}#2563eb{{else}}#e2e8f0{{end}};border-radius:10px">
+      <input type="radio" name="modalita" value="ammissione" {{if eq .Modalita "ammissione"}}checked{{end}} style="display:none" onchange="this.form.submit()">
+      <div style="font-size:1.75rem;margin-bottom:.5rem">✅</div>
+      <strong>Ammissione libera</strong>
+      <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Tutti che superano i requisiti sono ammessi. No limite di posti o budget.</p>
+    </label>
 
-      <div class="form-group">
-        <label>Campo di espansione array (nome campo logico che punta a un array da espandere in righe)</label>
-        <input type="text" name="espansione" value="{{.Espansione}}" class="form-control" placeholder="es. anni">
-      </div>
+    <label class="card-radio {{if eq .Modalita "lista_attesa"}}card-radio-selected{{end}}" style="cursor:pointer;padding:1.25rem;border:2px solid {{if eq .Modalita "lista_attesa"}}#2563eb{{else}}#e2e8f0{{end}};border-radius:10px">
+      <input type="radio" name="modalita" value="lista_attesa" {{if eq .Modalita "lista_attesa"}}checked{{end}} style="display:none" onchange="this.form.submit()">
+      <div style="font-size:1.75rem;margin-bottom:.5rem">📋</div>
+      <strong>Lista d'attesa</strong>
+      <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Come ammissione libera ma ordinata per criterio (es. data domanda). Tutti risultano ammessi in ordine.</p>
+    </label>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Salva e continua →</button>
-      </div>
-    </form>
   </div>
 
-  <!-- Colonna destra: viewer JSON flat -->
-  <div class="wizard-col-side">
-    <h3>Struttura istanza campione</h3>
-    {{if .ErrCampione}}
-    <div class="alert alert-error">{{.ErrCampione}}</div>
-    {{else if not .CampiFlat}}
-    <p class="text-muted">Nessun dato disponibile.</p>
-    {{else}}
-    <div class="json-viewer">
-      <table class="table table-sm">
-        <thead><tr><th>Percorso</th><th>Valore</th></tr></thead>
-        <tbody>
-        {{range .CampiFlat}}
-        <tr>
-          <td><code style="font-size:.75em">{{.Path}}</code></td>
-          <td style="font-size:.82em;color:#555;max-width:220px;word-break:break-word">{{.Value}}</td>
-        </tr>
-        {{end}}
-        </tbody>
-      </table>
-    </div>
-    {{end}}
+  {{if .Modalita}}
+  <div style="margin-top:1.5rem;padding:1rem;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
+    <strong>Modalità selezionata: {{.Modalita}}</strong>
+    {{if eq .Modalita "fondi"}}<span class="text-muted"> — Step attivi: mapping → filtri → tipologie → rimborso → fine</span>{{end}}
+    {{if eq .Modalita "posti"}}<span class="text-muted"> — Step attivi: mapping → filtri → tipologie (posti) → fine</span>{{end}}
+    {{if eq .Modalita "ammissione"}}<span class="text-muted"> — Step attivi: mapping → filtri → fine</span>{{end}}
+    {{if eq .Modalita "lista_attesa"}}<span class="text-muted"> — Step attivi: mapping → filtri → fine</span>{{end}}
   </div>
+  {{end}}
 
-</div>
+  <div class="form-actions" style="margin-top:1.5rem">
+    <button type="submit" class="btn btn-primary" {{if not .Modalita}}disabled{{end}}>Salva e continua →</button>
+  </div>
+</form>
 {{end}}

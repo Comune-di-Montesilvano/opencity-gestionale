@@ -2,8 +2,11 @@ package graduatoria
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
+
+	"opencity-gestionale/internal/graduatoria/cf"
 )
 
 // Record è il record estratto da un'istanza OpenCity tramite engine generico.
@@ -69,25 +72,150 @@ func (r *Record) ChiaveDedup(campi []string) string {
 
 // PassaFiltro verifica se il record supera il filtro dato.
 func (r *Record) PassaFiltro(f FiltroConfig) bool {
-	// Prova float
+	switch f.Op {
+	// --- operatori CF ---
+	case "cf_eta_max", "cf_eta_min", "cf_sesso", "cf_comune", "cf_valido", "cf_anno_max", "cf_anno_min":
+		return valutaCF(r.StringMap[f.Campo], f.Op, f.Valore)
+
+	// --- operatori stringa ---
+	case "contiene", "inizia_con", "finisce_con", "in", "non_in", "vuoto", "non_vuoto":
+		return valutaStringa(r.StringMap[f.Campo], f.Op, f.Valore)
+
+	// --- operatori booleano ---
+	case "vero", "falso":
+		return valutaBooleano(r.StringMap[f.Campo], f.Op)
+
+	// --- operatori data ---
+	case "prima_di", "dopo_di", "eta_max", "eta_min":
+		return valutaData(r.TimeMap[f.Campo], f.Op, f.Valore)
+
+	// --- operatori numerici (default) ---
+	default:
+		// tra: valore="min,max"
+		if f.Op == "tra" {
+			return valutaTra(r, f)
+		}
+		// Prova float → int → string con op standard
+		if fv, ok := r.FloatMap[f.Campo]; ok {
+			return cmpFloat(fv, f.Op, toFloat64(f.Valore))
+		}
+		if iv, ok := r.IntMap[f.Campo]; ok {
+			return cmpInt(iv, f.Op, int(toFloat64(f.Valore)))
+		}
+		if sv, ok := r.StringMap[f.Campo]; ok {
+			return cmpString(sv, f.Op, fmt.Sprintf("%v", f.Valore))
+		}
+		return false
+	}
+}
+
+func valutaCF(codice, op string, valore any) bool {
+	s := fmt.Sprintf("%v", valore)
+	switch op {
+	case "cf_eta_max":
+		return cf.EtaAnni(codice) <= int(toFloat64(valore))
+	case "cf_eta_min":
+		return cf.EtaAnni(codice) >= int(toFloat64(valore))
+	case "cf_anno_max":
+		return cf.AnnoBirth(codice) <= int(toFloat64(valore))
+	case "cf_anno_min":
+		return cf.AnnoBirth(codice) >= int(toFloat64(valore))
+	case "cf_sesso":
+		return strings.EqualFold(cf.Sesso(codice), s)
+	case "cf_comune":
+		return strings.EqualFold(cf.ComuneNascita(codice), s)
+	case "cf_valido":
+		return cf.Valido(codice)
+	}
+	return false
+}
+
+func valutaStringa(val, op string, valore any) bool {
+	s := strings.ToLower(fmt.Sprintf("%v", valore))
+	v := strings.ToLower(val)
+	switch op {
+	case "contiene":
+		return strings.Contains(v, s)
+	case "inizia_con":
+		return strings.HasPrefix(v, s)
+	case "finisce_con":
+		return strings.HasSuffix(v, s)
+	case "in":
+		for _, part := range strings.Split(s, ",") {
+			if strings.TrimSpace(part) == v {
+				return true
+			}
+		}
+		return false
+	case "non_in":
+		for _, part := range strings.Split(s, ",") {
+			if strings.TrimSpace(part) == v {
+				return false
+			}
+		}
+		return true
+	case "vuoto":
+		return val == ""
+	case "non_vuoto":
+		return val != ""
+	}
+	return false
+}
+
+func valutaBooleano(val, op string) bool {
+	truthy := val == "true" || val == "1"
+	switch op {
+	case "vero":
+		return truthy
+	case "falso":
+		return !truthy
+	}
+	return false
+}
+
+func valutaData(t time.Time, op string, valore any) bool {
+	s := fmt.Sprintf("%v", valore)
+	switch op {
+	case "prima_di":
+		ref := toTime(s)
+		return t.Before(ref)
+	case "dopo_di":
+		ref := toTime(s)
+		return t.After(ref)
+	case "eta_max":
+		n, _ := strconv.Atoi(s)
+		anni := etaAnniDa(t)
+		return anni <= n
+	case "eta_min":
+		n, _ := strconv.Atoi(s)
+		anni := etaAnniDa(t)
+		return anni >= n
+	}
+	return false
+}
+
+func etaAnniDa(t time.Time) int {
+	oggi := time.Now()
+	eta := oggi.Year() - t.Year()
+	if oggi.Month() < t.Month() || (oggi.Month() == t.Month() && oggi.Day() < t.Day()) {
+		eta--
+	}
+	return eta
+}
+
+func valutaTra(r *Record, f FiltroConfig) bool {
+	s := fmt.Sprintf("%v", f.Valore)
+	parts := strings.SplitN(s, ",", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	min := toFloat64(strings.TrimSpace(parts[0]))
+	max := toFloat64(strings.TrimSpace(parts[1]))
 	if fv, ok := r.FloatMap[f.Campo]; ok {
-		target := toFloat64(f.Valore)
-		return cmpFloat(fv, f.Op, target)
+		return fv >= min && fv <= max
 	}
-	// Prova time
-	if tv, ok := r.TimeMap[f.Campo]; ok {
-		target := toTime(f.Valore)
-		return cmpTime(tv, f.Op, target)
-	}
-	// Prova int
 	if iv, ok := r.IntMap[f.Campo]; ok {
-		target := int(toFloat64(f.Valore))
-		return cmpInt(iv, f.Op, target)
-	}
-	// Prova string
-	if sv, ok := r.StringMap[f.Campo]; ok {
-		target := fmt.Sprintf("%v", f.Valore)
-		return cmpString(sv, f.Op, target)
+		return float64(iv) >= min && float64(iv) <= max
 	}
 	return false
 }
@@ -201,9 +329,9 @@ func cmpInt(a int, op string, b int) bool {
 func cmpString(a, op, b string) bool {
 	switch op {
 	case "==":
-		return a == b
+		return strings.EqualFold(a, b)
 	case "!=":
-		return a != b
+		return !strings.EqualFold(a, b)
 	}
 	return false
 }

@@ -8,6 +8,7 @@ type EngineConfig struct {
 	Filtri         []FiltroConfig          `json:"filtri"`
 	Deduplicazione DedupConfig             `json:"deduplicazione"`
 	Ordinamento    []OrdineConfig          `json:"ordinamento"`
+	Modalita       string                  `json:"modalita"` // "fondi"|"posti"|"ammissione"|"lista_attesa"
 	Tipologie      []TipologiaConfig       `json:"tipologie"`
 	Rimborso       RimborsoConfig          `json:"rimborso"`
 }
@@ -35,16 +36,17 @@ type OrdineConfig struct {
 }
 
 type TipologiaConfig struct {
-	Nome     string       `json:"nome"`
-	Campo    string       `json:"campo"`
-	Valore   string       `json:"valore"`
-	Priorita int          `json:"priorita"`
-	Budget   BudgetConfig `json:"budget"`
+	Nome     string      `json:"nome"`
+	Campo    string      `json:"campo"`   // "" = corrisponde a tutti
+	Valore   string      `json:"valore"`  // "" = corrisponde a tutti
+	Priorita int         `json:"priorita"`
+	Limite   LimiteConfig `json:"limite"`
 }
 
-type BudgetConfig struct {
-	Tipo   string  `json:"tipo"`   // "residuo" | "percentuale" | "fisso"
-	Valore float64 `json:"valore"` // usato per percentuale e fisso
+// LimiteConfig definisce come vengono assegnate le risorse nella tipologia.
+type LimiteConfig struct {
+	Tipo   string  `json:"tipo"`   // "budget"|"posti"|"nessuno"|"residuo"|"percentuale"|"fisso"
+	Valore float64 `json:"valore"` // € se budget/fisso, count se posti, percentuale (0-1) se percentuale
 }
 
 type RimborsoConfig struct {

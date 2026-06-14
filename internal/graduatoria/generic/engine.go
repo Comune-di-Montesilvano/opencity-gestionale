@@ -58,45 +58,87 @@ func (e *Engine) Calcola(apps []opencity.Application, cfg graduatoria.BandoConfi
 		}
 	}
 
-	// Rispetta ordine di priorità delle tipologie.
+	grad := &graduatoria.Graduatoria{Escluse: escluse}
+
+	switch ecfg.Modalita {
+	case "ammissione", "lista_attesa":
+		return buildGraduatoriaAmmissione(ammissibili, grad, ecfg), nil
+	case "posti":
+		return buildGraduatoriaPosti(ammissibili, grad, ecfg), nil
+	default: // "fondi" o non specificato
+		return buildGraduatoriaFondi(ammissibili, grad, ecfg, cfg.BudgetTotale), nil
+	}
+}
+
+func buildGraduatoriaAmmissione(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig) *graduatoria.Graduatoria {
+	ordinaRecord(ammissibili, ecfg.Ordinamento)
+	ammissibili, dupl := deduplicaRecord(ammissibili, ecfg.Deduplicazione)
+	appendDuplicati(grad, dupl, ecfg.Deduplicazione.Chiave)
+
+	var righe []graduatoria.RigaGraduatoria
+	for pos, rec := range ammissibili {
+		righe = append(righe, graduatoria.RigaGraduatoria{
+			Posizione: pos + 1,
+			Istanza:   rec.ToIstanza(),
+			Ammessa:   true,
+		})
+	}
+	grad.Gruppi = append(grad.Gruppi, &graduatoria.GraduatoriaGruppo{
+		Nome:  "ammessi",
+		Righe: righe,
+	})
+	return grad
+}
+
+func buildGraduatoriaPosti(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig) *graduatoria.Graduatoria {
 	sort.Slice(ecfg.Tipologie, func(i, j int) bool {
 		return ecfg.Tipologie[i].Priorita < ecfg.Tipologie[j].Priorita
 	})
 
-	// Raggruppa ammissibili per tipologia.
-	gruppiRecord := make(map[string][]*graduatoria.Record)
-	for _, rec := range ammissibili {
-		nome := tipologiaDiRecord(rec, ecfg.Tipologie)
-		if nome == "" {
-			escluse = append(escluse, graduatoria.RigaGraduatoria{
-				Istanza:        rec.ToIstanza(),
-				Ammessa:        false,
-				NoteEsclusione: "tipologia non riconosciuta",
-			})
-			continue
-		}
-		gruppiRecord[nome] = append(gruppiRecord[nome], rec)
-	}
-
-	grad := &graduatoria.Graduatoria{Escluse: escluse}
-	residuo := cfg.BudgetTotale
+	gruppiRecord := raggruppaPerTipologia(ammissibili, ecfg.Tipologie, grad)
 
 	for _, tip := range ecfg.Tipologie {
 		lista := gruppiRecord[tip.Nome]
-
 		ordinaRecord(lista, ecfg.Ordinamento)
-
 		lista, dupl := deduplicaRecord(lista, ecfg.Deduplicazione)
-		for _, d := range dupl {
-			grad.Escluse = append(grad.Escluse, graduatoria.RigaGraduatoria{
-				Istanza:        d.rec.ToIstanza(),
-				Ammessa:        false,
-				NoteEsclusione: "duplicato: stesso " + strings.Join(ecfg.Deduplicazione.Chiave, "+") + " già presente",
-				OriginalID:     d.origID,
-			})
-		}
+		appendDuplicati(grad, dupl, ecfg.Deduplicazione.Chiave)
 
-		budget := budgetTipologia(tip.Budget, cfg.BudgetTotale, residuo)
+		maxPosti := int(tip.Limite.Valore)
+		var righe []graduatoria.RigaGraduatoria
+		for pos, rec := range lista {
+			riga := graduatoria.RigaGraduatoria{
+				Posizione: pos + 1,
+				Istanza:   rec.ToIstanza(),
+				Ammessa:   maxPosti == 0 || pos < maxPosti,
+			}
+			if !riga.Ammessa {
+				riga.NoteEsclusione = "posti esauriti"
+			}
+			righe = append(righe, riga)
+		}
+		grad.Gruppi = append(grad.Gruppi, &graduatoria.GraduatoriaGruppo{
+			Nome:  tip.Nome,
+			Righe: righe,
+		})
+	}
+	return grad
+}
+
+func buildGraduatoriaFondi(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig, budgetTotale float64) *graduatoria.Graduatoria {
+	sort.Slice(ecfg.Tipologie, func(i, j int) bool {
+		return ecfg.Tipologie[i].Priorita < ecfg.Tipologie[j].Priorita
+	})
+
+	gruppiRecord := raggruppaPerTipologia(ammissibili, ecfg.Tipologie, grad)
+	residuo := budgetTotale
+
+	for _, tip := range ecfg.Tipologie {
+		lista := gruppiRecord[tip.Nome]
+		ordinaRecord(lista, ecfg.Ordinamento)
+		lista, dupl := deduplicaRecord(lista, ecfg.Deduplicazione)
+		appendDuplicati(grad, dupl, ecfg.Deduplicazione.Chiave)
+
+		budget := limiteTipologia(tip.Limite, budgetTotale, residuo)
 		righe, usato := assegnaRecord(lista, budget, ecfg.Rimborso)
 		residuo -= usato
 
@@ -106,8 +148,7 @@ func (e *Engine) Calcola(apps []opencity.Application, cfg graduatoria.BandoConfi
 			BudgetUsato: usato,
 		})
 	}
-
-	return grad, nil
+	return grad
 }
 
 func (e *Engine) CSVHeaders() []string {
@@ -267,13 +308,41 @@ func applicaFiltri(rec *graduatoria.Record, filtri []graduatoria.FiltroConfig) (
 	return true, ""
 }
 
+func raggruppaPerTipologia(ammissibili []*graduatoria.Record, tipologie []graduatoria.TipologiaConfig, grad *graduatoria.Graduatoria) map[string][]*graduatoria.Record {
+	gruppi := make(map[string][]*graduatoria.Record)
+	for _, rec := range ammissibili {
+		nome := tipologiaDiRecord(rec, tipologie)
+		if nome == "" {
+			grad.Escluse = append(grad.Escluse, graduatoria.RigaGraduatoria{
+				Istanza:        rec.ToIstanza(),
+				Ammessa:        false,
+				NoteEsclusione: "tipologia non riconosciuta",
+			})
+			continue
+		}
+		gruppi[nome] = append(gruppi[nome], rec)
+	}
+	return gruppi
+}
+
 func tipologiaDiRecord(rec *graduatoria.Record, tipologie []graduatoria.TipologiaConfig) string {
 	for _, tip := range tipologie {
-		if rec.StringMap[tip.Campo] == tip.Valore {
+		if tip.Campo == "" || rec.StringMap[tip.Campo] == tip.Valore {
 			return tip.Nome
 		}
 	}
 	return ""
+}
+
+func appendDuplicati(grad *graduatoria.Graduatoria, dupl []recordDuplicato, chiave []string) {
+	for _, d := range dupl {
+		grad.Escluse = append(grad.Escluse, graduatoria.RigaGraduatoria{
+			Istanza:        d.rec.ToIstanza(),
+			Ammessa:        false,
+			NoteEsclusione: "duplicato: stesso " + strings.Join(chiave, "+") + " già presente",
+			OriginalID:     d.origID,
+		})
+	}
 }
 
 func ordinaRecord(lista []*graduatoria.Record, ordini []graduatoria.OrdineConfig) {
@@ -327,13 +396,13 @@ func deduplicaRecord(lista []*graduatoria.Record, cfg graduatoria.DedupConfig) (
 	return unici, dupl
 }
 
-func budgetTipologia(cfg graduatoria.BudgetConfig, totale, residuo float64) float64 {
+func limiteTipologia(cfg graduatoria.LimiteConfig, totale, residuo float64) float64 {
 	switch cfg.Tipo {
 	case "percentuale":
 		return totale * cfg.Valore
-	case "fisso":
+	case "fisso", "budget":
 		return cfg.Valore
-	default: // "residuo"
+	default: // "residuo" o non specificato
 		return residuo
 	}
 }

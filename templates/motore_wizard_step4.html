@@ -2,7 +2,7 @@
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 4: Tipologie{{end}}
+{{define "title"}}{{.Motore.Nome}} — Step 4: Filtri{{end}}
 
 {{define "content"}}
 <div class="page-header">
@@ -11,92 +11,73 @@
 
 <div class="wizard-steps">
   <span class="wizard-step">1. Servizio</span>
-  <span class="wizard-step">2. Mapping</span>
-  <span class="wizard-step">3. Filtri</span>
-  <span class="wizard-step wizard-step-active">4. Tipologie</span>
-  <span class="wizard-step">5. Rimborso</span>
+  <span class="wizard-step">2. Tipo bando</span>
+  <span class="wizard-step">3. Mapping</span>
+  <span class="wizard-step wizard-step-active">4. Filtri</span>
+  <span class="wizard-step">5. Tipologie</span>
+  <span class="wizard-step">6. Rimborso</span>
   <span class="wizard-step">Fine</span>
 </div>
 
 <form method="POST" action="/motori/{{.Motore.ID}}/wizard/4">
+  <h2>Filtri di ammissibilità</h2>
+  <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria.</p>
 
-  <!-- Tipologie -->
-  <h2>Tipologie</h2>
-  <p class="text-muted">Definisci le categorie di istanze (es. "rette", "mense"). Ogni tipologia può avere un budget dedicato e una priorità.</p>
-
-  <div id="tipologie-container">
-  {{range $i, $t := .Tipologie}}
-  <div class="tipologia-row card-row">
-    <div class="form-group">
-      <label>Nome</label>
-      <input type="text" name="tip_nome" value="{{$t.Nome}}" class="form-control form-control-sm" placeholder="es. rette">
-    </div>
-    <div class="form-group">
-      <label>Campo</label>
-      <select name="tip_campo" class="form-control form-control-sm">
-        <option value="">— campo —</option>
-        {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $t.Campo}}selected{{end}}>{{.}}</option>{{end}}
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Valore</label>
-      <input type="text" name="tip_valore" value="{{$t.Valore}}" class="form-control form-control-sm" placeholder="es. rette">
-    </div>
-    <div class="form-group">
-      <label>Priorità</label>
-      <input type="number" name="tip_priorita" value="{{$t.Priorita}}" class="form-control form-control-sm" min="1" placeholder="1">
-    </div>
-    <div class="form-group">
-      <label>Budget tipo</label>
-      <select name="tip_budget_tipo" class="form-control form-control-sm">
-        <option value="percentuale" {{if eq $t.Budget.Tipo "percentuale"}}selected{{end}}>% del totale</option>
-        <option value="fisso" {{if eq $t.Budget.Tipo "fisso"}}selected{{end}}>Importo fisso</option>
-        <option value="residuo" {{if eq $t.Budget.Tipo "residuo"}}selected{{end}}>Residuo</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Budget valore</label>
-      <input type="number" name="tip_budget_valore" value="{{$t.Budget.Valore}}" class="form-control form-control-sm" step="0.01" min="0" placeholder="50">
-    </div>
-    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-row').remove()">✕</button>
-  </div>
-  {{end}}
-  </div>
-  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiTipologia()">+ Aggiungi tipologia</button>
-
-  <!-- Ordinamento -->
-  <h2 style="margin-top:2rem">Ordinamento</h2>
-  <p class="text-muted">Ordine di scorrimento della graduatoria (es. ISEE crescente, poi numero figli decrescente).</p>
-
-  <div id="ordini-container">
-  {{range $i, $o := .Ordinamento}}
-  <div class="ordine-row">
-    <select name="ord_campo" class="form-control form-control-sm">
+  <div id="filtri-container">
+  {{range $i, $f := .Filtri}}
+  <div class="filtro-row" data-idx="{{$i}}">
+    <select name="filtro_campo" class="form-control form-control-sm">
       <option value="">— campo —</option>
-      {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $o.Campo}}selected{{end}}>{{.}}</option>{{end}}
+      {{range $.CampiMappati}}
+      <option value="{{.}}" {{if eq . $f.Campo}}selected{{end}}>{{.}}</option>
+      {{end}}
     </select>
-    <select name="ord_dir" class="form-control form-control-sm">
-      <option value="asc" {{if eq $o.Dir "asc"}}selected{{end}}>Crescente ↑</option>
-      <option value="desc" {{if eq $o.Dir "desc"}}selected{{end}}>Decrescente ↓</option>
+    <select name="filtro_op" class="form-control form-control-sm" onchange="aggiornaValore(this)">
+      <optgroup label="Numerico">
+        <option value="<="   {{if eq $f.Op "<="}}selected{{end}}>≤</option>
+        <option value=">="   {{if eq $f.Op ">="}}selected{{end}}>≥</option>
+        <option value="=="   {{if eq $f.Op "=="}}selected{{end}}>==</option>
+        <option value="!="   {{if eq $f.Op "!="}}selected{{end}}>≠</option>
+        <option value="<"    {{if eq $f.Op "<"}}selected{{end}}>&lt;</option>
+        <option value=">"    {{if eq $f.Op ">"}}selected{{end}}>&gt;</option>
+        <option value="tra"  {{if eq $f.Op "tra"}}selected{{end}}>tra (min,max)</option>
+      </optgroup>
+      <optgroup label="Stringa">
+        <option value="contiene"     {{if eq $f.Op "contiene"}}selected{{end}}>contiene</option>
+        <option value="inizia_con"   {{if eq $f.Op "inizia_con"}}selected{{end}}>inizia con</option>
+        <option value="finisce_con"  {{if eq $f.Op "finisce_con"}}selected{{end}}>finisce con</option>
+        <option value="in"           {{if eq $f.Op "in"}}selected{{end}}>in lista (a,b,c)</option>
+        <option value="non_in"       {{if eq $f.Op "non_in"}}selected{{end}}>non in lista</option>
+        <option value="vuoto"        {{if eq $f.Op "vuoto"}}selected{{end}}>vuoto</option>
+        <option value="non_vuoto"    {{if eq $f.Op "non_vuoto"}}selected{{end}}>non vuoto</option>
+      </optgroup>
+      <optgroup label="Booleano">
+        <option value="vero"  {{if eq $f.Op "vero"}}selected{{end}}>vero</option>
+        <option value="falso" {{if eq $f.Op "falso"}}selected{{end}}>falso</option>
+      </optgroup>
+      <optgroup label="Data">
+        <option value="prima_di" {{if eq $f.Op "prima_di"}}selected{{end}}>prima di</option>
+        <option value="dopo_di"  {{if eq $f.Op "dopo_di"}}selected{{end}}>dopo di</option>
+        <option value="eta_max"  {{if eq $f.Op "eta_max"}}selected{{end}}>età max (anni)</option>
+        <option value="eta_min"  {{if eq $f.Op "eta_min"}}selected{{end}}>età min (anni)</option>
+      </optgroup>
+      <optgroup label="Codice Fiscale">
+        <option value="cf_eta_max"  {{if eq $f.Op "cf_eta_max"}}selected{{end}}>CF età max</option>
+        <option value="cf_eta_min"  {{if eq $f.Op "cf_eta_min"}}selected{{end}}>CF età min</option>
+        <option value="cf_anno_max" {{if eq $f.Op "cf_anno_max"}}selected{{end}}>CF anno nascita max</option>
+        <option value="cf_anno_min" {{if eq $f.Op "cf_anno_min"}}selected{{end}}>CF anno nascita min</option>
+        <option value="cf_sesso"    {{if eq $f.Op "cf_sesso"}}selected{{end}}>CF sesso (M/F)</option>
+        <option value="cf_comune"   {{if eq $f.Op "cf_comune"}}selected{{end}}>CF comune nascita</option>
+        <option value="cf_valido"   {{if eq $f.Op "cf_valido"}}selected{{end}}>CF valido (checksum)</option>
+      </optgroup>
     </select>
-    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.ordine-row').remove()">✕</button>
+    <input type="text" name="filtro_valore" value="{{$f.Valore}}" class="form-control form-control-sm" placeholder="valore">
+    <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
   </div>
   {{end}}
   </div>
-  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiOrdine()">+ Aggiungi criterio</button>
 
-  <!-- Deduplicazione -->
-  <h2 style="margin-top:2rem">Deduplicazione</h2>
-  <p class="text-muted">Se attiva, mantiene una sola istanza per chiave (es. figlio + anno + tipo). La più recente vince.</p>
-
-  <div class="form-group" style="display:flex;align-items:center;gap:.75rem">
-    <input type="checkbox" name="dedup_attiva" value="1" id="dedup-attiva" {{if .Deduplicazione.Attiva}}checked{{end}}>
-    <label for="dedup-attiva" style="margin:0">Attiva deduplicazione</label>
-  </div>
-  <div class="form-group">
-    <label>Chiave dedup (campi separati da virgola)</label>
-    <input type="text" name="dedup_chiave" value="{{join .Deduplicazione.Chiave ","}}" class="form-control" placeholder="es. figlio_cf,annualita,tipo">
-  </div>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltro()" style="margin-top:.5rem">+ Aggiungi filtro</button>
 
   <div class="form-actions" style="margin-top:1.5rem">
     <a href="/motori/{{.Motore.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
@@ -104,31 +85,77 @@
   </div>
 </form>
 
-<script>
-function aggiungiTipologia() {
-  const campi = {{range .CampiMappati}}'{{.}}',{{end}};
-  const opzioni = campi.map(c => `<option value="${c}">${c}</option>`).join('');
-  const html = `<div class="tipologia-row card-row">
-    <div class="form-group"><label>Nome</label><input type="text" name="tip_nome" class="form-control form-control-sm" placeholder="es. rette"></div>
-    <div class="form-group"><label>Campo</label><select name="tip_campo" class="form-control form-control-sm"><option value="">— campo —</option>${opzioni}</select></div>
-    <div class="form-group"><label>Valore</label><input type="text" name="tip_valore" class="form-control form-control-sm" placeholder="es. rette"></div>
-    <div class="form-group"><label>Priorità</label><input type="number" name="tip_priorita" class="form-control form-control-sm" min="1" value="1"></div>
-    <div class="form-group"><label>Budget tipo</label><select name="tip_budget_tipo" class="form-control form-control-sm"><option value="percentuale">% del totale</option><option value="fisso">Importo fisso</option><option value="residuo">Residuo</option></select></div>
-    <div class="form-group"><label>Budget valore</label><input type="number" name="tip_budget_valore" class="form-control form-control-sm" step="0.01" min="0" value="0"></div>
-    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-row').remove()">✕</button>
-  </div>`;
-  document.getElementById('tipologie-container').insertAdjacentHTML('beforeend', html);
-}
+<template id="filtro-tmpl">
+  <div class="filtro-row">
+    <select name="filtro_campo" class="form-control form-control-sm">
+      <option value="">— campo —</option>
+      {{range .CampiMappati}}<option value="{{.}}">{{.}}</option>{{end}}
+    </select>
+    <select name="filtro_op" class="form-control form-control-sm" onchange="aggiornaValore(this)">
+      <optgroup label="Numerico">
+        <option value="<=">&le;</option><option value=">=">&ge;</option>
+        <option value="==">=</option><option value="!=">≠</option>
+        <option value="<">&lt;</option><option value=">">&gt;</option>
+        <option value="tra">tra (min,max)</option>
+      </optgroup>
+      <optgroup label="Stringa">
+        <option value="contiene">contiene</option>
+        <option value="inizia_con">inizia con</option>
+        <option value="finisce_con">finisce con</option>
+        <option value="in">in lista (a,b,c)</option>
+        <option value="non_in">non in lista</option>
+        <option value="vuoto">vuoto</option>
+        <option value="non_vuoto">non vuoto</option>
+      </optgroup>
+      <optgroup label="Booleano">
+        <option value="vero">vero</option>
+        <option value="falso">falso</option>
+      </optgroup>
+      <optgroup label="Data">
+        <option value="prima_di">prima di</option>
+        <option value="dopo_di">dopo di</option>
+        <option value="eta_max">età max (anni)</option>
+        <option value="eta_min">età min (anni)</option>
+      </optgroup>
+      <optgroup label="Codice Fiscale">
+        <option value="cf_eta_max">CF età max</option>
+        <option value="cf_eta_min">CF età min</option>
+        <option value="cf_anno_max">CF anno nascita max</option>
+        <option value="cf_anno_min">CF anno nascita min</option>
+        <option value="cf_sesso">CF sesso (M/F)</option>
+        <option value="cf_comune">CF comune nascita</option>
+        <option value="cf_valido">CF valido</option>
+      </optgroup>
+    </select>
+    <input type="text" name="filtro_valore" class="form-control form-control-sm" placeholder="valore">
+    <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
+  </div>
+</template>
 
-function aggiungiOrdine() {
-  const campi = [{{range .CampiMappati}}'{{.}}',{{end}}];
-  const opzioni = campi.map(c => `<option value="${c}">${c}</option>`).join('');
-  const html = `<div class="ordine-row">
-    <select name="ord_campo" class="form-control form-control-sm"><option value="">— campo —</option>${opzioni}</select>
-    <select name="ord_dir" class="form-control form-control-sm"><option value="asc">Crescente ↑</option><option value="desc">Decrescente ↓</option></select>
-    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.ordine-row').remove()">✕</button>
-  </div>`;
-  document.getElementById('ordini-container').insertAdjacentHTML('beforeend', html);
+<script>
+function aggiungiFiltro() {
+  const tmpl = document.getElementById('filtro-tmpl').content.cloneNode(true);
+  document.getElementById('filtri-container').appendChild(tmpl);
+}
+function rimuoviFiltro(btn) {
+  btn.closest('.filtro-row').remove();
+}
+const NO_VALUE_OPS = new Set(['vuoto','non_vuoto','vero','falso','cf_valido']);
+function aggiornaValore(sel) {
+  const input = sel.closest('.filtro-row').querySelector('input[name="filtro_valore"]');
+  if (NO_VALUE_OPS.has(sel.value)) {
+    input.value = '';
+    input.disabled = true;
+    input.placeholder = '—';
+  } else {
+    input.disabled = false;
+    const hints = {
+      'tra':'min,max', 'prima_di':'2025-01-01', 'dopo_di':'2025-01-01',
+      'eta_max':'18', 'eta_min':'3', 'cf_sesso':'M', 'cf_comune':'H501',
+      'cf_eta_max':'18', 'cf_eta_min':'3', 'in':'a,b,c', 'non_in':'a,b,c',
+    };
+    input.placeholder = hints[sel.value] || 'valore';
+  }
 }
 </script>
 {{end}}

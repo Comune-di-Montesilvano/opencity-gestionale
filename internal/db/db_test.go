@@ -200,7 +200,7 @@ func TestRunsCRUD(t *testing.T) {
 		BandoID:     bandoID,
 		CalcolataDa: "mario",
 		CalcolataAt: time.Now(),
-		DatiJSON:    `{"PerAnno":[],"Escluse":null}`,
+		DatiJSON:    `{"Gruppi":[],"Escluse":null}`,
 		NumTotale:   100,
 		NumAmmesse:  80,
 		NumEscluse:  20,

@@ -171,17 +171,6 @@ func (h *GraduatoriaHandler) GetRunTabella(w http.ResponseWriter, r *http.Reques
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
 	var righe []graduatoria.RigaGraduatoria
-	for _, pa := range grad.PerAnno {
-		if pa.Annualita != anno {
-			continue
-		}
-		switch tipo {
-		case "rette":
-			righe = pa.Rette
-		case "mense":
-			righe = pa.Mense
-		}
-	}
 	if tipo == "escluse" {
 		righe = grad.Escluse
 	}
@@ -227,17 +216,6 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
 	var righe []graduatoria.RigaGraduatoria
-	for _, pa := range grad.PerAnno {
-		if pa.Annualita != anno {
-			continue
-		}
-		switch tipo {
-		case "rette":
-			righe = pa.Rette
-		case "mense":
-			righe = pa.Mense
-		}
-	}
 	if tipo == "escluse" {
 		righe = grad.Escluse
 	}
