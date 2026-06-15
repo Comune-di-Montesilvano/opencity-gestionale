@@ -48,7 +48,7 @@ func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	renderTemplate(w, "dashboard.html", map[string]any{
+	renderTemplate(w, "dashboard_operatore.html", map[string]any{
 		"Op":    op,
 		"Items": items,
 	})
