@@ -1,19 +1,17 @@
 services:
   gestionale:
-    build: .
+    image: ghcr.io/comune-di-montesilvano/opencity-gestionale:latest
     ports:
       - "127.0.0.1:${PORT:-8080}:${PORT:-8080}"
     volumes:
       - gestionale_data:/data
-    env_file:
-      - .env
     environment:
       PORT: ${PORT:-8080}
       DB_PATH: /data/gestionale.db
-      OPENCITY_BASE_URL: https://service.comune.montesilvano.pe.it
+      OPENCITY_BASE_URL: ${OPENCITY_BASE_URL}
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-apioperator}
-      TRUST_PROXY: ${TRUST_PROXY:-true}
+      TRUST_PROXY: "true"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-8080}/health"]
       interval: 30s
@@ -22,5 +20,26 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  backup:
+    image: alpine:3.21
+    volumes:
+      - gestionale_data:/data:ro
+      - gestionale_backup:/backup
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache sqlite > /dev/null 2>&1
+        while true; do
+          FNAME="/backup/gestionale-$$(date +%Y%m%d-%H%M).db"
+          sqlite3 /data/gestionale.db ".backup $$FNAME"
+          find /backup -name '*.db' -mtime +30 -delete
+          sleep 86400
+        done
+    restart: unless-stopped
+    depends_on:
+      gestionale:
+        condition: service_healthy
+
 volumes:
   gestionale_data:
+  gestionale_backup:
