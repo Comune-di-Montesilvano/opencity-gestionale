@@ -38,7 +38,7 @@ func (h *DashboardHandler) renderAdmin(w http.ResponseWriter, r *http.Request, o
 	})
 }
 
-func (h *DashboardHandler) renderOperatore(w http.ResponseWriter, r *http.Request, op *middleware.OperatorCtx) {
+func (h *DashboardHandler) renderOperatore(w http.ResponseWriter, _ *http.Request, op *middleware.OperatorCtx) {
 	motori, _ := db.ListMotori(h.DB, "attivo")
 
 	type motoreConRun struct {
