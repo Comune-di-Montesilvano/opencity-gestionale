@@ -1,0 +1,9 @@
+# Sviluppo locale — caricato automaticamente da `docker compose up`
+# Portainer ignora questo file (non è nel repository Portainer)
+services:
+  gestionale:
+    build: .
+    image: ""
+  backup:
+    profiles:
+      - backup
