@@ -1,0 +1,75 @@
+{{define "dashboard_admin.html"}}{{template "base" .}}{{end}}
+
+{{define "title"}}Bandi{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Bandi</h1>
+  <a href="/motori/nuovo" class="btn btn-primary">+ Nuovo bando</a>
+</div>
+
+<div class="stats-row">
+  <div class="stat">
+    <span class="stat-value">{{index .Counts "attivo"}}</span>
+    <span class="stat-label">Attivi</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{index .Counts "bozza"}}</span>
+    <span class="stat-label">Bozze</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{index .Counts "archiviato"}}</span>
+    <span class="stat-label">Archiviati</span>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <a href="/dashboard?stato=attivo" class="tab {{if eq .Stato "attivo"}}tab-active{{end}}">Attivi</a>
+  <a href="/dashboard?stato=bozza" class="tab {{if eq .Stato "bozza"}}tab-active{{end}}">Bozze</a>
+  <a href="/dashboard?stato=archiviato" class="tab {{if eq .Stato "archiviato"}}tab-active{{end}}">Archiviati</a>
+</div>
+
+{{if not .Motori}}
+<p class="text-muted" style="margin-top:1rem">Nessun bando in questo stato.</p>
+{{else}}
+<table class="table" style="margin-top:1rem">
+  <thead>
+    <tr>
+      <th>Nome</th>
+      <th>Budget</th>
+      <th>ISEE max</th>
+      <th>Scadenza</th>
+      <th>Stato</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Motori}}
+  <tr>
+    <td><a href="/motori/{{.ID}}">{{.Nome}}</a></td>
+    <td>{{if .BudgetTotale}}€{{printf "%.2f" .BudgetTotale}}{{else}}—{{end}}</td>
+    <td>{{if .ISEEMassimo}}€{{printf "%.2f" .ISEEMassimo}}{{else}}—{{end}}</td>
+    <td>{{if .ScadenzaPresentazione}}{{.ScadenzaPresentazione}}{{else}}—{{end}}</td>
+    <td>
+      {{if eq .StatoMotore "attivo"}}<span class="badge badge-green">Attivo</span>
+      {{else if eq .StatoMotore "archiviato"}}<span class="badge badge-gray">Archiviato</span>
+      {{else}}<span class="badge badge-yellow">Bozza</span>{{end}}
+    </td>
+    <td class="td-actions">
+      <a href="/motori/{{.ID}}" class="btn btn-sm btn-secondary">Dettaglio</a>
+      <a href="/motori/{{.ID}}/wizard/2" class="btn btn-sm btn-secondary">Modifica</a>
+      <form method="POST" action="/motori/{{.ID}}/duplica" style="display:inline">
+        <button type="submit" class="btn btn-sm">Duplica</button>
+      </form>
+      {{if ne .StatoMotore "archiviato"}}
+      <form method="POST" action="/motori/{{.ID}}/archivia" style="display:inline">
+        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo bando?')">Archivia</button>
+      </form>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}
