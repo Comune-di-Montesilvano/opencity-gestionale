@@ -9,20 +9,29 @@
 </head>
 <body>
 {{if .Op}}
-<nav class="navbar">
-  <span class="navbar-brand">Gestionale OpenCity — Montesilvano</span>
-  <div class="navbar-links">
-    <a href="/dashboard">Dashboard</a>
-    <a href="/motori">Motori</a>
-    <a href="/audit">Audit</a>
-    <span class="navbar-user">{{.Op.Username}} ({{.Op.Ruolo}})</span>
-    <a href="/logout">Esci</a>
-  </div>
-</nav>
-{{end}}
+<div class="app-layout">
+  <aside class="sidebar no-print">
+    <div class="sidebar-brand">Gestionale<br>OpenCity</div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/motori">Motori</a>
+      <a href="/audit">Audit</a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="sidebar-user">{{.Op.Username}} ({{.Op.Ruolo}})</span>
+      <a href="/logout" class="btn btn-sm btn-secondary btn-block">Esci</a>
+    </div>
+  </aside>
+  <main class="main-content">
+    {{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
+    {{block "content" .}}{{end}}
+  </main>
+</div>
+{{else}}
 <main class="container">
-{{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
-{{block "content" .}}{{end}}
+  {{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
+  {{block "content" .}}{{end}}
 </main>
+{{end}}
 </body>
 </html>{{end}}
