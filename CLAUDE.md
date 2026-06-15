@@ -155,6 +155,14 @@ Creare un motore richiede 7 step via wizard. Ogni step salva subito in DB — ri
 
 `saveEngineConfig` in `motori.go` serializza la `EngineConfig` corrente e la salva in `bandi.engine_config`. I motori attivi appaiono in `/motori` per tutti gli operatori con accesso al servizio.
 
+### Dashboard — split per ruolo (`internal/web/handlers/dashboard.go`)
+
+`GetDashboard` sceglie il template in base al ruolo:
+- Admin → `renderAdmin` → `dashboard_admin.html` (stats card + tabs `?stato=attivo|bozza|archiviato` + tabella CRUD bandi). Usa `db.CountBandiPerStato` per le stats.
+- Operatore → `renderOperatore` → `dashboard_operatore.html` (cards bandi attivi + ultima run). Filtra per `op.CanAccessService`, passa `soloPublicate=true` a `db.ListRuns`.
+
+Template `dashboard.html` eliminato — rinominato in `dashboard_operatore.html`.
+
 ### Workflow pubblicazione run
 
 Le run vengono create in stato `'bozza'` (`graduatorie_run.stato`). Solo l'admin può pubblicarle (`POST /motori/{id}/run/{runID}/pubblica`). Gli operatori non-admin vedono solo le run `'pubblicata'` — `db.ListRuns` accetta un parametro opzionale `soloPublicate bool`.
@@ -169,7 +177,7 @@ FuncMap aggiuntive in `handlers/render.go`:
 - `hasCol(cols []string, col string) bool`
 - `join(s []string, sep string) string`
 
-CSS `@media print` in `static/style.css` nasconde `.no-print` e `.navbar`.
+CSS `@media print` in `static/style.css` nasconde `.no-print` e `.sidebar`; resetta `margin-left` su `.main-content`.
 
 ### Auth completamente delegata a OpenCity
 
@@ -224,11 +232,17 @@ POST /motori/{id}/run/{runID}/pubblica    pubblica run (admin only)
 GET  /motori/{id}/run/{runID}/stampa      documento stampabile
 POST /motori/{id}/run/{runID}/approva-batch
 POST /motori/{id}/run/{runID}/rifiuta-batch
+GET  /motori/{id}/run/{runID}/export/iban   CSV IBAN ammessi
+GET  /motori/{id}/istruttoria               istruttoria pre-calcolo
+POST /motori/{id}/istruttoria/scansiona     HTMX: scansiona istanze
+POST /motori/{id}/istruttoria/batch         azione batch istruttoria
 GET  /audit                               audit trail
 GET  /dev/reload-templates                solo se DEV=true
 ```
 
 `bandoIDFromPath(r)` e `parseFloat(s)` in `handlers/helpers.go` — usati da graduatoria e motori handler.
+
+`db.ListRuns(db, bandoID, soloPublicate ...bool)` — terzo parametro variadic: se `true`, filtra solo run `'pubblicata'` (usato in `renderOperatore`; admin passa `false`).
 
 ## OpenCity API — Istanza Montesilvano
 
