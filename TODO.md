@@ -25,9 +25,9 @@
 
 ## Deploy
 
-- [ ] **Proxmox Podman**: systemd unit con `podman run --rm -v /opt/gestionale/data:/data:z ghcr.io/comune-di-montesilvano/opencity-gestionale:latest`
-- [ ] **Reverse proxy TLS**: nginx/Caddy davanti per HTTPS — impostare `TRUST_PROXY=true` per cookie Secure
-- [ ] **Backup SQLite**: cron `sqlite3 /data/gestionale.db ".backup /backup/gestionale-$(date +%Y%m%d).db"`
+- [x] **Proxmox Podman**: deploy via Portainer Stack — `docker-compose.yml` usa immagine GHCR, `docker-compose.override.yml` per build locale
+- [x] **Reverse proxy TLS**: esterno, fuori scope — `TRUST_PROXY=true` hardcoded in prod compose
+- [x] **Backup SQLite**: sidecar `backup` nello stack — Alpine + sqlite3, loop giornaliero, pruning 30gg, volume `gestionale_backup` exportabile da Portainer UI
 
 ---
 
