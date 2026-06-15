@@ -146,6 +146,24 @@ func CountBandi(db *sql.DB) (int, error) {
 	return n, err
 }
 
+func CountBandiPerStato(db *sql.DB) (map[string]int, error) {
+	rows, err := db.Query(`SELECT COALESCE(stato_motore,'bozza'), COUNT(*) FROM bandi GROUP BY stato_motore`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := map[string]int{"attivo": 0, "bozza": 0, "archiviato": 0}
+	for rows.Next() {
+		var stato string
+		var n int
+		if err := rows.Scan(&stato, &n); err != nil {
+			return nil, err
+		}
+		counts[stato] = n
+	}
+	return counts, rows.Err()
+}
+
 type scanner interface {
 	Scan(dest ...any) error
 }

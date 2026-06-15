@@ -119,6 +119,42 @@ func TestListBandi(t *testing.T) {
 	}
 }
 
+func TestCountBandiPerStato(t *testing.T) {
+	conn := openTestDB(t)
+
+	inserisci := func(stato string) {
+		b := &db.Bando{
+			ServiceID: "svc-" + stato + "-" + time.Now().String(),
+			Nome:      "Bando " + stato,
+			EngineType:   "generic",
+			EngineConfig: "{}",
+			Attivo:       stato != "archiviato",
+			StatoMotore:  stato,
+			CreatedAt:    time.Now(),
+		}
+		db.InsertBando(conn, b)
+	}
+
+	inserisci("attivo")
+	inserisci("attivo")
+	inserisci("bozza")
+	inserisci("archiviato")
+
+	counts, err := db.CountBandiPerStato(conn)
+	if err != nil {
+		t.Fatalf("CountBandiPerStato: %v", err)
+	}
+	if counts["attivo"] != 2 {
+		t.Errorf("attivo: got %d, want 2", counts["attivo"])
+	}
+	if counts["bozza"] != 1 {
+		t.Errorf("bozza: got %d, want 1", counts["bozza"])
+	}
+	if counts["archiviato"] != 1 {
+		t.Errorf("archiviato: got %d, want 1", counts["archiviato"])
+	}
+}
+
 // --- Sessioni ---
 
 func TestSessioniCRUD(t *testing.T) {
