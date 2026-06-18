@@ -42,7 +42,7 @@
             <th style="width:120px">Label (opz.)</th>
             <th style="width:90px">Tipo</th>
             <th>Path JSON</th>
-            <th style="width:60px" title="Relativo a ogni elemento dell'array di espansione">Espand.</th>
+            <th style="width:60px" title="Se spuntato: il path è relativo a ciascun elemento dell'array di espansione (non al documento radice)">Per elem.?</th>
             <th>Condizione PDND</th>
             <th style="width:32px"></th>
           </tr>
@@ -99,6 +99,11 @@
         </tbody>
       </table>
 
+      <div id="expand-note" style="font-size:12px; color:#6b7280; margin-bottom:.5rem; display:none">
+        ℹ️ I parametri con "Per elem.?" spuntato vengono estratti da ogni singolo elemento dell'array di espansione
+        (<code id="expand-note-name"></code>), non dal documento radice.
+      </div>
+
       <div class="form-actions" style="display:flex; gap:.5rem; align-items:center">
         <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
         <button type="button" class="btn btn-outline-secondary" onclick="salvaStep3()">Salva</button>
@@ -140,6 +145,9 @@
     <p class="text-muted">Nessun dato disponibile.</p>
     {{else}}
 
+    <!-- Array Builder popup — posizionato SOPRA il viewer -->
+    <div id="array-builder-panel" style="display:none; margin-bottom:.75rem; padding:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px"></div>
+
     <!-- Controlli filtro viewer -->
     <div style="display:flex; gap:.4rem; align-items:center; margin-bottom:.4rem; flex-wrap:wrap">
       <input type="text" id="viewer-search" class="form-control form-control-sm"
@@ -176,9 +184,6 @@
       </table>
     </div>
     {{end}}
-
-    <!-- Array Builder popup -->
-    <div id="array-builder-panel" style="display:none; margin-top:.75rem; padding:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px"></div>
   </div>
 </div>
 
@@ -262,6 +267,9 @@ document.querySelectorAll('.json-path-input[name="p_path"]').forEach(inp => upda
 if (document.getElementById('viewer-search') && document.getElementById('viewer-search').value) {
   renderViewer();
 }
+
+// Nota "Per elem." iniziale se espansione già impostata
+updateExpandNote(document.getElementById('espansione-field')?.value || '');
 
 // ── Gestione parametri ───────────────────────────────────────────────────────
 
@@ -494,9 +502,10 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
       <div style="display:flex; flex-direction:column; gap:6px">
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
           Dove
-          <select id="ab-cond-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
-          =
-          <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:100px">
+          <select id="ab-cond-field" class="form-control form-control-sm" style="width:auto" onchange="updateCondValSuggestions()">${keysOpts}</select>
+          uguale a
+          <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:120px" list="ab-cond-val-datalist" oninput="updateArrayPathPreview()">
+          <datalist id="ab-cond-val-datalist"></datalist>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
           Estrai campo
@@ -512,14 +521,46 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
     </div>
   `;
   panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   // Aggiorna preview path al cambio dei dropdown flusso B
-  ['ab-cond-field','ab-cond-val','ab-extract-field'].forEach(id => {
+  ['ab-extract-field'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('input', updateArrayPathPreview);
     if (el) el.addEventListener('change', updateArrayPathPreview);
   });
+
+  // Popola subito i valori per la prima chiave condizione
+  updateCondValSuggestions();
   updateArrayPathPreview();
+}
+
+// Raccoglie tutti i valori unici per la chiave condizione selezionata
+function updateCondValSuggestions() {
+  const key = document.getElementById('ab-cond-field')?.value;
+  const dl  = document.getElementById('ab-cond-val-datalist');
+  if (!key || !dl) return;
+
+  let arr = null;
+  try { arr = resolvePathJS(rawData, currentArrayPrefix); } catch(e) {}
+  if (!Array.isArray(arr)) { dl.innerHTML = ''; return; }
+
+  const vals = new Set();
+  arr.forEach(item => {
+    if (item && item[key] !== undefined && item[key] !== null) {
+      vals.add(String(item[key]));
+    }
+  });
+
+  dl.innerHTML = Array.from(vals).map(v => `<option value="${escapeHTML(v)}">`).join('');
+
+  // Se un solo valore univoco: auto-compila
+  if (vals.size === 1) {
+    const condValInput = document.getElementById('ab-cond-val');
+    if (condValInput && !condValInput.value) {
+      condValInput.value = Array.from(vals)[0];
+      updateArrayPathPreview();
+    }
+  }
 }
 
 function updateArrayPathPreview() {
@@ -558,9 +599,22 @@ function applyArrayExpand() {
   const espInput = document.getElementById('espansione-field');
   if (espInput) {
     espInput.value = currentArrayPrefix;
+    updateExpandNote(currentArrayPrefix);
     toast('Espansione impostata a: ' + currentArrayPrefix);
   }
   document.getElementById('array-builder-panel').style.display = 'none';
+}
+
+function updateExpandNote(espansione) {
+  const note = document.getElementById('expand-note');
+  const nameEl = document.getElementById('expand-note-name');
+  if (!note || !nameEl) return;
+  if (espansione) {
+    nameEl.textContent = espansione;
+    note.style.display = 'block';
+  } else {
+    note.style.display = 'none';
+  }
 }
 
 function applyExpandField() {
