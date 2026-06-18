@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,7 +13,7 @@ import (
 
 var (
 	tmplMu    sync.Mutex
-	tmplCache *template.Template
+	tmplCache map[string]*template.Template
 )
 
 var funcMap = template.FuncMap{
@@ -42,31 +42,48 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func loadTemplates() (*template.Template, error) {
-	tmplMu.Lock()
-	defer tmplMu.Unlock()
-	if tmplCache != nil {
-		return tmplCache, nil
-	}
-	// Prova prima ./templates (dev locale), poi /templates (Docker distroless).
-	glob := filepath.Join("templates", "*.html")
-	if m, _ := filepath.Glob(glob); len(m) == 0 {
-		glob = "/templates/*.html"
-	}
-	t, err := template.New("").Funcs(funcMap).ParseGlob(glob)
-	if err != nil {
-		return nil, fmt.Errorf("template parse (%s): %w", glob, err)
-	}
-	tmplCache = t
-	return tmplCache, nil
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func renderTemplate(w http.ResponseWriter, name string, data any) {
-	t, err := loadTemplates()
-	if err != nil {
-		http.Error(w, "Errore caricamento template: "+err.Error(), http.StatusInternalServerError)
-		return
+	tmplMu.Lock()
+	if tmplCache == nil {
+		tmplCache = make(map[string]*template.Template)
 	}
+	t, ok := tmplCache[name]
+	tmplMu.Unlock()
+
+	if !ok {
+		// Prova prima ./templates (dev locale), poi /templates (Docker distroless).
+		dir := "templates"
+		if m, _ := filepath.Glob(filepath.Join(dir, "*.html")); len(m) == 0 {
+			dir = "/templates"
+		}
+
+		basePath := filepath.Join(dir, "base.html")
+		filePath := filepath.Join(dir, name)
+
+		var err error
+		t = template.New(name).Funcs(funcMap)
+
+		if name != "base.html" && fileExists(basePath) && fileExists(filePath) {
+			_, err = t.ParseFiles(basePath, filePath)
+		} else {
+			_, err = t.ParseFiles(filePath)
+		}
+
+		if err != nil {
+			http.Error(w, "Errore caricamento template: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tmplMu.Lock()
+		tmplCache[name] = t
+		tmplMu.Unlock()
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, "Errore template: "+err.Error(), http.StatusInternalServerError)

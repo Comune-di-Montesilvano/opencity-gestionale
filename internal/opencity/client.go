@@ -147,6 +147,28 @@ func (c *Client) FetchSampleApplication(serviceID string) (*Application, error) 
 	return &app, nil
 }
 
+// FetchApplication recupera una singola istanza per ID.
+func (c *Client) FetchApplication(id string) (*Application, error) {
+	params := url.Values{"version": {"2"}}
+	resp, err := c.get("/lang/api/applications/"+id, params)
+	if err != nil {
+		return nil, fmt.Errorf("fetch application %s: %w", id, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("istanza %s non trovata", id)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("fetch application %s: HTTP %d", id, resp.StatusCode)
+	}
+	var app Application
+	if err := json.NewDecoder(resp.Body).Decode(&app); err != nil {
+		return nil, fmt.Errorf("unmarshal application %s: %w", id, err)
+	}
+	return &app, nil
+}
+
+
 // Approve accetta una pratica su OpenCity con il messaggio fornito.
 func (c *Client) Approve(applicationID, message string) error {
 	return c.transition(applicationID, "accept", message)
@@ -205,11 +227,9 @@ func (c *Client) FetchServices() ([]json.RawMessage, error) {
 		return nil, fmt.Errorf("fetch services: %w", err)
 	}
 	defer resp.Body.Close()
-	var result struct {
-		Data []json.RawMessage `json:"data"`
-	}
+	var result []json.RawMessage
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("fetch services decode: %w", err)
 	}
-	return result.Data, nil
+	return result, nil
 }

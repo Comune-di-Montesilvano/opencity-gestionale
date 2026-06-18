@@ -205,10 +205,22 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		client := opencity.NewClient(h.BaseURL, op.JWT)
 		var flatFields []extractor.FieldPreview
 		var errCampione string
-		if app, err2 := client.FetchSampleApplication(bando.ServiceID); err2 != nil {
+		sampleID := r.URL.Query().Get("sample_id")
+
+		var app *opencity.Application
+		var err2 error
+		if sampleID != "" {
+			app, err2 = client.FetchApplication(sampleID)
+		} else {
+			app, err2 = client.FetchSampleApplication(bando.ServiceID)
+		}
+
+		var flatJSON []byte
+		if err2 != nil {
 			errCampione = err2.Error()
 		} else {
 			flatFields = extractor.FlattenJSON(app.Data)
+			flatJSON, _ = json.Marshal(flatFields)
 		}
 		var campi []CampoLogicoConValore
 		for _, cl := range campiLogiciStandard {
@@ -236,6 +248,8 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"CampiFlat":   flatFields,
 			"ErrCampione": errCampione,
 			"Espansione":  cfg.Espansione,
+			"SampleID":    sampleID,
+			"FlatJSON":    string(flatJSON),
 		})
 
 	case "4":

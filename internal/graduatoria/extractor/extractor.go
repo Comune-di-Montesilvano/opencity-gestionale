@@ -13,11 +13,107 @@ func resolveNode(data any, path string) (any, error) {
 	if path == "" {
 		return data, nil
 	}
-	parts := strings.SplitN(path, ".", 2)
-	head, rest := parts[0], ""
-	if len(parts) == 2 {
-		rest = parts[1]
+
+	// Split by first '.' that is not inside '[' and ']'
+	head, rest := "", ""
+	inBrackets := 0
+	foundDot := false
+	for i, char := range path {
+		if char == '[' {
+			inBrackets++
+		} else if char == ']' {
+			inBrackets--
+		} else if char == '.' && inBrackets == 0 {
+			head = path[:i]
+			rest = path[i+1:]
+			foundDot = true
+			break
+		}
 	}
+	if !foundDot {
+		head = path
+	}
+
+	// Support conditional indexing like: anni[annualita1=20232024] or anni[0]
+	if strings.Contains(head, "[") && strings.HasSuffix(head, "]") {
+		idxOpen := strings.Index(head, "[")
+		arrayKey := head[:idxOpen]
+		cond := head[idxOpen+1 : len(head)-1]
+
+		m, ok := data.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("atteso oggetto a %q, trovato %T", arrayKey, data)
+		}
+		val, ok := m[arrayKey]
+		if !ok {
+			return nil, fmt.Errorf("chiave %q non trovata", arrayKey)
+		}
+
+		arr, ok := val.([]any)
+		if !ok {
+			return nil, fmt.Errorf("atteso array a %q, trovato %T", arrayKey, val)
+		}
+
+		// check if condition is a pure index (all digits)
+		isIndex := true
+		for _, char := range cond {
+			if char < '0' || char > '9' {
+				isIndex = false
+				break
+			}
+		}
+
+		var item any
+		if isIndex {
+			var idx int
+			_, err := fmt.Sscanf(cond, "%d", &idx)
+			if err != nil {
+				return nil, fmt.Errorf("indice non valido %q in %q: %w", cond, head, err)
+			}
+			if idx < 0 || idx >= len(arr) {
+				return nil, fmt.Errorf("indice %d fuori dai limiti [0-%d] in %q", idx, len(arr)-1, head)
+			}
+			item = arr[idx]
+		} else {
+			// filter condition: key=val or key==val
+			var condKey, condVal string
+			if strings.Contains(cond, "==") {
+				cp := strings.SplitN(cond, "==", 2)
+				condKey, condVal = cp[0], cp[1]
+			} else if strings.Contains(cond, "=") {
+				cp := strings.SplitN(cond, "=", 2)
+				condKey, condVal = cp[0], cp[1]
+			} else {
+				return nil, fmt.Errorf("condizione non valida %q in %q", cond, head)
+			}
+
+			condKey = strings.TrimSpace(condKey)
+			condVal = strings.Trim(strings.TrimSpace(condVal), `"'`)
+
+			var found any
+			for _, elem := range arr {
+				vKey, err := resolveNode(elem, condKey)
+				if err != nil {
+					continue
+				}
+				vStr := strings.TrimSpace(fmt.Sprintf("%v", vKey))
+				if vStr == condVal {
+					found = elem
+					break
+				}
+			}
+			if found == nil {
+				return nil, fmt.Errorf("nessun elemento soddisfa la condizione %q in %q", cond, head)
+			}
+			item = found
+		}
+
+		if rest == "" {
+			return item, nil
+		}
+		return resolveNode(item, rest)
+	}
+
 	m, ok := data.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("atteso oggetto a %q, trovato %T", head, data)
