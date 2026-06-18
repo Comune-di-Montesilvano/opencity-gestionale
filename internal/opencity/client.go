@@ -147,6 +147,34 @@ func (c *Client) FetchSampleApplication(serviceID string) (*Application, error) 
 	return &app, nil
 }
 
+// FetchApplicationAtOffset recupera l'istanza all'offset N e il conteggio totale.
+// Usato dalla navigazione prev/next nel wizard step 3.
+func (c *Client) FetchApplicationAtOffset(serviceID string, offset int) (*Application, int, error) {
+	params := url.Values{
+		"version":    {"2"},
+		"service_id": {serviceID},
+		"limit":      {"1"},
+		"offset":     {fmt.Sprintf("%d", offset)},
+	}
+	resp, err := c.get("/lang/api/applications", params)
+	if err != nil {
+		return nil, 0, fmt.Errorf("fetch at offset %d: %w", offset, err)
+	}
+	defer resp.Body.Close()
+	var page PagedResponse
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		return nil, 0, fmt.Errorf("decode at offset %d: %w", offset, err)
+	}
+	if len(page.Data) == 0 {
+		return nil, page.Meta.Count, fmt.Errorf("nessuna istanza all'offset %d", offset)
+	}
+	var app Application
+	if err := json.Unmarshal(page.Data[0], &app); err != nil {
+		return nil, page.Meta.Count, fmt.Errorf("unmarshal at offset %d: %w", offset, err)
+	}
+	return &app, page.Meta.Count, nil
+}
+
 // FetchApplication recupera una singola istanza per ID.
 func (c *Client) FetchApplication(id string) (*Application, error) {
 	params := url.Values{"version": {"2"}}
