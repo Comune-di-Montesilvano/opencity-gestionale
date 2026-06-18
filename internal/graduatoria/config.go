@@ -16,9 +16,12 @@ type EngineConfig struct {
 
 type FieldMapping struct {
 	Path     string `json:"path"`
-	Tipo     string `json:"tipo"`              // "float" | "int" | "string" | "count" | "time"
-	Expand   bool   `json:"expand"`            // true = relativo a elemento array espansione
-	PDNDPath string `json:"pdnd_path,omitempty"` // path del campo firma/signature PDND (es. meta.signature)
+	Tipo     string `json:"tipo"`                  // "float" | "int" | "string" | "count" | "time"
+	Expand   bool   `json:"expand"`                // true = relativo a elemento array espansione
+	Label    string `json:"label,omitempty"`       // nome leggibile (opzionale, default = chiave mapping)
+	PDNDPath string `json:"pdnd_path,omitempty"`   // path del campo firma/signature PDND (es. meta.signature)
+	PDNDOp   string `json:"pdnd_op,omitempty"`     // "non_vuoto" | "==" | "!=" (default: "non_vuoto")
+	PDNDVal  string `json:"pdnd_val,omitempty"`    // valore confronto (solo per "==" e "!=")
 }
 
 type FiltroConfig struct {
