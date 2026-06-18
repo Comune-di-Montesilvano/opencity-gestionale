@@ -23,6 +23,12 @@
   <div class="wizard-col-main">
     <form method="POST" action="/motori/{{.Motore.ID}}/wizard/3" id="step3-form">
 
+      <!-- Campi nascosti di stato -->
+      <input type="hidden" name="espansione" id="espansione-field" value="{{.Espansione}}">
+      <input type="hidden" name="save_only" id="save-only-flag" value="0">
+      <input type="hidden" name="current_offset" value="{{.SampleOffset}}">
+      <input type="hidden" name="viewer_filter" id="viewer-filter-hidden" value="{{.ViewerFilter}}">
+
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem">
         <h2 style="margin:0">Parametri</h2>
         <button type="button" class="btn btn-sm btn-secondary" onclick="addRow()">+ Aggiungi parametro</button>
@@ -93,11 +99,10 @@
         </tbody>
       </table>
 
-      <input type="hidden" name="espansione" id="espansione-field" value="{{.Espansione}}">
-
-      <div class="form-actions">
+      <div class="form-actions" style="display:flex; gap:.5rem; align-items:center">
         <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
-        <button type="submit" class="btn btn-primary">Salva e continua →</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="salvaStep3()">Salva</button>
+        <button type="submit" class="btn btn-primary">Continua →</button>
       </div>
     </form>
   </div>
@@ -109,6 +114,7 @@
     <div style="display:flex; gap:.25rem; align-items:center; margin-bottom:.5rem; flex-wrap:wrap">
       <form method="GET" action="/motori/{{.Motore.ID}}/wizard/3" style="display:flex; gap:.25rem; flex:1">
         <input type="text" name="sample_id" value="{{.SampleID}}" class="form-control form-control-sm" placeholder="Incolla ID istanza...">
+        <input type="hidden" name="viewer_filter" value="{{.ViewerFilter}}">
         <button type="submit" class="btn btn-sm btn-secondary">Carica</button>
       </form>
       {{if gt .SampleTotal 0}}
@@ -133,8 +139,16 @@
     {{else if eq (len .CampiFlat) 0}}
     <p class="text-muted">Nessun dato disponibile.</p>
     {{else}}
-    <div class="form-group" style="margin-bottom:.5rem">
-      <input type="text" id="json-search" class="form-control form-control-sm" placeholder="Filtra percorsi..." oninput="filterJSON()">
+
+    <!-- Controlli filtro viewer -->
+    <div style="display:flex; gap:.4rem; align-items:center; margin-bottom:.4rem; flex-wrap:wrap">
+      <input type="text" id="viewer-search" class="form-control form-control-sm"
+             style="flex:1; min-width:100px" placeholder="Filtra percorsi…"
+             value="{{.ViewerFilter}}"
+             oninput="onViewerFilterInput(this.value)">
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; white-space:nowrap; cursor:pointer">
+        <input type="checkbox" id="hide-empty" onchange="renderViewer()"> Nascondi vuoti
+      </label>
     </div>
 
     <div class="json-viewer" style="border:1px solid #e2e8f0; border-radius:6px; max-height:60vh; overflow-y:auto">
@@ -142,13 +156,20 @@
         <thead><tr><th>Percorso</th><th>Valore</th></tr></thead>
         <tbody id="json-viewer-body">
         {{range .CampiFlat}}
-        <tr style="cursor:pointer" onclick="{{if .IsArray}}openArrayBuilderFromViewer('{{.Path}}', {{jsonKeys .ArraySampleKeys}}){{else}}selectPath('{{.Path}}'){{end}}">
+        <tr style="cursor:pointer"
+            data-path="{{.Path}}"
+            data-value="{{.Value}}"
+            data-isarray="{{if .IsArray}}1{{else}}0{{end}}"
+            data-isfile="{{if .IsFileArray}}1{{else}}0{{end}}"
+            onclick="{{if .IsArray}}openArrayBuilderFromViewer('{{.Path}}', {{jsonKeys .ArraySampleKeys}}){{else}}selectPath('{{.Path}}'){{end}}">
           <td class="json-path-cell">
-            <code style="font-size:.75em; color:{{if .IsArray}}#7c3aed{{else}}#2563eb{{end}}; display:block; word-break:break-all">
-              {{.Path}}{{if .IsArray}} <span style="background:#ede9fe; color:#6d28d9; border-radius:3px; padding:1px 4px; font-size:.85em">[Array]</span>{{end}}
+            <code style="font-size:.75em; display:block; word-break:break-all; color:{{if .IsFileArray}}#d97706{{else if .IsArray}}#7c3aed{{else}}#2563eb{{end}}">
+              {{.Path}}{{if .IsFileArray}} <span style="background:#fef3c7; color:#92400e; border-radius:3px; padding:1px 4px; font-size:.85em">[File]</span>{{else if .IsArray}} <span style="background:#ede9fe; color:#6d28d9; border-radius:3px; padding:1px 4px; font-size:.85em">[Array]</span>{{end}}
             </code>
           </td>
-          <td class="json-value" style="font-size:.82em; color:#555; max-width:180px; word-break:break-word">{{.Value}}</td>
+          <td class="json-value" style="font-size:.82em; color:#555; max-width:180px; word-break:break-word">
+            {{if .IsFileArray}}<a href="{{index .ArrayFirstValues "url"}}" target="_blank" onclick="event.stopPropagation()" style="color:#d97706; font-size:.85em">Apri allegato ↗</a>{{else}}{{.Value}}{{end}}
+          </td>
         </tr>
         {{end}}
         </tbody>
@@ -157,7 +178,7 @@
     {{end}}
 
     <!-- Array Builder popup -->
-    <div id="array-builder-panel" style="display:none; margin-top:.75rem; padding:10px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px"></div>
+    <div id="array-builder-panel" style="display:none; margin-top:.75rem; padding:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px"></div>
   </div>
 </div>
 
@@ -203,7 +224,9 @@
   </tr>
 </template>
 
+<!-- Dati JSON per JS -->
 <pre id="flat-data" style="display:none">{{if .FlatJSON}}{{safeJSON .FlatJSON}}{{else}}[]{{end}}</pre>
+<pre id="raw-data" style="display:none">{{if .RawDataJSON}}{{safeJSON .RawDataJSON}}{{else}}{}{{end}}</pre>
 
 <style>
 .json-path-cell:hover code { text-decoration:underline; }
@@ -212,18 +235,35 @@
 
 <script>
 const flatData = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
+const rawData  = JSON.parse(document.getElementById('raw-data').textContent || '{}') || {};
+
+// flatMap per lookup rapido path → valore scalare
 const flatMap = {};
-flatData.forEach(item => { if (!item.IsArray) flatMap[item.Path] = item.Value; });
+// flatArrayMap per lookup array → {ArraySampleKeys, ArrayFirstValues, IsFileArray}
+const flatArrayMap = {};
+flatData.forEach(item => {
+  if (item.IsArray) {
+    flatArrayMap[item.Path] = item;
+  } else {
+    flatMap[item.Path] = item.Value;
+  }
+});
 
 let lastFocusedPathInput = null;
 
-// Track focus su path input
 document.addEventListener('focusin', e => {
   if (e.target.name === 'p_path' || e.target.name === 'p_pdnd_path') lastFocusedPathInput = e.target;
 });
 
 // Preview iniziale per tutti gli input con valore
-document.querySelectorAll('.json-path-input[name="p_path"]').forEach(updatePreview);
+document.querySelectorAll('.json-path-input[name="p_path"]').forEach(inp => updatePreview(inp));
+
+// Viewer: filtro iniziale se viewer_filter è popolato
+if (document.getElementById('viewer-search') && document.getElementById('viewer-search').value) {
+  renderViewer();
+}
+
+// ── Gestione parametri ───────────────────────────────────────────────────────
 
 function addRow() {
   const tmpl = document.getElementById('row-template');
@@ -235,6 +275,120 @@ function removeRow(btn) {
   btn.closest('tr').remove();
 }
 
+// ── Salva senza avanzare ─────────────────────────────────────────────────────
+
+function salvaStep3() {
+  document.getElementById('save-only-flag').value = '1';
+  document.getElementById('step3-form').submit();
+}
+// Reset save_only quando il form è inviato normalmente (Continua →)
+document.getElementById('step3-form').addEventListener('submit', function(e) {
+  // Se non è un nav_to_offset e non è il pulsante Salva, lascia save_only=0
+  const active = document.activeElement;
+  if (!active || active.name !== 'nav_to_offset') {
+    // salvaStep3 gestisce il suo caso; per submit normale lascia 0
+  }
+});
+
+// ── Path preview ─────────────────────────────────────────────────────────────
+
+function updatePreview(input) {
+  const previewEl = input.parentElement ? input.parentElement.querySelector('.valore-campione') : null;
+  if (!previewEl) return;
+  const path = input.value.trim();
+  if (!path) { previewEl.textContent = ''; return; }
+
+  if (path.startsWith('$app:')) {
+    previewEl.innerHTML = '<span style="color:#64748b">Calcolato a runtime</span>';
+    return;
+  }
+
+  // 1. Lookup flatMap (scalari)
+  if (flatMap[path] !== undefined) {
+    previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(String(flatMap[path])) + '</strong></span>';
+    return;
+  }
+
+  // 2. Risoluzione contro rawData (per path con notazione array tipo anni[key=val].campo)
+  if (rawData && typeof rawData === 'object') {
+    try {
+      const val = resolvePathJS(rawData, path);
+      if (val !== undefined && val !== null && !Array.isArray(val) && typeof val !== 'object') {
+        previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(String(val).substring(0, 80)) + '</strong></span>';
+        return;
+      }
+    } catch(e) {}
+  }
+
+  previewEl.innerHTML = '<span style="color:#dc2626">Non trovato nel campione</span>';
+}
+
+// Risolve dot-notation + [key=val] o [N] contro un oggetto JS
+function resolvePathJS(data, path) {
+  if (data === undefined || data === null || path === '') return data;
+  // Trova il primo '.' non dentro '[]'
+  let head = path, rest = '';
+  let depth = 0;
+  for (let i = 0; i < path.length; i++) {
+    const c = path[i];
+    if (c === '[') depth++;
+    else if (c === ']') depth--;
+    else if (c === '.' && depth === 0) {
+      head = path.slice(0, i);
+      rest = path.slice(i + 1);
+      break;
+    }
+  }
+  // Gestione [key=val] o [N]
+  const bi = head.indexOf('[');
+  if (bi !== -1 && head.endsWith(']')) {
+    const arrayKey = head.slice(0, bi);
+    const cond     = head.slice(bi + 1, -1);
+    const arr = data[arrayKey];
+    if (!Array.isArray(arr)) return undefined;
+    let item;
+    if (/^\d+$/.test(cond)) {
+      item = arr[parseInt(cond, 10)];
+    } else {
+      const sep = cond.includes('==') ? '==' : '=';
+      const parts = cond.split(sep);
+      const ck = parts[0];
+      const cv = parts.slice(1).join(sep);
+      item = arr.find(e => e && String(e[ck]) === cv);
+    }
+    return rest ? resolvePathJS(item, rest) : item;
+  }
+  const val = data[head];
+  return rest ? resolvePathJS(val, rest) : val;
+}
+
+// ── Viewer: filtro e hide empty ───────────────────────────────────────────────
+
+function onViewerFilterInput(val) {
+  // Sincronizza hidden field per persistenza nelle navigazioni
+  document.getElementById('viewer-filter-hidden').value = val;
+  renderViewer();
+}
+
+function renderViewer() {
+  const q = (document.getElementById('viewer-search')?.value || '').toLowerCase();
+  const hideEmpty = document.getElementById('hide-empty')?.checked || false;
+  const emptyVals = new Set(['', '(null)', '0']);
+
+  document.querySelectorAll('#json-viewer-body tr').forEach(row => {
+    const path  = row.dataset.path || '';
+    const value = row.dataset.value || '';
+    const isArr = row.dataset.isarray === '1';
+
+    // Filtro testo
+    const matchesQ = !q || path.toLowerCase().includes(q) || (!isArr && value.toLowerCase().includes(q));
+    // Filtro vuoti (solo scalari)
+    const isEmpty = !isArr && emptyVals.has(value.trim());
+    const show = matchesQ && (!hideEmpty || !isEmpty);
+    row.style.display = show ? '' : 'none';
+  });
+}
+
 function selectPath(path) {
   navigator.clipboard.writeText(path).catch(() => {});
   if (lastFocusedPathInput) {
@@ -242,84 +396,161 @@ function selectPath(path) {
     updatePreview(lastFocusedPathInput);
     lastFocusedPathInput.focus();
   }
-  toast('Percorso copiato: ' + path);
+  toast('Path copiato: ' + path);
 }
 
-function updatePreview(input) {
-  const previewEl = input.parentElement.querySelector('.valore-campione');
-  if (!previewEl) return;
-  const path = input.value.trim();
-  if (!path) { previewEl.textContent = ''; return; }
-  if (path.startsWith('$app:')) {
-    previewEl.innerHTML = '<span style="color:#64748b">Calcolato a runtime</span>';
-    return;
-  }
-  const val = flatMap[path];
-  if (val !== undefined) {
-    previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(val) + '</strong></span>';
-  } else {
-    previewEl.innerHTML = '<span style="color:#dc2626">Non trovato nel campione</span>';
-  }
-}
+// ── PDND ─────────────────────────────────────────────────────────────────────
 
 function updatePDNDValVisibility(el) {
   const row = el.closest('td');
   if (!row) return;
-  const opSelect = row.querySelector('.pdnd-op-select');
   const valInput = row.querySelector('.pdnd-val-input');
-  if (!opSelect || !valInput) return;
-  const needsVal = opSelect.value === '==' || opSelect.value === '!=';
+  if (!valInput) return;
+  const needsVal = el.value === '==' || el.value === '!=';
   valInput.style.display = needsVal ? 'inline-block' : 'none';
 }
 
-// Array builder — aperto dal viewer quando si clicca un nodo [Array]
+// ── Array builder ─────────────────────────────────────────────────────────────
+
 let currentArrayPrefix = '';
-let currentArrayKeys = [];
+let currentArrayKeys   = [];
 
 function openArrayBuilderFromViewer(arrayPrefix, keys) {
   currentArrayPrefix = arrayPrefix;
-  currentArrayKeys = keys;
+  currentArrayKeys   = keys;
+
+  const fp = flatArrayMap[arrayPrefix] || {};
+  const values = fp.ArrayFirstValues || {};
+  const isFile = fp.IsFileArray || false;
+
   const panel = document.getElementById('array-builder-panel');
   if (!panel) return;
+
+  // Tabella key → valore del primo elemento
+  let valuesTable = '';
+  if (keys.length > 0) {
+    const rows = keys.map(k => {
+      const v = values[k] !== undefined ? values[k] : '';
+      return `<tr><td style="color:#374151;font-weight:500">${escapeHTML(k)}</td><td style="color:#6b7280">${escapeHTML(v)}</td></tr>`;
+    }).join('');
+    valuesTable = `
+      <div style="margin-bottom:10px">
+        <div style="font-weight:500; color:#374151; margin-bottom:4px">Primo elemento (campione):</div>
+        <table style="width:100%; font-size:11px; border-collapse:collapse">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // File array: mostra link download
+  let fileSection = '';
+  if (isFile && values['url']) {
+    fileSection = `<div style="background:#fef3c7; border-radius:4px; padding:6px 8px; margin-bottom:10px">
+      <strong>Allegato:</strong> <a href="${escapeHTML(values['url'])}" target="_blank" style="color:#d97706">Apri ↗</a>
+      ${values['name'] ? ' — ' + escapeHTML(values['name']) : ''}
+    </div>`;
+  }
 
   const keysOpts = keys.map(k => `<option value="${escapeHTML(k)}">${escapeHTML(k)}</option>`).join('');
 
   panel.innerHTML = `
-    <div style="font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between">
+    <div style="font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center">
       <span>Array: <code>${escapeHTML(arrayPrefix)}</code></span>
       <button type="button" class="btn btn-xs btn-secondary" onclick="document.getElementById('array-builder-panel').style.display='none'">×</button>
     </div>
-    <div style="display:flex; flex-direction:column; gap:8px">
-      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
-        Seleziona elemento dove
-        <select id="ab-cond-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
-        è uguale a
-        <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:100px">
+
+    ${valuesTable}
+    ${fileSection}
+
+    <hr style="margin:8px 0">
+
+    <!-- Flusso A: espansione (itera su tutti gli elementi) -->
+    <div style="margin-bottom:12px; padding:8px; background:#f0fdf4; border-radius:4px; border:1px solid #bbf7d0">
+      <div style="font-weight:600; color:#166534; margin-bottom:4px">A — Itera su tutti gli elementi (espansione)</div>
+      <div style="color:#374151; margin-bottom:6px; font-size:11px">
+        Il motore espande questo array: ogni elemento diventa una riga separata nella graduatoria.<br>
+        Poi aggiungi parametri con il path relativo (es. <code>corrispettivo</code>, <code>tiporichiesta</code>) e spunta "Espand.".
       </div>
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
-        ed estrai il campo
-        <select id="ab-extract-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
+        <button type="button" class="btn btn-sm" style="background:#16a34a; color:#fff" onclick="applyArrayExpand()">
+          Imposta come espansione
+        </button>
+        <span style="color:#6b7280; font-size:11px">→ espansione = <code>${escapeHTML(arrayPrefix)}</code></span>
       </div>
-      <div style="display:flex; gap:6px">
-        <button type="button" class="btn btn-sm btn-primary" onclick="applyArrayBuilder()">Applica → inserisci path</button>
-        <button type="button" class="btn btn-sm btn-secondary" onclick="applyArrayExpand()">Usa come espansione</button>
+      ${keys.length > 0 ? `
+      <div style="margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+        <span style="color:#374151; font-size:11px">Inserisci parametro espanso (path relativo):</span>
+        <select id="ab-expand-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="applyExpandField()">Aggiungi riga</button>
+      </div>` : ''}
+    </div>
+
+    <!-- Flusso B: estrai da elemento specifico -->
+    <div style="padding:8px; background:#eff6ff; border-radius:4px; border:1px solid #bfdbfe">
+      <div style="font-weight:600; color:#1e40af; margin-bottom:4px">B — Estrai da un elemento specifico</div>
+      <div style="color:#374151; margin-bottom:6px; font-size:11px">
+        Seleziona l'elemento con una condizione e inserisce il path come parametro scalare.
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+          Dove
+          <select id="ab-cond-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
+          =
+          <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:100px">
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+          Estrai campo
+          <select id="ab-extract-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
+        </div>
+        <div>
+          <button type="button" class="btn btn-sm" style="background:#2563eb; color:#fff" onclick="applyArrayBuilder()">
+            Inserisci come parametro scalare
+          </button>
+        </div>
+        <div id="ab-path-preview" style="font-size:11px; color:#6b7280"></div>
       </div>
     </div>
   `;
   panel.style.display = 'block';
+
+  // Aggiorna preview path al cambio dei dropdown flusso B
+  ['ab-cond-field','ab-cond-val','ab-extract-field'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateArrayPathPreview);
+    if (el) el.addEventListener('change', updateArrayPathPreview);
+  });
+  updateArrayPathPreview();
+}
+
+function updateArrayPathPreview() {
+  const condField   = document.getElementById('ab-cond-field')?.value || '';
+  const condVal     = document.getElementById('ab-cond-val')?.value || '';
+  const extractField = document.getElementById('ab-extract-field')?.value || '';
+  const prev = document.getElementById('ab-path-preview');
+  if (!prev) return;
+  if (condField && extractField) {
+    const path = `${currentArrayPrefix}[${condField}=${condVal}].${extractField}`;
+    prev.innerHTML = 'Path risultante: <code>' + escapeHTML(path) + '</code>';
+  } else {
+    prev.textContent = '';
+  }
 }
 
 function applyArrayBuilder() {
-  const condField = document.getElementById('ab-cond-field').value;
-  const condVal = document.getElementById('ab-cond-val').value;
-  const extractField = document.getElementById('ab-extract-field').value;
+  const condField    = document.getElementById('ab-cond-field')?.value || '';
+  const condVal      = document.getElementById('ab-cond-val')?.value || '';
+  const extractField = document.getElementById('ab-extract-field')?.value || '';
   const path = `${currentArrayPrefix}[${condField}=${condVal}].${extractField}`;
   if (lastFocusedPathInput) {
     lastFocusedPathInput.value = path;
     updatePreview(lastFocusedPathInput);
     lastFocusedPathInput.focus();
+    toast('Path inserito: ' + path);
+  } else {
+    // Nessun input focalizzato: crea nuova riga con il path
+    addRowWithPath(path, extractField, 'string', false);
+    toast('Riga aggiunta per: ' + path);
   }
-  toast('Path inserito: ' + path);
   document.getElementById('array-builder-panel').style.display = 'none';
 }
 
@@ -332,13 +563,33 @@ function applyArrayExpand() {
   document.getElementById('array-builder-panel').style.display = 'none';
 }
 
-function filterJSON() {
-  const q = document.getElementById('json-search').value.toLowerCase();
-  document.querySelectorAll('#json-viewer-body tr').forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = text.includes(q) ? '' : 'none';
-  });
+function applyExpandField() {
+  const field = document.getElementById('ab-expand-field')?.value || '';
+  if (!field) return;
+  // Path relativo (senza prefisso array)
+  addRowWithPath(field, field, 'string', true);
+  toast('Riga espansa aggiunta: ' + field);
 }
+
+// Crea nuova riga nella tabella parametri
+function addRowWithPath(path, nome, tipo, expand) {
+  const tmpl = document.getElementById('row-template');
+  const clone = tmpl.content.cloneNode(true);
+  const tr = clone.querySelector('tr');
+  tr.querySelector('[name="p_nome"]').value   = nome;
+  tr.querySelector('[name="p_path"]').value   = path;
+  const tipoEl = tr.querySelector('[name="p_tipo"]');
+  if (tipoEl) { for (const opt of tipoEl.options) { opt.selected = opt.value === tipo; } }
+  const expandHidden = tr.querySelector('[name="p_expand"]');
+  const expandCheck  = expandHidden?.nextElementSibling;
+  if (expand && expandHidden) { expandHidden.value = '1'; if (expandCheck) expandCheck.checked = true; }
+  document.getElementById('params-body').appendChild(clone);
+  // Preview del path nella riga appena creata
+  const newInput = document.getElementById('params-body').lastElementChild?.querySelector('[name="p_path"]');
+  if (newInput) updatePreview(newInput);
+}
+
+// ── Utilità ───────────────────────────────────────────────────────────────────
 
 function toast(msg) {
   const el = document.getElementById('toast-feedback');
@@ -350,6 +601,5 @@ function toast(msg) {
 function escapeHTML(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 </script>
 {{end}}

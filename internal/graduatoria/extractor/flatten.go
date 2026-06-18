@@ -9,10 +9,12 @@ import (
 
 // FieldPreview rappresenta un campo del payload JSON con il suo percorso e valore.
 type FieldPreview struct {
-	Path            string
-	Value           string
-	IsArray         bool     // true = il nodo è un array, non espanso
-	ArraySampleKeys []string // chiavi del primo elemento (disponibili per il builder UI)
+	Path             string
+	Value            string
+	IsArray          bool              // true = il nodo è un array, non espanso
+	ArraySampleKeys  []string          // chiavi del primo elemento (per dropdown builder UI)
+	ArrayFirstValues map[string]string // valori del primo elemento (key → valore stringa)
+	IsFileArray      bool              // true se il primo elemento ha una chiave "url" (upload Form.IO)
 }
 
 // FlattenJSON appiattisce un json.RawMessage in una lista ordinata di path=valore.
@@ -51,13 +53,28 @@ func flatten(v any, prefix string, out *[]FieldPreview, depth int) {
 			Value:   fmt.Sprintf("[Array, %d elementi]", len(val)),
 			IsArray: true,
 		}
-		// Raccoglie le chiavi del primo elemento per il builder
 		if len(val) > 0 {
 			if m, ok := val[0].(map[string]any); ok {
-				for k := range m {
-					fp.ArraySampleKeys = append(fp.ArraySampleKeys, k)
+				keys := make([]string, 0, len(m))
+				vals := make(map[string]string, len(m))
+				for k, v := range m {
+					keys = append(keys, k)
+					s := strings.TrimSpace(fmt.Sprintf("%v", v))
+					if len(s) > 60 {
+						s = s[:60] + "…"
+					}
+					vals[k] = s
 				}
-				sort.Strings(fp.ArraySampleKeys)
+				sort.Strings(keys)
+				fp.ArraySampleKeys = keys
+				fp.ArrayFirstValues = vals
+				for _, k := range keys {
+					if k == "url" {
+						fp.IsFileArray = true
+						fp.Value = fmt.Sprintf("[File, %d allegati]", len(val))
+						break
+					}
+				}
 			}
 		}
 		*out = append(*out, fp)

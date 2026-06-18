@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -218,10 +219,14 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 		var flatFields []extractor.FieldPreview
 		var flatJSON []byte
+		rawDataJSON := ""
 		if app != nil {
 			flatFields = extractor.FlattenJSON(app.Data)
 			flatJSON, _ = json.Marshal(flatFields)
+			rawDataJSON = string(app.Data)
 		}
+
+		viewerFilter := r.URL.Query().Get("viewer_filter")
 
 		// Costruisce lista parametri dal mapping corrente (ordine alfabetico)
 		nomi := make([]string, 0, len(cfg.Mapping))
@@ -255,6 +260,8 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"SampleOffset":     sampleOffset,
 			"SampleTotal":      sampleTotal,
 			"FlatJSON":         string(flatJSON),
+			"RawDataJSON":      rawDataJSON,
+			"ViewerFilter":     viewerFilter,
 		})
 
 	case "4":
@@ -390,8 +397,25 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		vf := r.FormValue("viewer_filter")
 		if navOffset := strings.TrimSpace(r.FormValue("nav_to_offset")); navOffset != "" {
-			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/3?sample_offset=%s", bando.ID, navOffset), http.StatusSeeOther)
+			u := fmt.Sprintf("/motori/%d/wizard/3?sample_offset=%s", bando.ID, url.QueryEscape(navOffset))
+			if vf != "" {
+				u += "&viewer_filter=" + url.QueryEscape(vf)
+			}
+			http.Redirect(w, r, u, http.StatusSeeOther)
+			return
+		}
+		if r.FormValue("save_only") == "1" {
+			offset := strings.TrimSpace(r.FormValue("current_offset"))
+			if offset == "" {
+				offset = "0"
+			}
+			u := fmt.Sprintf("/motori/%d/wizard/3?sample_offset=%s", bando.ID, url.QueryEscape(offset))
+			if vf != "" {
+				u += "&viewer_filter=" + url.QueryEscape(vf)
+			}
+			http.Redirect(w, r, u, http.StatusSeeOther)
 			return
 		}
 		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/4", bando.ID), http.StatusSeeOther)
