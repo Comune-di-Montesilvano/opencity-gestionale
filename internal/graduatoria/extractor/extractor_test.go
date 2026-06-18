@@ -88,3 +88,47 @@ func TestResolveNodeConditional(t *testing.T) {
 		t.Errorf("expected error for unsatisfied condition, got nil")
 	}
 }
+
+func TestFlattenJSON_ArrayAsTerminal(t *testing.T) {
+	raw := json.RawMessage(`{
+		"nome": "Mario",
+		"anni": [
+			{"annualita": 2024, "importo": 100.5},
+			{"annualita": 2025, "importo": 200.0}
+		]
+	}`)
+	fields := FlattenJSON(raw)
+
+	// "anni" deve apparire come nodo array terminale
+	var anniField *FieldPreview
+	for i := range fields {
+		if fields[i].Path == "anni" {
+			anniField = &fields[i]
+		}
+	}
+	if anniField == nil {
+		t.Fatal("manca nodo 'anni' nel risultato FlattenJSON")
+	}
+	if !anniField.IsArray {
+		t.Error("campo 'anni' deve avere IsArray=true")
+	}
+	if len(anniField.ArraySampleKeys) == 0 {
+		t.Error("ArraySampleKeys vuoto per 'anni'")
+	}
+	// Verifica che anni.0.annualita NON sia presente
+	for _, f := range fields {
+		if f.Path == "anni.0.annualita" || f.Path == "anni.0" {
+			t.Errorf("path '%s' non deve essere presente quando IsArray=true", f.Path)
+		}
+	}
+	// "nome" deve ancora essere presente
+	var nomeFound bool
+	for _, f := range fields {
+		if f.Path == "nome" {
+			nomeFound = true
+		}
+	}
+	if !nomeFound {
+		t.Error("campo 'nome' deve essere presente")
+	}
+}

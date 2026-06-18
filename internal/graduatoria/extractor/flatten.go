@@ -9,12 +9,15 @@ import (
 
 // FieldPreview rappresenta un campo del payload JSON con il suo percorso e valore.
 type FieldPreview struct {
-	Path  string
-	Value string
+	Path            string
+	Value           string
+	IsArray         bool     // true = il nodo è un array, non espanso
+	ArraySampleKeys []string // chiavi del primo elemento (disponibili per il builder UI)
 }
 
 // FlattenJSON appiattisce un json.RawMessage in una lista ordinata di path=valore.
-// Per gli array espande al massimo i primi 2 elementi (indice 0 e 1).
+// Gli array non vengono espansi: vengono emessi come nodi terminali con IsArray=true
+// e ArraySampleKeys popolato con le chiavi del primo elemento.
 func FlattenJSON(raw json.RawMessage) []FieldPreview {
 	var root any
 	if err := json.Unmarshal(raw, &root); err != nil {
@@ -27,7 +30,6 @@ func FlattenJSON(raw json.RawMessage) []FieldPreview {
 }
 
 const maxDepth = 8
-const maxArrayElems = 2
 
 func flatten(v any, prefix string, out *[]FieldPreview, depth int) {
 	if depth > maxDepth {
@@ -43,16 +45,22 @@ func flatten(v any, prefix string, out *[]FieldPreview, depth int) {
 			flatten(child, key, out, depth+1)
 		}
 	case []any:
-		for i, elem := range val {
-			if i >= maxArrayElems {
-				break
-			}
-			key := fmt.Sprintf("%s.%d", prefix, i)
-			if prefix == "" {
-				key = fmt.Sprintf("%d", i)
-			}
-			flatten(elem, key, out, depth+1)
+		// Emette il nodo array senza espandere gli elementi
+		fp := FieldPreview{
+			Path:    prefix,
+			Value:   fmt.Sprintf("[Array, %d elementi]", len(val)),
+			IsArray: true,
 		}
+		// Raccoglie le chiavi del primo elemento per il builder
+		if len(val) > 0 {
+			if m, ok := val[0].(map[string]any); ok {
+				for k := range m {
+					fp.ArraySampleKeys = append(fp.ArraySampleKeys, k)
+				}
+				sort.Strings(fp.ArraySampleKeys)
+			}
+		}
+		*out = append(*out, fp)
 	case nil:
 		*out = append(*out, FieldPreview{Path: prefix, Value: "(null)"})
 	case bool:
