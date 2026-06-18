@@ -249,7 +249,12 @@ func popolaCampo(rec *graduatoria.Record, nome string, fm graduatoria.FieldMappi
 	// Se il campo ha un PDNDPath, estrai la firma di certificazione come __cert_{nome}
 	if fm.PDNDPath != "" {
 		sig, _ := extractor.Str(data, fm.PDNDPath)
-		rec.StringMap["__cert_"+nome] = sig
+		certified := evaluatePDNDCondition(sig, fm.PDNDOp, fm.PDNDVal)
+		if certified {
+			rec.StringMap["__cert_"+nome] = sig
+		} else {
+			rec.StringMap["__cert_"+nome] = ""
+		}
 	}
 	return nil
 }
@@ -445,4 +450,17 @@ func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduat
 		righe = append(righe, riga)
 	}
 	return righe, budget - residuo
+}
+
+// evaluatePDNDCondition valuta se un valore soddisfa la condizione PDND.
+// op vuoto o "non_vuoto": certificato se val != "" (comportamento legacy).
+func evaluatePDNDCondition(val, op, expected string) bool {
+	switch op {
+	case "==":
+		return val == expected
+	case "!=":
+		return val != expected
+	default: // "non_vuoto" o ""
+		return val != ""
+	}
 }
