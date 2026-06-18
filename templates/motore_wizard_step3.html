@@ -93,11 +93,7 @@
         </tbody>
       </table>
 
-      <div class="form-group" style="margin-top:1.25rem">
-        <label><strong>Campo di espansione array</strong></label>
-        <input type="text" name="espansione" value="{{.Espansione}}" class="form-control" style="max-width:300px" placeholder="es. anni">
-        <small class="text-muted">Nome del campo JSON che contiene l'array da espandere in righe separate (una riga per elemento). Lascia vuoto se non necessario.</small>
-      </div>
+      <input type="hidden" name="espansione" id="espansione-field" value="{{.Espansione}}">
 
       <div class="form-actions">
         <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
@@ -118,13 +114,13 @@
       {{if gt .SampleTotal 0}}
       <div style="display:flex; gap:.25rem">
         {{if gt .SampleOffset 0}}
-        <a href="/motori/{{.Motore.ID}}/wizard/3?sample_offset={{dec .SampleOffset}}" class="btn btn-sm btn-secondary">←</a>
+        <button type="submit" form="step3-form" name="nav_to_offset" value="{{dec .SampleOffset}}" class="btn btn-sm btn-secondary" title="Salva e vai all'istanza precedente">←</button>
         {{else}}
         <button class="btn btn-sm btn-secondary" disabled>←</button>
         {{end}}
         <span style="font-size:12px; padding:4px 6px; white-space:nowrap">{{inc .SampleOffset}}/{{.SampleTotal}}</span>
         {{if lt (inc .SampleOffset) .SampleTotal}}
-        <a href="/motori/{{.Motore.ID}}/wizard/3?sample_offset={{inc .SampleOffset}}" class="btn btn-sm btn-secondary">→</a>
+        <button type="submit" form="step3-form" name="nav_to_offset" value="{{inc .SampleOffset}}" class="btn btn-sm btn-secondary" title="Salva e vai all'istanza successiva">→</button>
         {{else}}
         <button class="btn btn-sm btn-secondary" disabled>→</button>
         {{end}}
@@ -328,7 +324,7 @@ function applyArrayBuilder() {
 }
 
 function applyArrayExpand() {
-  const espInput = document.querySelector('input[name="espansione"]');
+  const espInput = document.getElementById('espansione-field');
   if (espInput) {
     espInput.value = currentArrayPrefix;
     toast('Espansione impostata a: ' + currentArrayPrefix);

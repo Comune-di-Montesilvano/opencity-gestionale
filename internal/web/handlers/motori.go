@@ -390,6 +390,10 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if navOffset := strings.TrimSpace(r.FormValue("nav_to_offset")); navOffset != "" {
+			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/3?sample_offset=%s", bando.ID, navOffset), http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/4", bando.ID), http.StatusSeeOther)
 
 	case "4":
