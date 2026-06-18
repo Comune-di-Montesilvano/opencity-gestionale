@@ -61,6 +61,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("POST /motori/{id}/wizard/{step}", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostWizardStep))))
 	mux.Handle("POST /motori/{id}/wizard/test", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostTestEngine))))
 	mux.Handle("POST /motori/{id}/wizard/attiva", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostAttivaMotore))))
+	mux.Handle("GET /motori/{id}/api/valori-campo", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.GetValoriCampo))))
 	mux.Handle("GET /motori/{id}", authMW(http.HandlerFunc(motori.GetDettaglio)))
 	mux.Handle("POST /motori/{id}/duplica", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostDuplica))))
 	mux.Handle("POST /motori/{id}/archivia", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostArchivia))))

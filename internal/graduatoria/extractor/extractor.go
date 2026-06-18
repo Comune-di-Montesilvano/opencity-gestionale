@@ -3,6 +3,7 @@ package extractor
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,21 +75,61 @@ func resolveNode(data any, path string) (any, error) {
 				return nil, fmt.Errorf("indice %d fuori dai limiti [0-%d] in %q", idx, len(arr)-1, head)
 			}
 			item = arr[idx]
+		} else if strings.HasPrefix(cond, "max:") || strings.HasPrefix(cond, "min:") {
+			// Aggregazione: max:campo o min:campo → elemento con valore massimo/minimo
+			isMax := strings.HasPrefix(cond, "max:")
+			aggKey := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(cond, "max:"), "min:"))
+			bestIdx := -1
+			var bestVal float64
+			for i, elem := range arr {
+				vNode, err := resolveNode(elem, aggKey)
+				if err != nil {
+					continue
+				}
+				var f float64
+				switch n := vNode.(type) {
+				case float64:
+					f = n
+				case json.Number:
+					if ff, err := n.Float64(); err == nil {
+						f = ff
+					} else {
+						continue
+					}
+				case string:
+					ff, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+					if err != nil {
+						continue
+					}
+					f = ff
+				default:
+					continue
+				}
+				if bestIdx == -1 || (isMax && f > bestVal) || (!isMax && f < bestVal) {
+					bestIdx = i
+					bestVal = f
+				}
+			}
+			if bestIdx == -1 {
+				return nil, fmt.Errorf("nessun elemento con campo %q in %q", aggKey, arrayKey)
+			}
+			item = arr[bestIdx]
 		} else {
-			// filter condition: key=val or key==val
-			var condKey, condVal string
-			if strings.Contains(cond, "==") {
-				cp := strings.SplitN(cond, "==", 2)
-				condKey, condVal = cp[0], cp[1]
-			} else if strings.Contains(cond, "=") {
-				cp := strings.SplitN(cond, "=", 2)
-				condKey, condVal = cp[0], cp[1]
-			} else {
+			// Condizione comparativa: key op val
+			// Tenta operatori in ordine di specificità (multi-char prima di single-char)
+			var condKey, condOp, condVal string
+			for _, op := range []string{"!=", ">=", "<=", "~", ">", "<", "==", "="} {
+				idx := strings.Index(cond, op)
+				if idx >= 0 {
+					condKey = strings.TrimSpace(cond[:idx])
+					condOp = op
+					condVal = strings.Trim(strings.TrimSpace(cond[idx+len(op):]), `"'`)
+					break
+				}
+			}
+			if condKey == "" {
 				return nil, fmt.Errorf("condizione non valida %q in %q", cond, head)
 			}
-
-			condKey = strings.TrimSpace(condKey)
-			condVal = strings.Trim(strings.TrimSpace(condVal), `"'`)
 
 			var found any
 			for _, elem := range arr {
@@ -97,7 +138,32 @@ func resolveNode(data any, path string) (any, error) {
 					continue
 				}
 				vStr := strings.TrimSpace(fmt.Sprintf("%v", vKey))
-				if vStr == condVal {
+				var matches bool
+				switch condOp {
+				case "=", "==":
+					matches = vStr == condVal
+				case "!=":
+					matches = vStr != condVal
+				case "~":
+					matches = strings.Contains(vStr, condVal)
+				case ">", "<", ">=", "<=":
+					vF, err1 := strconv.ParseFloat(vStr, 64)
+					cF, err2 := strconv.ParseFloat(condVal, 64)
+					if err1 != nil || err2 != nil {
+						continue
+					}
+					switch condOp {
+					case ">":
+						matches = vF > cF
+					case "<":
+						matches = vF < cF
+					case ">=":
+						matches = vF >= cF
+					case "<=":
+						matches = vF <= cF
+					}
+				}
+				if matches {
 					found = elem
 					break
 				}

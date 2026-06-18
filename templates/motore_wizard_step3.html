@@ -239,8 +239,9 @@
 </style>
 
 <script>
-const flatData = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
-const rawData  = JSON.parse(document.getElementById('raw-data').textContent || '{}') || {};
+const flatData   = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
+const rawData    = JSON.parse(document.getElementById('raw-data').textContent || '{}') || {};
+const _motoreId  = {{.Motore.ID}};
 
 // flatMap per lookup rapido path → valore scalare
 const flatMap = {};
@@ -270,6 +271,17 @@ if (document.getElementById('viewer-search') && document.getElementById('viewer-
 
 // Nota "Per elem." iniziale se espansione già impostata
 updateExpandNote(document.getElementById('espansione-field')?.value || '');
+
+// Ripristina array builder dopo navigazione prev/next (sessionStorage)
+try {
+  const saved = sessionStorage.getItem('ab_state');
+  if (saved) {
+    const st = JSON.parse(saved);
+    if (st && st.prefix && flatArrayMap[st.prefix]) {
+      openArrayBuilderFromViewer(st.prefix, st.keys || []);
+    }
+  }
+} catch(e) {}
 
 // ── Gestione parametri ───────────────────────────────────────────────────────
 
@@ -464,7 +476,7 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
   panel.innerHTML = `
     <div style="font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center">
       <span>Array: <code>${escapeHTML(arrayPrefix)}</code></span>
-      <button type="button" class="btn btn-xs btn-secondary" onclick="document.getElementById('array-builder-panel').style.display='none'">×</button>
+      <button type="button" class="btn btn-xs btn-secondary" onclick="document.getElementById('array-builder-panel').style.display='none'; sessionStorage.removeItem('ab_state')">×</button>
     </div>
 
     ${valuesTable}
@@ -503,9 +515,22 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
           Dove
           <select id="ab-cond-field" class="form-control form-control-sm" style="width:auto" onchange="updateCondValSuggestions()">${keysOpts}</select>
-          uguale a
-          <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:120px" list="ab-cond-val-datalist" oninput="updateArrayPathPreview()">
-          <datalist id="ab-cond-val-datalist"></datalist>
+          <select id="ab-op" class="form-control form-control-sm" style="width:auto" onchange="onOpChange()">
+            <option value="=">uguale a</option>
+            <option value="!=">diverso da</option>
+            <option value=">">maggiore di</option>
+            <option value="<">minore di</option>
+            <option value=">=">≥ maggiore/uguale</option>
+            <option value="<=">≤ minore/uguale</option>
+            <option value="~">contiene</option>
+            <option value="max">il massimo di</option>
+            <option value="min">il minimo di</option>
+          </select>
+          <span id="ab-val-wrap" style="display:flex;gap:4px;align-items:center">
+            <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:120px" list="ab-cond-val-datalist" oninput="updateArrayPathPreview()">
+            <datalist id="ab-cond-val-datalist"></datalist>
+            <button type="button" id="ab-load-values-btn" class="btn btn-xs btn-secondary" onclick="loadAllValoriCampo()" title="Carica tutti i valori da tutte le istanze">⟳ Carica tutti</button>
+          </span>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
           Estrai campo
@@ -529,17 +554,41 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
     if (el) el.addEventListener('change', updateArrayPathPreview);
   });
 
+  // Salva stato builder in sessionStorage (sopravvive a prev/next)
+  sessionStorage.setItem('ab_state', JSON.stringify({ prefix: arrayPrefix, keys }));
+
   // Popola subito i valori per la prima chiave condizione
   updateCondValSuggestions();
   updateArrayPathPreview();
 }
 
-// Raccoglie tutti i valori unici per la chiave condizione selezionata
+// Gestisce cambio operatore: nasconde valore per max/min
+function onOpChange() {
+  const op = document.getElementById('ab-op')?.value;
+  const valWrap = document.getElementById('ab-val-wrap');
+  if (valWrap) valWrap.style.display = (op === 'max' || op === 'min') ? 'none' : 'flex';
+  updateArrayPathPreview();
+}
+
+// Raccoglie valori unici dall'istanza corrente per la chiave condizione selezionata.
+// Per max/min nasconde il campo valore.
 function updateCondValSuggestions() {
-  const key = document.getElementById('ab-cond-field')?.value;
-  const dl  = document.getElementById('ab-cond-val-datalist');
+  const key    = document.getElementById('ab-cond-field')?.value;
+  const op     = document.getElementById('ab-op')?.value || '=';
+  const dl     = document.getElementById('ab-cond-val-datalist');
+  const valWrap = document.getElementById('ab-val-wrap');
+
+  // max/min: nessun valore necessario
+  if (op === 'max' || op === 'min') {
+    if (valWrap) valWrap.style.display = 'none';
+    updateArrayPathPreview();
+    return;
+  }
+  if (valWrap) valWrap.style.display = 'flex';
+
   if (!key || !dl) return;
 
+  // Popola dal rawData corrente (veloce, un'istanza)
   let arr = null;
   try { arr = resolvePathJS(rawData, currentArrayPrefix); } catch(e) {}
   if (!Array.isArray(arr)) { dl.innerHTML = ''; return; }
@@ -553,24 +602,58 @@ function updateCondValSuggestions() {
 
   dl.innerHTML = Array.from(vals).map(v => `<option value="${escapeHTML(v)}">`).join('');
 
-  // Se un solo valore univoco: auto-compila
+  // Auto-compila se valore unico nell'istanza corrente
   if (vals.size === 1) {
-    const condValInput = document.getElementById('ab-cond-val');
-    if (condValInput && !condValInput.value) {
-      condValInput.value = Array.from(vals)[0];
-      updateArrayPathPreview();
+    const cv = document.getElementById('ab-cond-val');
+    if (cv && !cv.value) { cv.value = Array.from(vals)[0]; updateArrayPathPreview(); }
+  }
+
+  updateArrayPathPreview();
+}
+
+// Carica tutti i valori unici dall'endpoint (tutte le istanze del servizio)
+async function loadAllValoriCampo() {
+  const key = document.getElementById('ab-cond-field')?.value;
+  if (!key) return;
+  const dl  = document.getElementById('ab-cond-val-datalist');
+  const btn = document.getElementById('ab-load-values-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Carico…'; }
+
+  try {
+    const u = `/motori/${_motoreId}/api/valori-campo?array=${encodeURIComponent(currentArrayPrefix)}&field=${encodeURIComponent(key)}`;
+    const resp = await fetch(u);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.valori && dl) {
+      dl.innerHTML = data.valori.map(v => `<option value="${escapeHTML(v)}">`).join('');
     }
+    if (btn) {
+      if (data.tipo === 'libero') {
+        btn.textContent = `Prime ${data.valori?.length || 0} (campo libero su ${data.totale_istanze} istanze)`;
+      } else {
+        btn.textContent = `${data.valori?.length || 0} valori da ${data.totale_istanze} istanze`;
+      }
+      btn.disabled = false;
+    }
+  } catch(e) {
+    if (btn) { btn.textContent = 'Errore'; btn.disabled = false; }
   }
 }
 
 function updateArrayPathPreview() {
-  const condField   = document.getElementById('ab-cond-field')?.value || '';
-  const condVal     = document.getElementById('ab-cond-val')?.value || '';
+  const condField    = document.getElementById('ab-cond-field')?.value || '';
+  const op           = document.getElementById('ab-op')?.value || '=';
+  const condVal      = document.getElementById('ab-cond-val')?.value || '';
   const extractField = document.getElementById('ab-extract-field')?.value || '';
   const prev = document.getElementById('ab-path-preview');
   if (!prev) return;
   if (condField && extractField) {
-    const path = `${currentArrayPrefix}[${condField}=${condVal}].${extractField}`;
+    let path;
+    if (op === 'max' || op === 'min') {
+      path = `${currentArrayPrefix}[${op}:${condField}].${extractField}`;
+    } else {
+      path = `${currentArrayPrefix}[${condField}${op}${condVal}].${extractField}`;
+    }
     prev.innerHTML = 'Path risultante: <code>' + escapeHTML(path) + '</code>';
   } else {
     prev.textContent = '';
@@ -579,9 +662,15 @@ function updateArrayPathPreview() {
 
 function applyArrayBuilder() {
   const condField    = document.getElementById('ab-cond-field')?.value || '';
+  const op           = document.getElementById('ab-op')?.value || '=';
   const condVal      = document.getElementById('ab-cond-val')?.value || '';
   const extractField = document.getElementById('ab-extract-field')?.value || '';
-  const path = `${currentArrayPrefix}[${condField}=${condVal}].${extractField}`;
+  let path;
+  if (op === 'max' || op === 'min') {
+    path = `${currentArrayPrefix}[${op}:${condField}].${extractField}`;
+  } else {
+    path = `${currentArrayPrefix}[${condField}${op}${condVal}].${extractField}`;
+  }
   if (lastFocusedPathInput) {
     lastFocusedPathInput.value = path;
     updatePreview(lastFocusedPathInput);

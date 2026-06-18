@@ -668,6 +668,95 @@ func (h *MotoriHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/motori?flash=Motore+archiviato&flashType=success", http.StatusSeeOther)
 }
 
+// --- API helper wizard step 3 ---
+
+// GetValoriCampo recupera i valori unici di un campo all'interno di un array,
+// aggregati su tutte le istanze del servizio. Usato dal wizard step 3 per popolare
+// il datalist del builder array.
+// GET /motori/{id}/api/valori-campo?array=anni&field=tiporichiesta
+func (h *MotoriHandler) GetValoriCampo(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bando, _, err := loadMotoreConConfig(h, r)
+	if err != nil {
+		http.Error(w, `{"errore":"motore non trovato"}`, http.StatusNotFound)
+		return
+	}
+
+	arrayPath := strings.TrimSpace(r.URL.Query().Get("array"))
+	field := strings.TrimSpace(r.URL.Query().Get("field"))
+	if arrayPath == "" || field == "" {
+		http.Error(w, `{"errore":"parametri array e field obbligatori"}`, http.StatusBadRequest)
+		return
+	}
+
+	client := opencity.NewClient(h.BaseURL, op.JWT)
+	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"errore": err.Error()})
+		return
+	}
+
+	// Conta occorrenze di ogni valore unico
+	valCount := make(map[string]int)
+	for _, rawApp := range rawApps {
+		var app opencity.Application
+		if json.Unmarshal(rawApp, &app) != nil || len(app.Data) == 0 {
+			continue
+		}
+		elems, err := extractor.ArrayElements(app.Data, arrayPath)
+		if err != nil {
+			continue
+		}
+		seen := make(map[string]struct{})
+		for _, elem := range elems {
+			v, err := extractor.Str(elem, field)
+			if err != nil || v == "" {
+				continue
+			}
+			if _, already := seen[v]; !already {
+				valCount[v]++
+				seen[v] = struct{}{}
+			}
+		}
+	}
+
+	// Ordina per frequenza decrescente poi alfabetico
+	type kv struct {
+		Val   string
+		Count int
+	}
+	kvs := make([]kv, 0, len(valCount))
+	for v, c := range valCount {
+		kvs = append(kvs, kv{v, c})
+	}
+	sort.Slice(kvs, func(i, j int) bool {
+		if kvs[i].Count != kvs[j].Count {
+			return kvs[i].Count > kvs[j].Count
+		}
+		return kvs[i].Val < kvs[j].Val
+	})
+
+	const soglia = 20
+	tipo := "select"
+	if len(kvs) > soglia {
+		tipo = "libero"
+		kvs = kvs[:soglia]
+	}
+
+	valori := make([]string, len(kvs))
+	for i, kv := range kvs {
+		valori[i] = kv.Val
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"valori":         valori,
+		"totale_istanze": len(rawApps),
+		"tipo":           tipo,
+	})
+}
+
 // --- helpers ---
 
 func parseFilterValue(s string) any {

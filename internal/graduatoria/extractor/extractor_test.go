@@ -87,6 +87,51 @@ func TestResolveNodeConditional(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for unsatisfied condition, got nil")
 	}
+
+	// Test 8: operatore != (diverso da)
+	corrNeq, err := Float(raw, "anni[annualita1!=20232024].corrispettivo")
+	if err != nil {
+		t.Fatalf("!= unexpected error: %v", err)
+	}
+	if corrNeq != 450.5 {
+		t.Errorf("!= expected 450.5, got %v", corrNeq)
+	}
+
+	// Test 9: operatore > (maggiore di) — verifica l'annualità dell'elemento con corrispettivo > 400
+	annGt, err := Str(raw, "anni[corrispettivo>400].annualita1")
+	if err != nil {
+		t.Fatalf("> unexpected error: %v", err)
+	}
+	if annGt != "20242025" {
+		t.Errorf("> expected '20242025', got %v", annGt)
+	}
+
+	// Test 10: operatore ~ (contiene)
+	annTilde, err := Str(raw, "anni[annualita1~2024].annualita1")
+	if err != nil {
+		t.Fatalf("~ unexpected error: %v", err)
+	}
+	if annTilde != "20232024" {
+		t.Errorf("~ expected '20232024', got %v", annTilde)
+	}
+
+	// Test 11: max: → elemento con corrispettivo massimo
+	corrMax, err := Float(raw, "anni[max:corrispettivo].corrispettivo")
+	if err != nil {
+		t.Fatalf("max: unexpected error: %v", err)
+	}
+	if corrMax != 450.5 {
+		t.Errorf("max: expected 450.5, got %v", corrMax)
+	}
+
+	// Test 12: min: → elemento con corrispettivo minimo
+	corrMin, err := Float(raw, "anni[min:corrispettivo].corrispettivo")
+	if err != nil {
+		t.Fatalf("min: unexpected error: %v", err)
+	}
+	if corrMin != 318.0 {
+		t.Errorf("min: expected 318.0, got %v", corrMin)
+	}
 }
 
 func TestFlattenJSON_ArrayAsTerminal(t *testing.T) {
