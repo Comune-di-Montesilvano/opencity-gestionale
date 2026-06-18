@@ -2,7 +2,7 @@
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 3: Mapping{{end}}
+{{define "title"}}{{.Motore.Nome}} — Step 3: Parametri{{end}}
 
 {{define "content"}}
 <div class="page-header">
@@ -12,7 +12,7 @@
 <div class="wizard-steps">
   <span class="wizard-step">1. Servizio</span>
   <span class="wizard-step">2. Tipo bando</span>
-  <span class="wizard-step wizard-step-active">3. Mapping</span>
+  <span class="wizard-step wizard-step-active">3. Parametri</span>
   <span class="wizard-step">4. Filtri</span>
   <span class="wizard-step">5. Tipologie</span>
   <span class="wizard-step">6. Rimborso</span>
@@ -20,71 +20,83 @@
 </div>
 
 <div class="wizard-layout">
-
   <div class="wizard-col-main">
-    <form method="POST" action="/motori/{{.Motore.ID}}/wizard/3">
+    <form method="POST" action="/motori/{{.Motore.ID}}/wizard/3" id="step3-form">
 
-      <h2>Mapping campi logici → JSON</h2>
-      <p class="text-muted">Per ogni campo logico, indica il percorso nel JSON dell'istanza. Usa il viewer a destra per navigare la struttura. Lascia vuoto per non mappare.</p>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem">
+        <h2 style="margin:0">Parametri</h2>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="addRow()">+ Aggiungi parametro</button>
+      </div>
+      <p class="text-muted" style="margin-bottom:1rem">Definisci i parametri logici da estrarre da ogni istanza. Usa il viewer a destra per navigare la struttura JSON.</p>
 
-      {{if .CampiFlat}}
-      <datalist id="percorsi-json">
-        {{range .CampiFlat}}<option value="{{.Path}}">{{end}}
-      </datalist>
-      {{end}}
-
-      <table class="table">
+      <table class="table" id="params-table">
         <thead>
-          <tr><th>Campo logico</th><th>Descrizione</th><th>Path JSON</th><th>Tipo</th><th>Array?</th><th title="Path del campo firma PDND (es. ordinary_economic_situation_indicator.meta.signature). Lascia vuoto se il campo non ha certificazione PDND.">Firma PDND</th></tr>
+          <tr>
+            <th style="width:140px">Nome logico</th>
+            <th style="width:120px">Label (opz.)</th>
+            <th style="width:90px">Tipo</th>
+            <th>Path JSON</th>
+            <th style="width:60px" title="Relativo a ogni elemento dell'array di espansione">Espand.</th>
+            <th>Condizione PDND</th>
+            <th style="width:32px"></th>
+          </tr>
         </thead>
-        <tbody>
-        {{range .CampiLogici}}
-        <tr>
-          <td><strong>{{.Nome}}</strong></td>
-          <td class="text-muted" style="font-size:.85em">{{.Desc}}</td>
-          <td>
-            <input type="text" name="path_{{.Nome}}" value="{{.Path}}"
-              class="form-control form-control-sm json-path-input" list="percorsi-json"
-              placeholder="{{if .PathDefault}}{{.PathDefault}}{{else}}data.campo{{end}}"
-              data-campo="path_{{.Nome}}" oninput="updatePreview(this)">
-            <div class="valore-campione" style="font-size: 11px; margin-top: 2px; min-height: 14px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-              <span id="preview_path_{{.Nome}}"></span>
-              <button type="button" class="btn btn-link btn-xs btn-array-builder" id="btn_builder_path_{{.Nome}}" style="display:none; padding:0; font-size:11px; text-decoration:none;" onclick="openArrayBuilder('path_{{.Nome}}')">⚙️ Condizione Array</button>
-            </div>
-            <div class="array-builder-box" id="builder_path_{{.Nome}}" style="display:none; margin-top:6px; padding:10px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;"></div>
-          </td>
-          <td>
-            <select name="tipo_{{.Nome}}" class="form-control form-control-sm">
-              <option value="float"  {{if eq .Tipo "float"}}selected{{end}}>float</option>
-              <option value="string" {{if eq .Tipo "string"}}selected{{end}}>string</option>
-              <option value="int"    {{if eq .Tipo "int"}}selected{{end}}>int</option>
-              <option value="time"   {{if eq .Tipo "time"}}selected{{end}}>time</option>
-              <option value="count"  {{if eq .Tipo "count"}}selected{{end}}>count</option>
-            </select>
-          </td>
-          <td style="text-align:center">
-            <input type="checkbox" name="expand_{{.Nome}}" value="1" {{if .Expand}}checked{{end}} title="Espandi array">
-          </td>
-          <td>
-            <input type="text" name="pdnd_{{.Nome}}" value="{{.PDNDPath}}"
-              class="form-control form-control-sm json-path-input" list="percorsi-json"
-              placeholder="path firma (vuoto = no PDND)"
-              data-campo="pdnd_{{.Nome}}" oninput="updatePreview(this)">
-            <div class="valore-campione" style="font-size: 11px; margin-top: 2px; min-height: 14px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-              <span id="preview_pdnd_{{.Nome}}"></span>
-              <button type="button" class="btn btn-link btn-xs btn-array-builder" id="btn_builder_pdnd_{{.Nome}}" style="display:none; padding:0; font-size:11px; text-decoration:none;" onclick="openArrayBuilder('pdnd_{{.Nome}}')">⚙️ Condizione Array</button>
-            </div>
-            <div class="array-builder-box" id="builder_pdnd_{{.Nome}}" style="display:none; margin-top:6px; padding:10px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;"></div>
-          </td>
-        </tr>
-        {{end}}
+        <tbody id="params-body">
+          {{range $i, $p := .ParametriMappati}}
+          <tr data-idx="{{$i}}">
+            <td><input type="text" name="p_nome" value="{{$p.Nome}}" class="form-control form-control-sm" placeholder="es. isee" required></td>
+            <td><input type="text" name="p_label" value="{{$p.Label}}" class="form-control form-control-sm" placeholder="es. Valore ISEE"></td>
+            <td>
+              <select name="p_tipo" class="form-control form-control-sm">
+                <option value="float"  {{if eq $p.Tipo "float"}}selected{{end}}>Valore (€)</option>
+                <option value="int"    {{if eq $p.Tipo "int"}}selected{{end}}>Numerico</option>
+                <option value="string" {{if eq $p.Tipo "string"}}selected{{end}}>Testo</option>
+                <option value="time"   {{if eq $p.Tipo "time"}}selected{{end}}>Data</option>
+                <option value="count"  {{if eq $p.Tipo "count"}}selected{{end}}>Conteggio</option>
+              </select>
+            </td>
+            <td>
+              <input type="text" name="p_path" value="{{$p.Path}}"
+                class="form-control form-control-sm json-path-input"
+                placeholder="es. ordinary_economic_situation_indicator.isee"
+                oninput="updatePreview(this)">
+              <div class="valore-campione" style="font-size:11px; margin-top:2px; min-height:14px; font-weight:500"></div>
+            </td>
+            <td style="text-align:center">
+              <input type="hidden" name="p_expand" value="{{if $p.Expand}}1{{else}}0{{end}}">
+              <input type="checkbox" {{if $p.Expand}}checked{{end}}
+                onchange="this.previousSibling.value = this.checked ? '1' : '0'"
+                title="Espandi: questo campo è relativo a ogni elemento dell'array di espansione">
+            </td>
+            <td style="vertical-align:top; padding-top:6px">
+              <div class="pdnd-section" style="display:flex; flex-direction:column; gap:4px">
+                <input type="text" name="p_pdnd_path" value="{{$p.PDNDPath}}"
+                  class="form-control form-control-sm json-path-input"
+                  placeholder="path campo da verificare"
+                  oninput="updatePreview(this); updatePDNDValVisibility(this)">
+                <div style="display:flex; gap:4px; align-items:center">
+                  <select name="p_pdnd_op" class="form-control form-control-sm pdnd-op-select" onchange="updatePDNDValVisibility(this)" style="width:auto">
+                    <option value="non_vuoto" {{if or (eq $p.PDNDOp "") (eq $p.PDNDOp "non_vuoto")}}selected{{end}}>non vuoto</option>
+                    <option value="==" {{if eq $p.PDNDOp "=="}}selected{{end}}>uguale a</option>
+                    <option value="!=" {{if eq $p.PDNDOp "!="}}selected{{end}}>diverso da</option>
+                  </select>
+                  <input type="text" name="p_pdnd_val" value="{{$p.PDNDVal}}"
+                    class="form-control form-control-sm pdnd-val-input"
+                    placeholder="valore"
+                    style="{{if or (eq $p.PDNDOp "==") (eq $p.PDNDOp "!=")}}display:inline-block{{else}}display:none{{end}}; width:100px">
+                </div>
+              </div>
+            </td>
+            <td><button type="button" class="btn btn-xs btn-danger" onclick="removeRow(this)" title="Rimuovi">×</button></td>
+          </tr>
+          {{end}}
         </tbody>
       </table>
 
-      <div class="form-group">
-        <label>Campo di espansione array</label>
-        <input type="text" name="espansione" value="{{.Espansione}}" class="form-control" placeholder="es. anni">
-        <small class="text-muted">Nome del campo logico che punta all'array da espandere in righe separate.</small>
+      <div class="form-group" style="margin-top:1.25rem">
+        <label><strong>Campo di espansione array</strong></label>
+        <input type="text" name="espansione" value="{{.Espansione}}" class="form-control" style="max-width:300px" placeholder="es. anni">
+        <small class="text-muted">Nome del campo JSON che contiene l'array da espandere in righe separate (una riga per elemento). Lascia vuoto se non necessario.</small>
       </div>
 
       <div class="form-actions">
@@ -94,31 +106,51 @@
     </form>
   </div>
 
+  <!-- Viewer JSON (colonna destra) -->
   <div class="wizard-col-side" style="position:sticky; top:1rem">
-    <h3>Struttura istanza campione</h3>
-    
-    <form method="GET" action="/motori/{{.Motore.ID}}/wizard/3" style="display:flex; gap:.25rem; margin-bottom:1rem">
-      <input type="text" name="sample_id" value="{{.SampleID}}" class="form-control form-control-sm" placeholder="Incolla ID istanza...">
-      <button type="submit" class="btn btn-sm btn-secondary">Carica</button>
-    </form>
+    <h3>Istanza campione</h3>
+
+    <div style="display:flex; gap:.25rem; align-items:center; margin-bottom:.5rem; flex-wrap:wrap">
+      <form method="GET" action="/motori/{{.Motore.ID}}/wizard/3" style="display:flex; gap:.25rem; flex:1">
+        <input type="text" name="sample_id" value="{{.SampleID}}" class="form-control form-control-sm" placeholder="Incolla ID istanza...">
+        <button type="submit" class="btn btn-sm btn-secondary">Carica</button>
+      </form>
+      {{if gt .SampleTotal 0}}
+      <div style="display:flex; gap:.25rem">
+        {{if gt .SampleOffset 0}}
+        <a href="/motori/{{.Motore.ID}}/wizard/3?sample_offset={{dec .SampleOffset}}" class="btn btn-sm btn-secondary">←</a>
+        {{else}}
+        <button class="btn btn-sm btn-secondary" disabled>←</button>
+        {{end}}
+        <span style="font-size:12px; padding:4px 6px; white-space:nowrap">{{inc .SampleOffset}}/{{.SampleTotal}}</span>
+        {{if lt (inc .SampleOffset) .SampleTotal}}
+        <a href="/motori/{{.Motore.ID}}/wizard/3?sample_offset={{inc .SampleOffset}}" class="btn btn-sm btn-secondary">→</a>
+        {{else}}
+        <button class="btn btn-sm btn-secondary" disabled>→</button>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
 
     {{if .ErrCampione}}
     <div class="alert alert-error">{{.ErrCampione}}</div>
-    {{else if not .CampiFlat}}
+    {{else if eq (len .CampiFlat) 0}}
     <p class="text-muted">Nessun dato disponibile.</p>
     {{else}}
-    <div class="form-group" style="margin-bottom:.75rem">
-      <input type="text" id="json-search" class="form-control form-control-sm" placeholder="Filtra percorsi (es. isee, iban)..." oninput="filterJSON()">
+    <div class="form-group" style="margin-bottom:.5rem">
+      <input type="text" id="json-search" class="form-control form-control-sm" placeholder="Filtra percorsi..." oninput="filterJSON()">
     </div>
-    
-    <div class="json-viewer" style="border: 1px solid #e2e8f0; border-radius: 6px; max-height: 60vh; overflow-y: auto;">
+
+    <div class="json-viewer" style="border:1px solid #e2e8f0; border-radius:6px; max-height:60vh; overflow-y:auto">
       <table class="table table-sm" style="margin:0">
-        <thead><tr><th>Percorso (click per mappare/copiare)</th><th>Valore</th></tr></thead>
+        <thead><tr><th>Percorso</th><th>Valore</th></tr></thead>
         <tbody id="json-viewer-body">
         {{range .CampiFlat}}
-        <tr style="cursor:pointer" onclick="selectPath('{{.Path}}')">
+        <tr style="cursor:pointer" onclick="{{if .IsArray}}openArrayBuilderFromViewer('{{.Path}}', {{jsonKeys .ArraySampleKeys}}){{else}}selectPath('{{.Path}}'){{end}}">
           <td class="json-path-cell">
-            <code class="json-path" style="font-size:.75em; color:#2563eb; display:block; word-break:break-all">{{.Path}}</code>
+            <code style="font-size:.75em; color:{{if .IsArray}}#7c3aed{{else}}#2563eb{{end}}; display:block; word-break:break-all">
+              {{.Path}}{{if .IsArray}} <span style="background:#ede9fe; color:#6d28d9; border-radius:3px; padding:1px 4px; font-size:.85em">[Array]</span>{{end}}
+            </code>
           </td>
           <td class="json-value" style="font-size:.82em; color:#555; max-width:180px; word-break:break-word">{{.Value}}</td>
         </tr>
@@ -127,470 +159,204 @@
       </table>
     </div>
     {{end}}
-  </div>
 
+    <!-- Array Builder popup -->
+    <div id="array-builder-panel" style="display:none; margin-top:.75rem; padding:10px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:12px"></div>
+  </div>
 </div>
 
-<!-- Feedback Toast -->
+<!-- Feedback toast -->
 <div id="toast-feedback" style="display:none; position:fixed; bottom:20px; right:20px; background:#1e293b; color:#fff; padding:.5rem 1rem; border-radius:4px; font-size:12px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
+
+<!-- Template riga nuova (clonato da JS) -->
+<template id="row-template">
+  <tr>
+    <td><input type="text" name="p_nome" value="" class="form-control form-control-sm" placeholder="es. isee" required></td>
+    <td><input type="text" name="p_label" value="" class="form-control form-control-sm" placeholder="es. Valore ISEE"></td>
+    <td>
+      <select name="p_tipo" class="form-control form-control-sm">
+        <option value="float">Valore (€)</option>
+        <option value="int">Numerico</option>
+        <option value="string" selected>Testo</option>
+        <option value="time">Data</option>
+        <option value="count">Conteggio</option>
+      </select>
+    </td>
+    <td>
+      <input type="text" name="p_path" value="" class="form-control form-control-sm json-path-input" placeholder="es. data.campo" oninput="updatePreview(this)">
+      <div class="valore-campione" style="font-size:11px; margin-top:2px; min-height:14px; font-weight:500"></div>
+    </td>
+    <td style="text-align:center">
+      <input type="hidden" name="p_expand" value="0">
+      <input type="checkbox" onchange="this.previousSibling.value = this.checked ? '1' : '0'" title="Espandi per ogni elemento dell'array di espansione">
+    </td>
+    <td style="vertical-align:top; padding-top:6px">
+      <div class="pdnd-section" style="display:flex; flex-direction:column; gap:4px">
+        <input type="text" name="p_pdnd_path" value="" class="form-control form-control-sm json-path-input" placeholder="path campo da verificare" oninput="updatePreview(this); updatePDNDValVisibility(this)">
+        <div style="display:flex; gap:4px; align-items:center">
+          <select name="p_pdnd_op" class="form-control form-control-sm pdnd-op-select" onchange="updatePDNDValVisibility(this)" style="width:auto">
+            <option value="non_vuoto" selected>non vuoto</option>
+            <option value="==">uguale a</option>
+            <option value="!=">diverso da</option>
+          </select>
+          <input type="text" name="p_pdnd_val" value="" class="form-control form-control-sm pdnd-val-input" placeholder="valore" style="display:none; width:100px">
+        </div>
+      </div>
+    </td>
+    <td><button type="button" class="btn btn-xs btn-danger" onclick="removeRow(this)" title="Rimuovi">×</button></td>
+  </tr>
+</template>
 
 <pre id="flat-data" style="display:none">{{if .FlatJSON}}{{.FlatJSON}}{{else}}[]{{end}}</pre>
 
 <style>
-  .json-path-cell:hover code {
-    text-decoration: underline;
-    color: #1d4ed8 !important;
-  }
-  #json-viewer-body tr:hover {
-    background: #eff6ff;
-  }
+.json-path-cell:hover code { text-decoration:underline; }
+#json-viewer-body tr:hover { background:#eff6ff; }
 </style>
 
 <script>
 const flatData = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
 const flatMap = {};
-const cleanedFlatMap = {};
-let lastFocusedInput = null;
+flatData.forEach(item => { if (!item.IsArray) flatMap[item.Path] = item.Value; });
 
-// Clean indices out of a path
-function cleanPath(p) {
-  return p.split('.').filter(part => !/^\d+$/.test(part)).join('.');
-}
+let lastFocusedPathInput = null;
 
-flatData.forEach(item => {
-  flatMap[item.Path] = item.Value;
-  cleanedFlatMap[cleanPath(item.Path)] = item.Value;
+// Track focus su path input
+document.addEventListener('focusin', e => {
+  if (e.target.name === 'p_path') lastFocusedPathInput = e.target;
 });
 
-// Track text inputs to automatically insert the path on click
-document.querySelectorAll('.json-path-input').forEach(input => {
-  input.addEventListener('focus', () => {
-    lastFocusedInput = input;
-  });
-  // Update preview on load if value is present
-  updatePreview(input);
-});
+// Preview iniziale per tutti gli input con valore
+document.querySelectorAll('.json-path-input[name="p_path"]').forEach(updatePreview);
 
-// Watch checkboxes
-document.querySelectorAll('input[type="checkbox"][name^="expand_"]').forEach(checkbox => {
-  checkbox.addEventListener('change', () => {
-    const fieldName = checkbox.name.replace('expand_', '');
-    const pathInput = document.querySelector('input[name="path_' + fieldName + '"]');
-    if (pathInput) updatePreview(pathInput);
-    const pdndInput = document.querySelector('input[name="pdnd_' + fieldName + '"]');
-    if (pdndInput) updatePreview(pdndInput);
-  });
-});
-
-// Watch espansione input
-const espansioneInput = document.querySelector('input[name="espansione"]');
-if (espansioneInput) {
-  espansioneInput.addEventListener('input', () => {
-    document.querySelectorAll('.json-path-input').forEach(input => {
-      updatePreview(input);
-    });
-  });
+function addRow() {
+  const tmpl = document.getElementById('row-template');
+  const clone = tmpl.content.cloneNode(true);
+  document.getElementById('params-body').appendChild(clone);
 }
 
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function escapeJS(str) {
-  return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
-
-function checkArrayPath(inputVal) {
-  // Try pattern B first (conditional path)
-  let m = inputVal.match(/^(.+?)\[(.+?)\==?(.+?)\](?:\.(.+))?$/);
-  if (m) {
-    return {
-      arrayPrefix: m[1],
-      condField: m[2].trim(),
-      condVal: m[3].trim().replace(/^["']|["']$/g, ''),
-      subField: m[4] ? m[4].trim() : ''
-    };
-  }
-  
-  // Try pattern A (index path)
-  m = inputVal.match(/^(.+?)\.(\d+)(?:\.(.+))?$/);
-  if (m) {
-    return {
-      arrayPrefix: m[1],
-      condField: '',
-      condVal: '',
-      subField: m[3] ? m[3].trim() : ''
-    };
-  }
-  
-  return null;
-}
-
-function resolveConditionalPath(path, flatMap) {
-  let resolvedPath = path;
-  const condRegex = /([^.\[]+)\[([^\]]+)\]/g;
-  
-  resolvedPath = resolvedPath.replace(condRegex, (fullMatch, arrayKey, cond) => {
-    if (/^\d+$/.test(cond)) {
-      return arrayKey + '.' + cond;
-    }
-    
-    const condParts = cond.split(/==?/).map(s => s.trim());
-    if (condParts.length !== 2) return fullMatch;
-    
-    const condKey = condParts[0];
-    const condVal = condParts[1].replace(/^["']|["']$/g, '');
-    
-    let matchedIndex = null;
-    const keyPattern = new RegExp('^' + escapeRegExp(arrayKey) + '\\.(\\d+)\\.' + escapeRegExp(condKey) + '$');
-    
-    for (const key in flatMap) {
-      const m = key.match(keyPattern);
-      if (m && flatMap[key] === condVal) {
-        matchedIndex = m[1];
-        break;
-      }
-    }
-    
-    if (matchedIndex !== null) {
-      return arrayKey + '.' + matchedIndex;
-    }
-    return fullMatch;
-  });
-  
-  return resolvedPath;
-}
-
-function filterJSON() {
-  const q = document.getElementById('json-search').value.toLowerCase();
-  const rows = document.querySelectorAll('#json-viewer-body tr');
-  rows.forEach(row => {
-    const path = row.querySelector('.json-path').textContent.toLowerCase();
-    const val = row.querySelector('.json-value').textContent.toLowerCase();
-    if (path.includes(q) || val.includes(q)) {
-      row.style.display = '';
-    } else {
-      row.style.display = 'none';
-    }
-  });
+function removeRow(btn) {
+  btn.closest('tr').remove();
 }
 
 function selectPath(path) {
   navigator.clipboard.writeText(path).catch(() => {});
-  
-  if (lastFocusedInput) {
-    const id = lastFocusedInput.getAttribute('data-campo');
-    let fieldName = '';
-    if (id.startsWith('path_')) {
-      fieldName = id.replace('path_', '');
-    } else if (id.startsWith('pdnd_')) {
-      fieldName = id.replace('pdnd_', '');
-    }
-    
-    const isArrayCheckbox = document.querySelector('input[name="expand_' + fieldName + '"]');
-    const isArray = isArrayCheckbox ? isArrayCheckbox.checked : false;
-    
-    const arrayMatch = path.match(/^(.+?)\.(\d+)\.(.+)$/);
-    if (isArray && arrayMatch) {
-      const arrayPrefix = arrayMatch[1];
-      const relativePath = arrayMatch[3];
-      
-      lastFocusedInput.value = relativePath;
-      
-      const espansioneInput = document.querySelector('input[name="espansione"]');
-      if (espansioneInput && !espansioneInput.value.trim()) {
-        espansioneInput.value = arrayPrefix;
-        espansioneInput.dispatchEvent(new Event('input'));
-      }
-    } else {
-      lastFocusedInput.value = path;
-    }
-    
-    updatePreview(lastFocusedInput);
-    lastFocusedInput.focus();
+  if (lastFocusedPathInput) {
+    lastFocusedPathInput.value = path;
+    updatePreview(lastFocusedPathInput);
+    lastFocusedPathInput.focus();
   }
-  
-  const el = document.getElementById('toast-feedback');
-  el.textContent = 'Percorso copiato: ' + path;
-  el.style.display = 'block';
-  setTimeout(() => {
-    el.style.display = 'none';
-  }, 2000);
+  toast('Percorso copiato: ' + path);
 }
 
 function updatePreview(input) {
-  const path = input.value.trim();
-  const id = input.getAttribute('data-campo');
-  
-  let previewEl;
-  let fieldName = '';
-  if (id.startsWith('path_')) {
-    fieldName = id.replace('path_', '');
-    previewEl = document.getElementById('preview_path_' + fieldName);
-  } else if (id.startsWith('pdnd_')) {
-    fieldName = id.replace('pdnd_', '');
-    previewEl = document.getElementById('preview_pdnd_' + fieldName);
-  }
-  
+  const previewEl = input.parentElement.querySelector('.valore-campione');
   if (!previewEl) return;
-  
-  if (!path) {
-    previewEl.textContent = '';
-    const btn = document.getElementById('btn_builder_' + id);
-    if (btn) btn.style.display = 'none';
-    const builderBox = document.getElementById('builder_' + id);
-    if (builderBox) builderBox.style.display = 'none';
-    return;
-  }
-  
+  const path = input.value.trim();
+  if (!path) { previewEl.textContent = ''; return; }
   if (path.startsWith('$app:')) {
     previewEl.innerHTML = '<span style="color:#64748b">Calcolato a runtime</span>';
-    const btn = document.getElementById('btn_builder_' + id);
-    if (btn) btn.style.display = 'none';
-    const builderBox = document.getElementById('builder_' + id);
-    if (builderBox) builderBox.style.display = 'none';
     return;
   }
-
-  const isArrayCheckbox = document.querySelector('input[name="expand_' + fieldName + '"]');
-  const isArray = isArrayCheckbox ? isArrayCheckbox.checked : false;
-  
-  const espansioneInput = document.querySelector('input[name="espansione"]');
-  const espansione = espansioneInput ? espansioneInput.value.trim() : '';
-
-  // Show/hide builder button based on path shape
-  const arrayInfo = checkArrayPath(path);
-  const btn = document.getElementById('btn_builder_' + id);
-  if (btn) {
-    if (arrayInfo) {
-      btn.style.display = 'inline-block';
-      btn.setAttribute('data-array-info', JSON.stringify(arrayInfo));
-    } else {
-      btn.style.display = 'none';
-      const builderBox = document.getElementById('builder_' + id);
-      if (builderBox) builderBox.style.display = 'none';
-    }
-  }
-
-  // If array expansion is checked, preview relative elements
-  if (isArray && espansione) {
-    const regex = new RegExp('^' + escapeRegExp(espansione) + '\\.(\\d+)\\.' + escapeRegExp(path) + '$');
-    const matches = [];
-    for (const key in flatMap) {
-      const match = key.match(regex);
-      if (match) {
-        matches.push({ index: parseInt(match[1]), val: flatMap[key] });
-      }
-    }
-    if (matches.length > 0) {
-      matches.sort((a, b) => a.index - b.index);
-      const parts = matches.map(m => `[${m.index}]: <strong>${escapeHTML(m.val)}</strong>`);
-      previewEl.innerHTML = '<span style="color:#16a34a">Valori array: ' + parts.join(', ') + '</span>';
-      return;
-    }
-  }
-
-  // Guessed expansion fallback if Array? checked but path not matched
-  if (isArray) {
-    const regex = new RegExp('^(.+?)\\.(\\d+)\\.' + escapeRegExp(path) + '$');
-    const matches = [];
-    for (const key in flatMap) {
-      const match = key.match(regex);
-      if (match) {
-        matches.push({ prefix: match[1], index: parseInt(match[2]), val: flatMap[key] });
-      }
-    }
-    if (matches.length > 0) {
-      matches.sort((a, b) => a.index - b.index);
-      const guessedEspansione = matches[0].prefix;
-      const parts = matches.map(m => `[${m.index}]: <strong>${escapeHTML(m.val)}</strong>`);
-      let html = '<span style="color:#16a34a">Valori array: ' + parts.join(', ') + '</span>';
-      if (espansione !== guessedEspansione) {
-        html += ` <span style="color:#eab308; font-size: 0.9em;">(Imposta "${guessedEspansione}" in fondo come espansione)</span>`;
-      }
-      previewEl.innerHTML = html;
-      return;
-    }
-  }
-
-  // Resolve conditional path syntax in JS
-  let lookupPath = path;
-  if (path.includes('[')) {
-    lookupPath = resolveConditionalPath(path, flatMap);
-  }
-  
-  // Try exact lookup first on resolved path
-  let val = flatMap[lookupPath];
-  let matchedPath = lookupPath;
-  
-  // Fallback to cleaned path lookup if not found directly
-  if (val === undefined) {
-    const cleanUser = cleanPath(lookupPath);
-    val = cleanedFlatMap[cleanUser];
-    if (val !== undefined) {
-      for (const key in flatMap) {
-        if (cleanPath(key) === cleanUser) {
-          matchedPath = key;
-          break;
-        }
-      }
-    }
-  }
-  
-  // Fallback to prefix matching
-  if (val === undefined && lookupPath.length >= 3) {
-    const matches = [];
-    for (const key in flatMap) {
-      if (key.toLowerCase().startsWith(lookupPath.toLowerCase())) {
-        matches.push({ key, val: flatMap[key] });
-      }
-    }
-    
-    if (matches.length > 0) {
-      const fn = fieldName.toLowerCase();
-      matches.sort((a, b) => {
-        const aContains = a.key.toLowerCase().includes(fn);
-        const bContains = b.key.toLowerCase().includes(fn);
-        if (aContains && !bContains) return -1;
-        if (!aContains && bContains) return 1;
-        return a.key.length - b.key.length;
-      });
-      val = matches[0].val;
-      matchedPath = matches[0].key;
-    }
-  }
-  
+  const val = flatMap[path];
   if (val !== undefined) {
-    if (matchedPath !== path) {
-      previewEl.innerHTML = '<span style="color:#16a34a" title="' + escapeHTML(matchedPath) + '">Valore (' + escapeHTML(matchedPath.split('.').pop()) + '): <strong>' + escapeHTML(val) + '</strong></span>';
-    } else {
-      previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(val) + '</strong></span>';
-    }
+    previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(val) + '</strong></span>';
   } else {
     previewEl.innerHTML = '<span style="color:#dc2626">Non trovato nel campione</span>';
   }
 }
 
-function openArrayBuilder(inputId) {
-  const input = document.querySelector('input[name="' + inputId + '"]');
-  if (!input) return;
-  
-  const btn = document.getElementById('btn_builder_' + inputId);
-  if (!btn) return;
-  
-  const arrayInfo = JSON.parse(btn.getAttribute('data-array-info'));
-  if (!arrayInfo) return;
-  
-  const builderBox = document.getElementById('builder_' + inputId);
-  if (!builderBox) return;
-  
-  const subKeys = new Set();
-  const valuesMap = {};
-  
-  const prefixPattern = new RegExp('^' + escapeRegExp(arrayInfo.arrayPrefix) + '\\.\\d+\\.(.+)$');
-  
-  flatData.forEach(item => {
-    const match = item.Path.match(prefixPattern);
-    if (match) {
-      const subKey = match[1];
-      subKeys.add(subKey);
-      if (!valuesMap[subKey]) {
-        valuesMap[subKey] = new Set();
-      }
-      valuesMap[subKey].add(item.Value);
-    }
-  });
-  
-  const uniqueSubKeys = Array.from(subKeys).sort();
-  if (uniqueSubKeys.length === 0) {
-    builderBox.innerHTML = '<div style="color:#dc2626; padding: 4px 0;">Nessun elemento array trovato nel campione per "' + escapeHTML(arrayInfo.arrayPrefix) + '"</div>';
-    builderBox.style.display = 'block';
-    return;
-  }
-  
-  let html = `
-    <div style="font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-      <span>Configura Condizione Array (${escapeHTML(arrayInfo.arrayPrefix)})</span>
-      <button type="button" class="btn btn-xs btn-secondary" style="padding:1px 5px; font-size:10px;" onclick="document.getElementById('builder_${inputId}').style.display='none'">Annulla</button>
+function updatePDNDValVisibility(el) {
+  const row = el.closest('td');
+  if (!row) return;
+  const opSelect = row.querySelector('.pdnd-op-select');
+  const valInput = row.querySelector('.pdnd-val-input');
+  if (!opSelect || !valInput) return;
+  const needsVal = opSelect.value === '==' || opSelect.value === '!=';
+  valInput.style.display = needsVal ? 'inline-block' : 'none';
+}
+
+// Array builder — aperto dal viewer quando si clicca un nodo [Array]
+let currentArrayPrefix = '';
+let currentArrayKeys = [];
+
+function openArrayBuilderFromViewer(arrayPrefix, keys) {
+  currentArrayPrefix = arrayPrefix;
+  currentArrayKeys = keys;
+  const panel = document.getElementById('array-builder-panel');
+  if (!panel) return;
+
+  const keysOpts = keys.map(k => `<option value="${escapeHTML(k)}">${escapeHTML(k)}</option>`).join('');
+
+  panel.innerHTML = `
+    <div style="font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between">
+      <span>Array: <code>${escapeHTML(arrayPrefix)}</code></span>
+      <button type="button" class="btn btn-xs btn-secondary" onclick="document.getElementById('array-builder-panel').style.display='none'">×</button>
     </div>
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        Trova l'elemento dove il campo 
-        <select id="cond_field_${inputId}" class="form-control form-control-sm" style="width:auto; display:inline-block;" onchange="onCondFieldChange('${inputId}')">
-          ${uniqueSubKeys.map(k => `<option value="${escapeHTML(k)}" ${k === arrayInfo.condField ? 'selected' : ''}>${escapeHTML(k)}</option>`).join('')}
-        </select>
-        è uguale a 
-        <select id="cond_val_${inputId}" class="form-control form-control-sm" style="width:auto; display:inline-block;">
-        </select>
+    <div style="display:flex; flex-direction:column; gap:8px">
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+        Seleziona elemento dove
+        <select id="ab-cond-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
+        è uguale a
+        <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:100px">
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        e mappa il campo da estrarre:
-        <select id="extract_field_${inputId}" class="form-control form-control-sm" style="width:auto; display:inline-block;">
-          ${uniqueSubKeys.map(k => `<option value="${escapeHTML(k)}" ${k === arrayInfo.subField ? 'selected' : ''}>${escapeHTML(k)}</option>`).join('')}
-        </select>
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+        ed estrai il campo
+        <select id="ab-extract-field" class="form-control form-control-sm" style="width:auto">${keysOpts}</select>
       </div>
-      <div style="margin-top:4px;">
-        <button type="button" class="btn btn-sm btn-primary" onclick="applyArrayBuilder('${inputId}', '${escapeJS(arrayInfo.arrayPrefix)}')">Applica condizione</button>
+      <div style="display:flex; gap:6px">
+        <button type="button" class="btn btn-sm btn-primary" onclick="applyArrayBuilder()">Applica → inserisci path</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="applyArrayExpand()">Usa come espansione</button>
       </div>
     </div>
   `;
-  
-  builderBox.innerHTML = html;
-  builderBox.style.display = 'block';
-  builderBox.valuesMap = valuesMap;
-  
-  onCondFieldChange(inputId, arrayInfo.condVal);
+  panel.style.display = 'block';
 }
 
-function onCondFieldChange(inputId, selectedValue) {
-  const builderBox = document.getElementById('builder_' + inputId);
-  if (!builderBox || !builderBox.valuesMap) return;
-  
-  const condFieldSelect = document.getElementById('cond_field_' + inputId);
-  const condValSelect = document.getElementById('cond_val_' + inputId);
-  if (!condFieldSelect || !condValSelect) return;
-  
-  const subKey = condFieldSelect.value;
-  const values = Array.from(builderBox.valuesMap[subKey] || []).sort();
-  
-  condValSelect.innerHTML = values.map(v => `<option value="${escapeHTML(v)}" ${v === selectedValue ? 'selected' : ''}>${escapeHTML(v)}</option>`).join('');
-}
-
-function applyArrayBuilder(inputId, arrayPrefix) {
-  const condField = document.getElementById('cond_field_' + inputId).value;
-  const condVal = document.getElementById('cond_val_' + inputId).value;
-  const extractField = document.getElementById('extract_field_' + inputId).value;
-  
-  const input = document.querySelector('input[name="' + inputId + '"]');
-  if (input) {
-    input.value = `${arrayPrefix}[${condField}=${condVal}].${extractField}`;
-    
-    let fieldName = '';
-    if (inputId.startsWith('path_')) {
-      fieldName = inputId.replace('path_', '');
-    } else if (inputId.startsWith('pdnd_')) {
-      fieldName = inputId.replace('pdnd_', '');
-    }
-    const isArrayCheckbox = document.querySelector('input[name="expand_' + fieldName + '"]');
-    if (isArrayCheckbox && isArrayCheckbox.checked) {
-      isArrayCheckbox.checked = false;
-    }
-    
-    updatePreview(input);
-    input.focus();
+function applyArrayBuilder() {
+  const condField = document.getElementById('ab-cond-field').value;
+  const condVal = document.getElementById('ab-cond-val').value;
+  const extractField = document.getElementById('ab-extract-field').value;
+  const path = `${currentArrayPrefix}[${condField}=${condVal}].${extractField}`;
+  if (lastFocusedPathInput) {
+    lastFocusedPathInput.value = path;
+    updatePreview(lastFocusedPathInput);
+    lastFocusedPathInput.focus();
   }
-  
-  const builderBox = document.getElementById('builder_' + inputId);
-  if (builderBox) builderBox.style.display = 'none';
+  toast('Path inserito: ' + path);
+  document.getElementById('array-builder-panel').style.display = 'none';
+}
+
+function applyArrayExpand() {
+  const espInput = document.querySelector('input[name="espansione"]');
+  if (espInput) {
+    espInput.value = currentArrayPrefix;
+    toast('Espansione impostata a: ' + currentArrayPrefix);
+  }
+  document.getElementById('array-builder-panel').style.display = 'none';
+}
+
+function filterJSON() {
+  const q = document.getElementById('json-search').value.toLowerCase();
+  document.querySelectorAll('#json-viewer-body tr').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast-feedback');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 2200);
 }
 
 function escapeHTML(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 </script>
 {{end}}

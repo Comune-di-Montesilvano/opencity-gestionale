@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/http"
 	"os"
@@ -19,6 +20,12 @@ var (
 var funcMap = template.FuncMap{
 	"add":  func(a, b int) int { return a + b },
 	"sub":  func(a, b int) int { return a - b },
+	"inc":  func(i int) int { return i + 1 },
+	"dec":  func(i int) int { return i - 1 },
+	"jsonKeys": func(keys []string) template.JS {
+		b, _ := json.Marshal(keys)
+		return template.JS(b)
+	},
 	"join": func(s []string, sep string) string { return strings.Join(s, sep) },
 	"cfOscurato": func(cf string) string {
 		if len(cf) < 6 {
