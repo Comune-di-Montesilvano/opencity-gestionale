@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,34 +22,16 @@ type MotoriHandler struct {
 	BaseURL string
 }
 
-// CampoLogico descrive un campo standard mappabile dell'engine.
-type CampoLogico struct {
-	Nome        string
-	TipoDefault string
-	Desc        string
-	PathDefault string // path predefinito (es. $app:submitted_at)
-}
-
-var campiLogiciStandard = []CampoLogico{
-	{"isee", "float", "Valore ISEE dell'istanza", ""},
-	{"corrispettivo", "float", "Importo lordo (corrispettivo)", ""},
-	{"beneficio", "float", "Beneficio già ricevuto (es. Bonus Nidi)", ""},
-	{"figlio_cf", "string", "Codice fiscale figlio", ""},
-	{"richiedente_cf", "string", "Codice fiscale richiedente", ""},
-	{"tipo", "string", "Tipologia richiesta (rette/mensa/ecc.)", ""},
-	{"annualita", "int", "Anno scolastico (es. 20242025)", ""},
-	{"num_figli", "count", "Numero figli nel nucleo", ""},
-	{"data_presentazione", "time", "Data presentazione domanda", "$app:submitted_at"},
-	{"status", "string", "Stato istanza OpenCity", "$app:status"},
-}
-
-// CampoLogicoConValore arricchisce CampoLogico con i valori correnti dell'engine_config.
-type CampoLogicoConValore struct {
-	CampoLogico
+// ParametroMappato rappresenta un parametro logico configurato dall'utente nel wizard step 3.
+type ParametroMappato struct {
+	Nome     string
+	Label    string
 	Path     string
 	Tipo     string
 	Expand   bool
 	PDNDPath string
+	PDNDOp   string
+	PDNDVal  string
 }
 
 // --- Lista motori ---
@@ -203,53 +186,72 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	case "3":
 		client := opencity.NewClient(h.BaseURL, op.JWT)
-		var flatFields []extractor.FieldPreview
 		var errCampione string
-		sampleID := r.URL.Query().Get("sample_id")
+		var sampleOffset int
+		var sampleTotal int
+
+		sampleIDParam := r.URL.Query().Get("sample_id")
+		offsetParam := r.URL.Query().Get("sample_offset")
 
 		var app *opencity.Application
-		var err2 error
-		if sampleID != "" {
-			app, err2 = client.FetchApplication(sampleID)
+		if sampleIDParam != "" {
+			var err2 error
+			app, err2 = client.FetchApplication(sampleIDParam)
+			if err2 != nil {
+				errCampione = err2.Error()
+			}
+			// Recupera il totale per UI prev/next (1 call separata)
+			_, sampleTotal, _ = client.FetchApplicationAtOffset(bando.ServiceID, 0)
 		} else {
-			app, err2 = client.FetchSampleApplication(bando.ServiceID)
+			if offsetParam != "" {
+				sampleOffset, _ = strconv.Atoi(offsetParam)
+			}
+			var err2 error
+			app, sampleTotal, err2 = client.FetchApplicationAtOffset(bando.ServiceID, sampleOffset)
+			if err2 != nil {
+				errCampione = err2.Error()
+			}
 		}
 
+		var flatFields []extractor.FieldPreview
 		var flatJSON []byte
-		if err2 != nil {
-			errCampione = err2.Error()
-		} else {
+		if app != nil {
 			flatFields = extractor.FlattenJSON(app.Data)
 			flatJSON, _ = json.Marshal(flatFields)
 		}
-		var campi []CampoLogicoConValore
-		for _, cl := range campiLogiciStandard {
-			fm := cfg.Mapping[cl.Nome]
-			path := fm.Path
-			if path == "" {
-				path = cl.PathDefault
-			}
-			tipo := fm.Tipo
-			if tipo == "" {
-				tipo = cl.TipoDefault
-			}
-			campi = append(campi, CampoLogicoConValore{
-				CampoLogico: cl,
-				Path:        path,
-				Tipo:        tipo,
-				Expand:      fm.Expand,
-				PDNDPath:    fm.PDNDPath,
+
+		// Costruisce lista parametri dal mapping corrente (ordine alfabetico)
+		nomi := make([]string, 0, len(cfg.Mapping))
+		for n := range cfg.Mapping {
+			nomi = append(nomi, n)
+		}
+		sort.Strings(nomi)
+		var params []ParametroMappato
+		for _, n := range nomi {
+			fm := cfg.Mapping[n]
+			params = append(params, ParametroMappato{
+				Nome:     n,
+				Label:    fm.Label,
+				Path:     fm.Path,
+				Tipo:     fm.Tipo,
+				Expand:   fm.Expand,
+				PDNDPath: fm.PDNDPath,
+				PDNDOp:   fm.PDNDOp,
+				PDNDVal:  fm.PDNDVal,
 			})
 		}
+
 		renderTemplate(w, "motore_wizard_step3.html", map[string]any{
-			"Op":          op,
-			"Motore":      bando,
-			"CampiLogici": campi,
-			"CampiFlat":   flatFields,
-			"ErrCampione": errCampione,
-			"Espansione":  cfg.Espansione,
-			"SampleID":    sampleID,
-			"FlatJSON":    string(flatJSON),
+			"Op":               op,
+			"Motore":           bando,
+			"ParametriMappati": params,
+			"CampiFlat":        flatFields,
+			"ErrCampione":      errCampione,
+			"Espansione":       cfg.Espansione,
+			"SampleID":         sampleIDParam,
+			"SampleOffset":     sampleOffset,
+			"SampleTotal":      sampleTotal,
+			"FlatJSON":         string(flatJSON),
 		})
 
 	case "4":
@@ -324,17 +326,61 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	case "3":
 		cfg.Espansione = strings.TrimSpace(r.FormValue("espansione"))
-		for _, cl := range campiLogiciStandard {
-			path := strings.TrimSpace(r.FormValue("path_" + cl.Nome))
-			if path == "" {
-				delete(cfg.Mapping, cl.Nome)
+		cfg.Mapping = make(map[string]graduatoria.FieldMapping)
+
+		nomiForm := r.Form["p_nome"]
+		paths := r.Form["p_path"]
+		tipos := r.Form["p_tipo"]
+		labels := r.Form["p_label"]
+		expands := r.Form["p_expand"]
+		pdndPaths := r.Form["p_pdnd_path"]
+		pdndOps := r.Form["p_pdnd_op"]
+		pdndVals := r.Form["p_pdnd_val"]
+
+		for i, nome := range nomiForm {
+			nome = strings.TrimSpace(nome)
+			if nome == "" {
 				continue
 			}
-			cfg.Mapping[cl.Nome] = graduatoria.FieldMapping{
+			path := ""
+			if i < len(paths) {
+				path = strings.TrimSpace(paths[i])
+			}
+			if path == "" {
+				continue
+			}
+			tipo := "string"
+			if i < len(tipos) && tipos[i] != "" {
+				tipo = tipos[i]
+			}
+			label := ""
+			if i < len(labels) {
+				label = strings.TrimSpace(labels[i])
+			}
+			expand := false
+			if i < len(expands) && expands[i] == "1" {
+				expand = true
+			}
+			pdndPath := ""
+			if i < len(pdndPaths) {
+				pdndPath = strings.TrimSpace(pdndPaths[i])
+			}
+			pdndOp := ""
+			if i < len(pdndOps) {
+				pdndOp = pdndOps[i]
+			}
+			pdndVal := ""
+			if i < len(pdndVals) {
+				pdndVal = strings.TrimSpace(pdndVals[i])
+			}
+			cfg.Mapping[nome] = graduatoria.FieldMapping{
 				Path:     path,
-				Tipo:     r.FormValue("tipo_" + cl.Nome),
-				Expand:   r.FormValue("expand_"+cl.Nome) == "1",
-				PDNDPath: strings.TrimSpace(r.FormValue("pdnd_" + cl.Nome)),
+				Tipo:     tipo,
+				Label:    label,
+				Expand:   expand,
+				PDNDPath: pdndPath,
+				PDNDOp:   pdndOp,
+				PDNDVal:  pdndVal,
 			}
 		}
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
