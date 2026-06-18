@@ -47,6 +47,9 @@ var funcMap = template.FuncMap{
 		}
 		return false
 	},
+	"safeJSON": func(s string) template.JS {
+		return template.JS(s)
+	},
 }
 
 func fileExists(path string) bool {

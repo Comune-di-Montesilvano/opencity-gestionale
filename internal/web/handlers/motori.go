@@ -205,6 +205,9 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		} else {
 			if offsetParam != "" {
 				sampleOffset, _ = strconv.Atoi(offsetParam)
+				if sampleOffset < 0 {
+					sampleOffset = 0
+				}
 			}
 			var err2 error
 			app, sampleTotal, err2 = client.FetchApplicationAtOffset(bando.ServiceID, sampleOffset)

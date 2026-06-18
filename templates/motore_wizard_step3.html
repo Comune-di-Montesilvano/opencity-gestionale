@@ -73,7 +73,7 @@
                 <input type="text" name="p_pdnd_path" value="{{$p.PDNDPath}}"
                   class="form-control form-control-sm json-path-input"
                   placeholder="path campo da verificare"
-                  oninput="updatePreview(this); updatePDNDValVisibility(this)">
+                  oninput="updatePreview(this)">
                 <div style="display:flex; gap:4px; align-items:center">
                   <select name="p_pdnd_op" class="form-control form-control-sm pdnd-op-select" onchange="updatePDNDValVisibility(this)" style="width:auto">
                     <option value="non_vuoto" {{if or (eq $p.PDNDOp "") (eq $p.PDNDOp "non_vuoto")}}selected{{end}}>non vuoto</option>
@@ -192,7 +192,7 @@
     </td>
     <td style="vertical-align:top; padding-top:6px">
       <div class="pdnd-section" style="display:flex; flex-direction:column; gap:4px">
-        <input type="text" name="p_pdnd_path" value="" class="form-control form-control-sm json-path-input" placeholder="path campo da verificare" oninput="updatePreview(this); updatePDNDValVisibility(this)">
+        <input type="text" name="p_pdnd_path" value="" class="form-control form-control-sm json-path-input" placeholder="path campo da verificare" oninput="updatePreview(this)">
         <div style="display:flex; gap:4px; align-items:center">
           <select name="p_pdnd_op" class="form-control form-control-sm pdnd-op-select" onchange="updatePDNDValVisibility(this)" style="width:auto">
             <option value="non_vuoto" selected>non vuoto</option>
@@ -207,7 +207,7 @@
   </tr>
 </template>
 
-<pre id="flat-data" style="display:none">{{if .FlatJSON}}{{.FlatJSON}}{{else}}[]{{end}}</pre>
+<pre id="flat-data" style="display:none">{{if .FlatJSON}}{{safeJSON .FlatJSON}}{{else}}[]{{end}}</pre>
 
 <style>
 .json-path-cell:hover code { text-decoration:underline; }
@@ -223,7 +223,7 @@ let lastFocusedPathInput = null;
 
 // Track focus su path input
 document.addEventListener('focusin', e => {
-  if (e.target.name === 'p_path') lastFocusedPathInput = e.target;
+  if (e.target.name === 'p_path' || e.target.name === 'p_pdnd_path') lastFocusedPathInput = e.target;
 });
 
 // Preview iniziale per tutti gli input con valore
@@ -355,8 +355,5 @@ function escapeHTML(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 </script>
 {{end}}
