@@ -139,6 +139,19 @@
       {{end}}
     </div>
 
+    <!-- Bottone superset: aggiorna cache valori da tutte le istanze -->
+    <div style="margin-bottom:.5rem">
+      <button type="button" id="btn-superset"
+              style="font-size:.78rem;padding:2px 8px"
+              class="btn btn-sm btn-outline-secondary"
+              onclick="buildSuperset(this)">
+        ⟳ Aggiorna valori da tutte le istanze
+      </button>
+      <span id="superset-status" style="font-size:.78rem;color:#6b7280;margin-left:.4rem">
+        {{if .SupersetJSON}}{{if ne .SupersetJSON "{}"}}Cache presente{{end}}{{end}}
+      </span>
+    </div>
+
     {{if .ErrCampione}}
     <div class="alert alert-error">{{.ErrCampione}}</div>
     {{else if eq (len .CampiFlat) 0}}
@@ -232,6 +245,7 @@
 <!-- Dati JSON per JS -->
 <pre id="flat-data" style="display:none">{{if .FlatJSON}}{{safeJSON .FlatJSON}}{{else}}[]{{end}}</pre>
 <pre id="raw-data" style="display:none">{{if .RawDataJSON}}{{safeJSON .RawDataJSON}}{{else}}{}{{end}}</pre>
+<pre id="superset-data" style="display:none">{{if .SupersetJSON}}{{safeJSON .SupersetJSON}}{{else}}{}{{end}}</pre>
 
 <style>
 .json-path-cell:hover code { text-decoration:underline; }
@@ -239,9 +253,10 @@
 </style>
 
 <script>
-const flatData   = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
-const rawData    = JSON.parse(document.getElementById('raw-data').textContent || '{}') || {};
-const _motoreId  = {{.Motore.ID}};
+const flatData     = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
+const rawData      = JSON.parse(document.getElementById('raw-data').textContent || '{}') || {};
+const supersetData = JSON.parse(document.getElementById('superset-data').textContent || '{}') || {};
+const _motoreId    = {{.Motore.ID}};
 
 // flatMap per lookup rapido path → valore scalare
 const flatMap = {};
@@ -446,19 +461,34 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
   const panel = document.getElementById('array-builder-panel');
   if (!panel) return;
 
-  // Tabella key → valore del primo elemento
+  // Tabella key → valore campione + valori unici dal superset
+  const superValues = (supersetData && supersetData[arrayPrefix]) || {};
   let valuesTable = '';
   if (keys.length > 0) {
+    const hasSup = Object.keys(superValues).length > 0;
     const rows = keys.map(k => {
-      const v = values[k] !== undefined ? values[k] : '';
-      return `<tr><td style="color:#374151;font-weight:500">${escapeHTML(k)}</td><td style="color:#6b7280">${escapeHTML(v)}</td></tr>`;
+      const sample = values[k] !== undefined ? values[k] : '—';
+      const allVals = superValues[k] || [];
+      const badges = allVals.slice(0, 12).map(v =>
+        `<span style="display:inline-block;background:#e2e8f0;border-radius:3px;padding:1px 5px;margin:1px;cursor:pointer;font-size:10px"
+               onclick="setBuilderCondVal('${escapeHTML(v)}')">${escapeHTML(v)}</span>`
+      ).join('') + (allVals.length > 12 ? `<span style="color:#9ca3af;font-size:10px"> +${allVals.length-12}</span>` : '');
+      return `<tr>
+        <td style="color:#374151;font-weight:500;font-family:monospace;white-space:nowrap;padding:2px 4px">${escapeHTML(k)}</td>
+        <td style="color:#6b7280;padding:2px 4px">${escapeHTML(sample)}</td>
+        ${hasSup ? `<td style="padding:2px 4px">${badges || '<span style="color:#d1d5db;font-size:10px">—</span>'}</td>` : ''}
+      </tr>`;
     }).join('');
+    const header = hasSup
+      ? `<tr><th style="padding:2px 4px;font-weight:600">Campo</th><th style="padding:2px 4px;font-weight:600">Campione</th><th style="padding:2px 4px;font-weight:600">Valori (clicca per usare)</th></tr>`
+      : `<tr><th style="padding:2px 4px;font-weight:600">Campo</th><th style="padding:2px 4px;font-weight:600">Valore campione</th></tr>`;
     valuesTable = `
-      <div style="margin-bottom:10px">
-        <div style="font-weight:500; color:#374151; margin-bottom:4px">Primo elemento (campione):</div>
+      <div style="margin-bottom:10px;overflow-x:auto">
         <table style="width:100%; font-size:11px; border-collapse:collapse">
+          <thead>${header}</thead>
           <tbody>${rows}</tbody>
         </table>
+        ${!hasSup ? '<div style="font-size:10px;color:#9ca3af;margin-top:3px">Clicca "Aggiorna valori da tutte le istanze" per vedere tutti i valori</div>' : ''}
       </div>`;
   }
 
@@ -529,7 +559,6 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
           <span id="ab-val-wrap" style="display:flex;gap:4px;align-items:center">
             <input type="text" id="ab-cond-val" class="form-control form-control-sm" placeholder="valore" style="width:120px" list="ab-cond-val-datalist" oninput="updateArrayPathPreview()">
             <datalist id="ab-cond-val-datalist"></datalist>
-            <button type="button" id="ab-load-values-btn" class="btn btn-xs btn-secondary" onclick="loadAllValoriCampo()" title="Carica tutti i valori da tutte le istanze">⟳ Carica tutti</button>
           </span>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
@@ -570,12 +599,11 @@ function onOpChange() {
   updateArrayPathPreview();
 }
 
-// Raccoglie valori unici dall'istanza corrente per la chiave condizione selezionata.
-// Per max/min nasconde il campo valore.
+// Raccoglie valori unici per la chiave condizione: prima dal superset, poi dal rawData.
 function updateCondValSuggestions() {
-  const key    = document.getElementById('ab-cond-field')?.value;
-  const op     = document.getElementById('ab-op')?.value || '=';
-  const dl     = document.getElementById('ab-cond-val-datalist');
+  const key     = document.getElementById('ab-cond-field')?.value;
+  const op      = document.getElementById('ab-op')?.value || '=';
+  const dl      = document.getElementById('ab-cond-val-datalist');
   const valWrap = document.getElementById('ab-val-wrap');
 
   // max/min: nessun valore necessario
@@ -588,21 +616,25 @@ function updateCondValSuggestions() {
 
   if (!key || !dl) return;
 
-  // Popola dal rawData corrente (veloce, un'istanza)
-  let arr = null;
-  try { arr = resolvePathJS(rawData, currentArrayPrefix); } catch(e) {}
-  if (!Array.isArray(arr)) { dl.innerHTML = ''; return; }
+  // Priorità: superset (tutte le istanze) > rawData (istanza corrente)
+  const superVals = (supersetData && supersetData[currentArrayPrefix] && supersetData[currentArrayPrefix][key]) || [];
+  const vals = new Set(superVals);
 
-  const vals = new Set();
-  arr.forEach(item => {
-    if (item && item[key] !== undefined && item[key] !== null) {
-      vals.add(String(item[key]));
+  // Aggiungi valori dall'istanza corrente (fallback o integrazione)
+  try {
+    const arr = resolvePathJS(rawData, currentArrayPrefix);
+    if (Array.isArray(arr)) {
+      arr.forEach(item => {
+        if (item && item[key] !== undefined && item[key] !== null) {
+          vals.add(String(item[key]));
+        }
+      });
     }
-  });
+  } catch(e) {}
 
   dl.innerHTML = Array.from(vals).map(v => `<option value="${escapeHTML(v)}">`).join('');
 
-  // Auto-compila se valore unico nell'istanza corrente
+  // Auto-compila se valore unico
   if (vals.size === 1) {
     const cv = document.getElementById('ab-cond-val');
     if (cv && !cv.value) { cv.value = Array.from(vals)[0]; updateArrayPathPreview(); }
@@ -611,34 +643,6 @@ function updateCondValSuggestions() {
   updateArrayPathPreview();
 }
 
-// Carica tutti i valori unici dall'endpoint (tutte le istanze del servizio)
-async function loadAllValoriCampo() {
-  const key = document.getElementById('ab-cond-field')?.value;
-  if (!key) return;
-  const dl  = document.getElementById('ab-cond-val-datalist');
-  const btn = document.getElementById('ab-load-values-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Carico…'; }
-
-  try {
-    const u = `/motori/${_motoreId}/api/valori-campo?array=${encodeURIComponent(currentArrayPrefix)}&field=${encodeURIComponent(key)}`;
-    const resp = await fetch(u);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    if (data.valori && dl) {
-      dl.innerHTML = data.valori.map(v => `<option value="${escapeHTML(v)}">`).join('');
-    }
-    if (btn) {
-      if (data.tipo === 'libero') {
-        btn.textContent = `Prime ${data.valori?.length || 0} (campo libero su ${data.totale_istanze} istanze)`;
-      } else {
-        btn.textContent = `${data.valori?.length || 0} valori da ${data.totale_istanze} istanze`;
-      }
-      btn.disabled = false;
-    }
-  } catch(e) {
-    if (btn) { btn.textContent = 'Errore'; btn.disabled = false; }
-  }
-}
 
 function updateArrayPathPreview() {
   const condField    = document.getElementById('ab-cond-field')?.value || '';
@@ -730,6 +734,34 @@ function addRowWithPath(path, nome, tipo, expand) {
   // Preview del path nella riga appena creata
   const newInput = document.getElementById('params-body').lastElementChild?.querySelector('[name="p_path"]');
   if (newInput) updatePreview(newInput);
+}
+
+// ── Superset ─────────────────────────────────────────────────────────────────
+
+async function buildSuperset(btn) {
+  btn.disabled = true;
+  btn.textContent = '⟳ Caricamento…';
+  const status = document.getElementById('superset-status');
+  if (status) status.textContent = '';
+  try {
+    const resp = await fetch(`/motori/${_motoreId}/wizard/superset`, { method: 'POST' });
+    const text = await resp.text();
+    if (status) status.textContent = text;
+    btn.textContent = '⟳ Aggiorna valori da tutte le istanze';
+    btn.disabled = false;
+    // Ricarica pagina per aggiornare supersetData
+    window.location.reload();
+  } catch(e) {
+    if (status) status.textContent = 'Errore: ' + e.message;
+    btn.textContent = '⟳ Aggiorna valori da tutte le istanze';
+    btn.disabled = false;
+  }
+}
+
+// Imposta il valore nel campo condizione del builder Flusso B
+function setBuilderCondVal(val) {
+  const cv = document.getElementById('ab-cond-val');
+  if (cv) { cv.value = val; updateArrayPathPreview(); }
 }
 
 // ── Utilità ───────────────────────────────────────────────────────────────────

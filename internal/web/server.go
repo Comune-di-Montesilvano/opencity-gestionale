@@ -62,9 +62,12 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("POST /motori/{id}/wizard/test", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostTestEngine))))
 	mux.Handle("POST /motori/{id}/wizard/attiva", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostAttivaMotore))))
 	mux.Handle("GET /motori/{id}/api/valori-campo", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.GetValoriCampo))))
+	mux.Handle("GET /motori/{id}/api/statistiche-campo", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.GetStatisticheField))))
+	mux.Handle("POST /motori/{id}/wizard/superset", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostBuildSuperset))))
 	mux.Handle("GET /motori/{id}", authMW(http.HandlerFunc(motori.GetDettaglio)))
 	mux.Handle("POST /motori/{id}/duplica", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostDuplica))))
 	mux.Handle("POST /motori/{id}/archivia", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostArchivia))))
+	mux.Handle("POST /motori/{id}/rinomina", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostRinomina))))
 
 	// Graduatorie
 	mux.Handle("POST /motori/{id}/run", authMW(http.HandlerFunc(grad.PostCalcola)))
@@ -81,6 +84,9 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("GET /motori/{id}/istruttoria", authMW(http.HandlerFunc(istr.GetIstruttoria)))
 	mux.Handle("POST /motori/{id}/istruttoria/scansiona", authMW(http.HandlerFunc(istr.PostScansiona)))
 	mux.Handle("POST /motori/{id}/istruttoria/batch", authMW(http.HandlerFunc(istr.PostIstruttoriaBatch)))
+	mux.Handle("POST /motori/{id}/istruttoria/{praticaID}/dato", authMW(http.HandlerFunc(istr.PostSaveDato)))
+	mux.Handle("POST /motori/{id}/istruttoria/{praticaID}/nota", authMW(http.HandlerFunc(istr.PostSaveNota)))
+	mux.Handle("POST /motori/{id}/istruttoria/{praticaID}/riapri", authMW(http.HandlerFunc(istr.PostRiapri)))
 
 	// Bulk actions
 	mux.Handle("POST /motori/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))

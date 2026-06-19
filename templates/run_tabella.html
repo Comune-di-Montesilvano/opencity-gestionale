@@ -25,10 +25,8 @@
     <tr>
       {{if ne .Tipo "escluse"}}<th><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>{{end}}
       <th>#</th>
-      <th>Richiedente</th>
-      <th>CF Figlio</th>
-      <th>ISEE</th>
-      <th>Corrispettivo netto</th>
+      <th>Pratica</th>
+      {{range .MappingKeys}}<th>{{.}}</th>{{end}}
       <th>Rimborso</th>
       <th>Stato</th>
       <th>Note</th>
@@ -37,21 +35,25 @@
   </thead>
   <tbody>
   {{range .Righe}}
+  {{$riga := .}}
   <tr class="{{if .Ammessa}}row-ammessa{{else}}row-esclusa{{end}}">
     {{if ne $.Tipo "escluse"}}
     <td>
-      {{if .Ammessa}}<input type="checkbox" class="pratica-check" value="{{.Istanza.ID}}" onchange="updateCount()">{{end}}
+      {{if and .Ammessa .Istanza}}<input type="checkbox" class="pratica-check" value="{{.Istanza.ID}}" onchange="updateCount()">{{end}}
     </td>
     {{end}}
     <td>{{.Posizione}}</td>
-    <td><a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">{{.Istanza.RichiedenteCognome}} {{.Istanza.RichiedenteNome}}</a></td>
-    <td>{{if .Istanza.FiglioSelezionatoCF}}{{.Istanza.FiglioSelezionatoCF}}{{else}}<span class="badge badge-yellow">CF mancante</span>{{end}}</td>
-    <td>€{{printf "%.2f" .Istanza.ISEE}}</td>
-    <td>€{{printf "%.2f" (.CorrispettivoNetto)}}</td>
+    <td>
+      {{if .Istanza}}
+      <a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank"
+         style="font-family:monospace;font-size:.8rem" title="{{.Istanza.ID}}">{{.Istanza.ID | printf "%.8s"}}…</a>
+      {{end}}
+    </td>
+    {{range $.MappingKeys}}<td>{{if $riga.Istanza}}{{index $riga.Istanza.CampiMappati .}}{{end}}</td>{{end}}
     <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
     <td>{{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}</td>
     <td>{{.NoteEsclusione}}{{if .OriginalID}} → <a href="#pratica-{{.OriginalID}}">{{.OriginalID}}</a>{{end}}</td>
-    <td><a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a></td>
+    <td>{{if .Istanza}}<a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank" class="btn btn-xs">Apri</a>{{end}}</td>
   </tr>
   {{end}}
   </tbody>

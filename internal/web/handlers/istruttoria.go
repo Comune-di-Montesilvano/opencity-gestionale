@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"opencity-gestionale/internal/db"
 	"opencity-gestionale/internal/graduatoria"
@@ -38,23 +39,28 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
 	statoFilter := r.URL.Query().Get("stato")
-	istruttorie, err := db.ListIstruttorie(h.DB, int(bandoID), statoFilter)
+	appStatusFilter := r.URL.Query().Get("app_status")
+	istruttorie, err := db.ListIstruttorie(h.DB, int(bandoID), statoFilter, appStatusFilter)
 	if err != nil {
 		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	stats, _ := db.GetIstruttoriaStats(h.DB, int(bandoID))
+	statiApp, _ := db.ListStatiApp(h.DB, int(bandoID))
 
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
-		"Op":          op,
-		"Bando":       bando,
-		"Config":      ecfg,
-		"Istruttorie": istruttorie,
-		"Stats":       stats,
-		"StatoFilter": statoFilter,
-		"Flash":       flash,
-		"FlashType":   flashType,
+		"Op":              op,
+		"Bando":           bando,
+		"Config":          ecfg,
+		"Istruttorie":     istruttorie,
+		"Stats":           stats,
+		"StatoFilter":     statoFilter,
+		"AppStatusFilter": appStatusFilter,
+		"StatiApp":        statiApp,
+		"BaseURL":         h.BaseURL,
+		"Flash":           flash,
+		"FlashType":       flashType,
 	})
 }
 
@@ -81,6 +87,16 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Form non valido", http.StatusBadRequest)
+		return
+	}
+	statiSelezionati := r.Form["stati"]
+	statiSet := map[string]bool{}
+	for _, s := range statiSelezionati {
+		statiSet[s] = true
+	}
+
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
 	if err != nil {
@@ -88,17 +104,42 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Pulisce i record da_verificare: la scansione reimposta lo stato da zero.
+	// Record approvata/esclusa vengono preservati.
+	if err := db.ResetDaVerificare(h.DB, int(bandoID)); err != nil {
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Errore+reset:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
+		return
+	}
+
+	// Legge dati locali già salvati per applicare override durante la scansione.
+	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
+
 	nuove := 0
 	for _, raw := range rawApps {
 		var app opencity.Application
 		if json.Unmarshal(raw, &app) != nil {
 			continue
 		}
-		records, err := generic.EstraiRecords(app, ecfg)
+		// Filtra per stato se selezionato almeno uno.
+		if len(statiSet) > 0 && !statiSet[app.Status] {
+			continue
+		}
+		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
 		if err != nil || len(records) == 0 {
 			continue
 		}
-		// Raccogli motivi unici su tutti i record dell'app (es. righe espansione)
+		// Salta app che verrebbero comunque escluse dai filtri ammissibilità.
+		tuttiEsclusi := true
+		for _, rec := range records {
+			rec.DerivaCampi(ecfg.Rimborso)
+			if ok, _ := generic.ApplicaFiltri(rec, ecfg.Filtri); ok {
+				tuttiEsclusi = false
+				break
+			}
+		}
+		if tuttiEsclusi {
+			continue
+		}
 		motiviSet := map[string]struct{}{}
 		for _, rec := range records {
 			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
@@ -112,7 +153,7 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 		for m := range motiviSet {
 			motivi = append(motivi, m)
 		}
-		if err := db.UpsertIstruttoria(h.DB, int(bandoID), app.ID, motivi); err == nil {
+		if err := db.UpsertIstruttoria(h.DB, int(bandoID), app.ID, motivi, app.Status); err == nil {
 			nuove++
 		}
 	}
@@ -184,4 +225,126 @@ func (h *IstruttoriaHandler) PostIstruttoriaBatch(w http.ResponseWriter, r *http
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=%d+domande+%s&flashType=success", bandoID, len(ids), stato), http.StatusSeeOther)
+}
+
+// PostSaveDato — salva un valore locale per un campo mancante, ri-valuta i motivi via API.
+// HTMX: risponde con partial HTML aggiornato (motivi badges).
+func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.Error(w, "Bando non trovato", http.StatusNotFound)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Form non valido", http.StatusBadRequest)
+		return
+	}
+	campo := strings.TrimSpace(r.FormValue("campo"))
+	valore := strings.TrimSpace(r.FormValue("valore"))
+	if campo == "" {
+		http.Error(w, "Campo obbligatorio", http.StatusBadRequest)
+		return
+	}
+
+	// Salva il dato locale.
+	if err := db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, campo, valore); err != nil {
+		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Ri-valuta i motivi recuperando l'app da OpenCity e applicando i dati locali aggiornati.
+	var motivi []string
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
+	client := opencity.NewClient(h.BaseURL, op.JWT)
+	if app, err := client.FetchApplication(praticaID); err == nil {
+		// Legge tutti i dati locali aggiornati per questa pratica.
+		allDati, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
+		extras := allDati[praticaID]
+		records, _ := generic.EstraiRecordsConExtras(*app, ecfg, extras)
+		motiviSet := map[string]struct{}{}
+		for _, rec := range records {
+			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
+				motiviSet[m] = struct{}{}
+			}
+		}
+		for m := range motiviSet {
+			motivi = append(motivi, m)
+		}
+		// Aggiorna motivi_json nel DB.
+		db.UpdateMotiviIstruttoria(h.DB, int(bandoID), praticaID, motivi)
+	} else {
+		// Fallback: legge motivi dal DB senza ri-valutare.
+		if ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID); err == nil {
+			motivi = ist.Motivi
+		}
+	}
+
+	renderTemplate(w, "istruttoria_dato_partial.html", map[string]any{
+		"Motivi": motivi,
+	})
+}
+
+// PostRiapri — riporta una pratica approvata/esclusa a da_verificare.
+func (h *IstruttoriaHandler) PostRiapri(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := db.SetStato(h.DB, ist.ID, "da_verificare", ist.Nota, op.Username); err != nil {
+		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria", bandoID), http.StatusSeeOther)
+}
+
+// PostSaveNota — salva nota inline su una pratica. HTMX: risponde 200 vuoto.
+func (h *IstruttoriaHandler) PostSaveNota(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.Error(w, "Bando non trovato", http.StatusNotFound)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Form non valido", http.StatusBadRequest)
+		return
+	}
+	nota := strings.TrimSpace(r.FormValue("nota"))
+	if err := db.SaveNota(h.DB, int(bandoID), praticaID, nota); err != nil {
+		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

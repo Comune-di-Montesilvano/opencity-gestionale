@@ -5,6 +5,7 @@
   <div class="stats-row" style="margin-bottom:1rem">
     <div class="stat"><span class="stat-value">{{.NumIstanze}}</span><span class="stat-label">Istanze totali</span></div>
     <div class="stat"><span class="stat-value">{{.Grad.TotaleAmmesse}}</span><span class="stat-label">Ammesse</span></div>
+    {{if gt (.Grad.TotaleConRiserva) 0}}<div class="stat"><span class="stat-value" style="color:#e67e22">{{.Grad.TotaleConRiserva}}</span><span class="stat-label">Con riserva verifica</span></div>{{end}}
     <div class="stat"><span class="stat-value">{{len .Grad.Escluse}}</span><span class="stat-label">Escluse</span></div>
     <div class="stat"><span class="stat-value">€{{printf "%.2f" .Grad.TotaleBudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
   </div>

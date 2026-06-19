@@ -5,6 +5,7 @@ package graduatoria
 type EngineConfig struct {
 	Mapping        map[string]FieldMapping `json:"mapping"`
 	Espansione     string                  `json:"espansione"`
+	Istanza        FiltriIstanzaConfig     `json:"istanza"`
 	Filtri         []FiltroConfig          `json:"filtri"`
 	Deduplicazione DedupConfig             `json:"deduplicazione"`
 	Ordinamento    []OrdineConfig          `json:"ordinamento"`
@@ -12,6 +13,14 @@ type EngineConfig struct {
 	Tipologie      []TipologiaConfig       `json:"tipologie"`
 	Rimborso       RimborsoConfig          `json:"rimborso"`
 	Verifica       VerificaConfig          `json:"verifica"`
+}
+
+// FiltriIstanzaConfig filtra le istanze per proprietà top-level OpenCity
+// (stato, data presentazione) prima dell'estrazione dei campi form.
+type FiltriIstanzaConfig struct {
+	StatiAmmessi []string `json:"stati_ammessi"` // vuoto = tutti; es. ["4000"]
+	DataMassima  string   `json:"data_massima"`  // RFC3339 o "2006-01-02"
+	DataMinima   string   `json:"data_minima"`
 }
 
 type FieldMapping struct {
@@ -28,6 +37,7 @@ type FiltroConfig struct {
 	Campo  string `json:"campo"`
 	Op     string `json:"op"`    // "<=" | ">=" | "==" | "<" | ">" | "!="
 	Valore any    `json:"valore"`
+	Gruppo int    `json:"gruppo,omitempty"` // 0 = AND standalone; stesso numero > 0 = OR tra loro
 }
 
 type DedupConfig struct {

@@ -1,0 +1,4 @@
+{{define "istruttoria_dato_partial.html"}}
+{{range .Motivi}}<span class="badge badge-gray" style="margin-right:.2rem">{{.}}</span>{{end}}
+{{if not .Motivi}}<span style="color:#16a34a;font-size:.82rem;font-weight:600">✓ Nessun problema rilevato</span>{{end}}
+{{end}}

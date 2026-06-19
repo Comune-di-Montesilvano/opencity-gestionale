@@ -21,7 +21,7 @@
 
 <form method="POST" action="/motori/{{.Motore.ID}}/wizard/4">
   <h2>Filtri di ammissibilità</h2>
-  <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria.</p>
+  <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria. Usa il campo <strong>GR</strong> per raggruppare filtri in OR: stesso numero = almeno uno deve passare; 0 = AND indipendente.</p>
 
   <div id="filtri-container">
   {{range $i, $f := .Filtri}}
@@ -72,6 +72,9 @@
       </optgroup>
     </select>
     <input type="text" name="filtro_valore" value="{{$f.Valore}}" class="form-control form-control-sm" placeholder="valore">
+    <span style="font-size:.78rem;color:#6b7280;white-space:nowrap">GR</span>
+    <input type="number" name="filtro_gruppo" value="{{$f.Gruppo}}" min="0" max="99"
+           class="form-control form-control-sm" style="width:52px;flex:0 0 52px;min-width:0" title="Gruppo OR: stesso numero = oppure; 0 = e">
     <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
   </div>
   {{end}}
@@ -82,6 +85,46 @@
   <div class="form-actions" style="margin-top:1.5rem">
     <a href="/motori/{{.Motore.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
     <button type="submit" class="btn btn-primary">Salva e continua →</button>
+  </div>
+
+  <hr style="margin:2rem 0">
+
+  <h2>Istanze — filtri pre-estrazione</h2>
+  <p class="text-muted">Filtri applicati prima dell'estrazione dei campi form. Le istanze escluse qui non appaiono nemmeno tra le escluse dalla graduatoria.</p>
+
+  {{if .StatiDisponibili}}
+  <div style="margin-bottom:1rem">
+    <label style="font-weight:600;display:block;margin-bottom:.4rem">Stati ammessi</label>
+    <p class="text-muted" style="font-size:.85rem;margin-bottom:.5rem">Seleziona gli stati OpenCity da includere nel calcolo. Lascia tutto deselezionato per includere tutti gli stati.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+      {{$statiAmmessi := .Istanza.StatiAmmessi}}
+      {{range .StatiDisponibili}}
+      {{$code := .Code}}
+      <label style="display:flex;align-items:center;gap:.4rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:.3rem .7rem;font-size:.85rem;cursor:pointer">
+        <input type="checkbox" name="stati_ammessi" value="{{.Code}}"
+          {{range $statiAmmessi}}{{if eq . $code}}checked{{end}}{{end}}>
+        {{.Label}}
+        {{if gt .Count 0}}<span style="background:#e2e8f0;color:#475569;border-radius:999px;padding:.05rem .45rem;font-size:.75rem;font-weight:600">{{.Count}}</span>{{end}}
+      </label>
+      {{end}}
+    </div>
+  </div>
+  {{else}}
+  <div class="alert" style="background:#fefce8;border:1px solid #fde68a;color:#78350f;font-size:.85rem;padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem">
+    Nessuno stato disponibile. Aggiorna il superset nello step 3 per vedere gli stati OpenCity.
+  </div>
+  <input type="hidden" name="stati_ammessi" value="">
+  {{end}}
+
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem">
+    <div>
+      <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.25rem">Data presentazione — dal</label>
+      <input type="date" name="data_minima" value="{{.Istanza.DataMinima}}" class="form-control form-control-sm" style="width:160px">
+    </div>
+    <div>
+      <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.25rem">Data presentazione — al</label>
+      <input type="date" name="data_massima" value="{{.Istanza.DataMassima}}" class="form-control form-control-sm" style="width:160px">
+    </div>
   </div>
 
   <hr style="margin:2rem 0">
@@ -193,6 +236,9 @@
       </optgroup>
     </select>
     <input type="text" name="filtro_valore" class="form-control form-control-sm" placeholder="valore">
+    <span style="font-size:.78rem;color:#6b7280;white-space:nowrap">GR</span>
+    <input type="number" name="filtro_gruppo" value="0" min="0" max="99"
+           class="form-control form-control-sm" style="width:52px;flex:0 0 52px;min-width:0" title="Gruppo OR: stesso numero = oppure; 0 = e">
     <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
   </div>
 </template>

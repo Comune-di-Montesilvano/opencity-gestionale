@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -89,6 +90,9 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 	if bando.ScadenzaPresentazione != "" {
 		cfg.Scadenza, _ = time.Parse("2006-01-02", bando.ScadenzaPresentazione)
 	}
+	if overrides, err := db.GetIstruttorieDati(h.DB, int(bandoID)); err == nil && len(overrides) > 0 {
+		cfg.CampiExtra = overrides
+	}
 
 	grad, err := engine.Calcola(apps, cfg)
 	if err != nil {
@@ -160,12 +164,13 @@ func (h *GraduatoriaHandler) GetRun(w http.ResponseWriter, r *http.Request) {
 
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "run_dettaglio.html", map[string]any{
-		"Op":        op,
-		"Bando":     bando,
-		"Run":       run,
-		"Grad":      &grad,
-		"Flash":     flash,
-		"FlashType": flashType,
+		"Op":          op,
+		"Bando":       bando,
+		"Run":         run,
+		"Grad":        &grad,
+		"NumRiserva":  grad.TotaleConRiserva(),
+		"Flash":       flash,
+		"FlashType":   flashType,
 	})
 }
 
@@ -201,15 +206,16 @@ func (h *GraduatoriaHandler) GetRunTabella(w http.ResponseWriter, r *http.Reques
 	}
 
 	renderTemplate(w, "run_tabella.html", map[string]any{
-		"Op":      op,
-		"Bando":   bando,
-		"Run":     run,
-		"Anno":    anno,
-		"Tipo":    tipo,
-		"Righe":   righe,
-		"RunID":   runID,
-		"BandoID": bandoID,
-		"BaseURL": h.BaseURL,
+		"Op":          op,
+		"Bando":       bando,
+		"Run":         run,
+		"Anno":        anno,
+		"Tipo":        tipo,
+		"Righe":       righe,
+		"RunID":       runID,
+		"BandoID":     bandoID,
+		"BaseURL":     h.BaseURL,
+		"MappingKeys": mappingKeysFromBando(bando.EngineConfig),
 	})
 }
 
@@ -306,6 +312,18 @@ func (h *GraduatoriaHandler) GetStampa(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// mappingKeysFromBando estrae le chiavi del mapping in ordine alfabetico dall'engine config JSON.
+func mappingKeysFromBando(engineConfig string) []string {
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(engineConfig), &ecfg)
+	keys := make([]string, 0, len(ecfg.Mapping))
+	for k := range ecfg.Mapping {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // GetRunGruppo — tabella righe per un gruppo dell'engine generic.
 func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
@@ -344,14 +362,15 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 	}
 
 	renderTemplate(w, "run_tabella_gruppo.html", map[string]any{
-		"Op":      op,
-		"Bando":   bando,
-		"Run":     run,
-		"Nome":    nome,
-		"Righe":   righe,
-		"RunID":   runID,
-		"BandoID": bandoID,
-		"BaseURL": h.BaseURL,
+		"Op":          op,
+		"Bando":       bando,
+		"Run":         run,
+		"Nome":        nome,
+		"Righe":       righe,
+		"RunID":       runID,
+		"BandoID":     bandoID,
+		"BaseURL":     h.BaseURL,
+		"MappingKeys": mappingKeysFromBando(bando.EngineConfig),
 	})
 }
 

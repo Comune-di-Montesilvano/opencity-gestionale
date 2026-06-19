@@ -25,9 +25,8 @@
     <tr>
       <th><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>
       <th>#</th>
-      <th>ID / CF Richiedente</th>
-      <th>CF Figlio</th>
-      <th>ISEE</th>
+      <th>Pratica</th>
+      {{range .MappingKeys}}<th>{{.}}</th>{{end}}
       <th>Rimborso</th>
       <th>Stato</th>
       <th>Note</th>
@@ -36,6 +35,7 @@
   </thead>
   <tbody>
   {{range .Righe}}
+  {{$riga := .}}
   <tr class="{{if .Ammessa}}row-ammessa{{else}}row-esclusa{{end}}">
     <td>
       {{if .Ammessa}}<input type="checkbox" class="pratica-check" value="{{if .Istanza}}{{.Istanza.ID}}{{end}}" onchange="updateCount()">{{end}}
@@ -43,13 +43,11 @@
     <td>{{.Posizione}}</td>
     <td>
       {{if .Istanza}}
-      <a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank">
-        {{if .Istanza.RichiedenteCF}}{{.Istanza.RichiedenteCF}}{{else}}{{.Istanza.ID}}{{end}}
-      </a>
+      <a href="{{$.BaseURL}}/lang/it/operatori/{{.Istanza.ID}}/detail" target="_blank"
+         style="font-family:monospace;font-size:.8rem" title="{{.Istanza.ID}}">{{.Istanza.ID | printf "%.8s"}}…</a>
       {{end}}
     </td>
-    <td>{{if .Istanza}}{{.Istanza.FiglioSelezionatoCF}}{{end}}</td>
-    <td>{{if .Istanza}}€{{printf "%.2f" .Istanza.ISEE}}{{end}}</td>
+    {{range $.MappingKeys}}<td>{{if $riga.Istanza}}{{index $riga.Istanza.CampiMappati .}}{{end}}</td>{{end}}
     <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
     <td>{{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}</td>
     <td>{{.NoteEsclusione}}</td>

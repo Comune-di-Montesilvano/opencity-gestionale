@@ -6,10 +6,11 @@ CREATE TABLE IF NOT EXISTS bandi (
   isee_massimo  REAL,
   scadenza_presentazione TEXT,
   engine_type   TEXT NOT NULL DEFAULT 'generic',
-  engine_config TEXT NOT NULL DEFAULT '{}',
-  attivo        INTEGER NOT NULL DEFAULT 1,
-  stato_motore  TEXT NOT NULL DEFAULT 'bozza',
-  created_at    TEXT NOT NULL
+  engine_config   TEXT NOT NULL DEFAULT '{}',
+  attivo          INTEGER NOT NULL DEFAULT 1,
+  stato_motore    TEXT NOT NULL DEFAULT 'bozza',
+  valori_superset TEXT NOT NULL DEFAULT '{}',
+  created_at      TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS graduatorie_run (
@@ -48,7 +49,17 @@ CREATE TABLE IF NOT EXISTS istruttorie (
   nota          TEXT,
   operatore     TEXT,
   aggiornato_il TEXT,
+  app_status    TEXT NOT NULL DEFAULT '',
+  dati_json     TEXT NOT NULL DEFAULT '{}',
   UNIQUE(bando_id, pratica_id)
+);
+
+-- Dati locali condivisi per pratica (cross-bando): override campi mancanti + nota di lavoro.
+CREATE TABLE IF NOT EXISTS istruttorie_dati (
+  pratica_id    TEXT PRIMARY KEY,
+  dati_json     TEXT NOT NULL DEFAULT '{}',
+  nota          TEXT NOT NULL DEFAULT '',
+  aggiornato_il TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessioni (

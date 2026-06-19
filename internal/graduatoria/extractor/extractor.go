@@ -137,7 +137,12 @@ func resolveNode(data any, path string) (any, error) {
 				if err != nil {
 					continue
 				}
-				vStr := strings.TrimSpace(fmt.Sprintf("%v", vKey))
+				var vStr string
+				if f, ok := vKey.(float64); ok {
+					vStr = strconv.FormatFloat(f, 'f', -1, 64)
+				} else {
+					vStr = strings.TrimSpace(fmt.Sprintf("%v", vKey))
+				}
 				var matches bool
 				switch condOp {
 				case "=", "==":

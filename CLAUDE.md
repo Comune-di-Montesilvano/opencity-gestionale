@@ -112,6 +112,32 @@ Il dispatch avviene per op in `PassaFiltro`: op CF → `valutaCF`, stringa → `
 
 Operatori senza valore (`vuoto`, `non_vuoto`, `vero`, `falso`, `cf_valido`) ignorano `FiltroConfig.Valore`.
 
+**OR grouping**: `FiltroConfig.Gruppo int` — filtri con stesso numero > 0 sono OR'd tra loro; gruppo 0 = AND standalone. `applicaFiltri` in `engine.go` gestisce logica. `ApplicaFiltri` (esportata) usata da istruttoria.
+
+**Gotcha `vuoto`/`non_vuoto` in FiltriFlag**: `vuoto` = flagga quando campo è vuoto (anomalia). Configurare `non_vuoto` per errore flaggerebbe quasi tutti. Campo assente da FloatMap/StringMap/IntMap → `PassaFiltro` ritorna `false` silenzioso, non panic.
+
+### Filtri pre-estrazione istanza (`FiltriIstanzaConfig`)
+
+`EngineConfig.Istanza FiltriIstanzaConfig` filtra le app per `Status` e `SubmittedAt` PRIMA dell'estrazione campi form. Configurabile in wizard step 4 sezione "Istanze". Applicato in `passaFiltriIstanza` in `engine.go`.
+
+### Superset — chiavi speciali
+
+`PostBuildSuperset` (wizard step 3) raccoglie anche:
+- `"$app"."status"` → set di codici stato distinti
+- `"$status_names"[code]` → nome API (machine-readable, es. `status_submitted`)
+- `"$status_counts"[code]` → `["N"]` — conteggio istanze per stato
+
+### Istruttoria — comportamento scan
+
+`PostScansiona` (`POST /motori/{id}/istruttoria/scansiona`):
+1. **Prima cancella tutti i `da_verificare`** (`db.ResetDaVerificare`) — ogni scan ricomincia da zero; record `approvata`/`esclusa` preservati
+2. Applica `ApplicaFiltri` (filtri ammissibilità) — non flagga app escluse da ISEE/residenza/ecc.
+3. Salva app_status in `istruttorie.app_status`
+
+**Gotcha**: calcolo bloccato da `da_verificare` rimasti con config filtri sbagliata → rescansiona per resettare.
+
+**Dato in locale**: `POST /motori/{id}/istruttoria/{praticaID}/dato` salva override campo in `istruttorie.dati_json`. `db.GetIstruttorieDati` → passato a `EstraiRecordsConExtras` in istruttoria e in `PostCalcolaGraduatoria` come `cfg.CampiExtra`.
+
 ### Package CF helper (`internal/graduatoria/cf/`)
 
 Helper puri per codice fiscale italiano (formato: `AAABBB80A01H501U`):
@@ -176,6 +202,9 @@ FuncMap aggiuntive in `handlers/render.go`:
 - `protocolloBreve(id)` → `"…" + ultimi 8 char`
 - `hasCol(cols []string, col string) bool`
 - `join(s []string, sep string) string`
+- `statusLabel(code string) string` → label italiana per codice stato OpenCity (es. `"4000"` → `"In attesa istruttoria (4000)"`)
+
+CSS `.filtro-row .form-control { flex: 1; min-width: 100px }` override per input a larghezza fissa: usare `style="width:52px;flex:0 0 52px;min-width:0"` direttamente sull'elemento.
 
 CSS `@media print` in `static/style.css` nasconde `.no-print` e `.sidebar`; resetta `margin-left` su `.main-content`.
 
@@ -236,6 +265,7 @@ GET  /motori/{id}/run/{runID}/export/iban   CSV IBAN ammessi
 GET  /motori/{id}/istruttoria               istruttoria pre-calcolo
 POST /motori/{id}/istruttoria/scansiona     HTMX: scansiona istanze
 POST /motori/{id}/istruttoria/batch         azione batch istruttoria
+POST /motori/{id}/istruttoria/{praticaID}/dato  HTMX: salva dato locale + ri-valuta motivi
 GET  /audit                               audit trail
 GET  /dev/reload-templates                solo se DEV=true
 ```
@@ -266,8 +296,13 @@ GET  /dev/reload-templates                solo se DEV=true
 
 | Codice | Significato |
 |--------|-------------|
-| `4000` | pending |
+| `2000` | bozza |
+| `3000` | inviata |
+| `4000` | pending (in attesa istruttoria) |
+| `9000` | approvata |
 | `20000` | ritirata (esclusa automaticamente dai filtri) |
+
+`Application.StatusName` dall'API è machine-readable (es. `status_submitted`) — non localizzato. Usare `statusLabel` funcmap per label italiana in template.
 
 ## Struttura `data` — Rimborso rette e mense (service_id: `5756cd98-7fe6-4818-bad8-69a2c843b546`)
 
@@ -315,6 +350,14 @@ Ora configurato tramite `EngineConfig` (modalita=fondi). Parametri storici:
 | Viaggio riabilitazione | `10987e1d-afa3-4b53-83fb-ef2c2db04cdb` | 7 |
 
 Tutti i servizi usano `engine_type = "generic"` — configurabili via wizard senza codice.
+
+## Debug DB in produzione
+
+Container distroless — nessuna shell né `sqlite3`. Per accedere al DB:
+```bash
+docker cp opencity-backend-gestionale-1:/data/gestionale.db /tmp/gestionale.db
+python3 -c "import sqlite3; db=sqlite3.connect('/tmp/gestionale.db'); [print(r) for r in db.execute('SELECT ...')]"
+```
 
 ## Schema SQLite (`internal/db/schema.sql`)
 

@@ -31,44 +31,47 @@
 
   <div id="tipologie-container">
   {{range $i, $t := .Tipologie}}
-  <div class="tipologia-row card-row">
-    <div class="form-group">
-      <label>Nome</label>
-      <input type="text" name="tip_nome" value="{{$t.Nome}}" class="form-control form-control-sm" placeholder="es. rette">
+  <div class="tipologia-item" style="margin-bottom:.5rem">
+    <div class="tipologia-row card-row">
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" name="tip_nome" value="{{$t.Nome}}" class="form-control form-control-sm" placeholder="es. rette">
+      </div>
+      <div class="form-group">
+        <label>Campo filtro <span class="text-muted">(opz.)</span></label>
+        <select name="tip_campo" class="form-control form-control-sm" onchange="mostraStatisticheCampo(this)">
+          <option value="">— tutti —</option>
+          {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $t.Campo}}selected{{end}}>{{.}}</option>{{end}}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Valore <span class="text-muted">(opz.)</span></label>
+        <input type="text" name="tip_valore" value="{{$t.Valore}}" class="form-control form-control-sm" placeholder="es. rette">
+      </div>
+      <div class="form-group">
+        <label>Priorità</label>
+        <input type="number" name="tip_priorita" value="{{$t.Priorita}}" class="form-control form-control-sm" min="1" placeholder="1">
+      </div>
+      <div class="form-group">
+        <label>{{if eq $.Modalita "posti"}}Limite tipo{{else}}Budget tipo{{end}}</label>
+        <select name="tip_budget_tipo" class="form-control form-control-sm">
+          {{if eq $.Modalita "posti"}}
+          <option value="posti" {{if eq $t.Limite.Tipo "posti"}}selected{{end}}>Numero posti</option>
+          <option value="nessuno" {{if eq $t.Limite.Tipo "nessuno"}}selected{{end}}>Illimitato</option>
+          {{else}}
+          <option value="percentuale" {{if eq $t.Limite.Tipo "percentuale"}}selected{{end}}>% del totale</option>
+          <option value="fisso"       {{if eq $t.Limite.Tipo "fisso"}}selected{{end}}>Importo fisso</option>
+          <option value="residuo"     {{if or (eq $t.Limite.Tipo "residuo") (eq $t.Limite.Tipo "")}}selected{{end}}>Residuo</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{if eq $.Modalita "posti"}}N. posti{{else}}Valore{{end}}</label>
+        <input type="number" name="tip_budget_valore" value="{{$t.Limite.Valore}}" class="form-control form-control-sm" step="{{if eq $.Modalita "posti"}}1{{else}}0.01{{end}}" min="0">
+      </div>
+      <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-item').remove()">✕</button>
     </div>
-    <div class="form-group">
-      <label>Campo filtro <span class="text-muted">(opz.)</span></label>
-      <select name="tip_campo" class="form-control form-control-sm">
-        <option value="">— tutti —</option>
-        {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $t.Campo}}selected{{end}}>{{.}}</option>{{end}}
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Valore <span class="text-muted">(opz.)</span></label>
-      <input type="text" name="tip_valore" value="{{$t.Valore}}" class="form-control form-control-sm" placeholder="es. rette">
-    </div>
-    <div class="form-group">
-      <label>Priorità</label>
-      <input type="number" name="tip_priorita" value="{{$t.Priorita}}" class="form-control form-control-sm" min="1" placeholder="1">
-    </div>
-    <div class="form-group">
-      <label>{{if eq $.Modalita "posti"}}Limite tipo{{else}}Budget tipo{{end}}</label>
-      <select name="tip_budget_tipo" class="form-control form-control-sm">
-        {{if eq $.Modalita "posti"}}
-        <option value="posti" {{if eq $t.Limite.Tipo "posti"}}selected{{end}}>Numero posti</option>
-        <option value="nessuno" {{if eq $t.Limite.Tipo "nessuno"}}selected{{end}}>Illimitato</option>
-        {{else}}
-        <option value="percentuale" {{if eq $t.Limite.Tipo "percentuale"}}selected{{end}}>% del totale</option>
-        <option value="fisso"       {{if eq $t.Limite.Tipo "fisso"}}selected{{end}}>Importo fisso</option>
-        <option value="residuo"     {{if or (eq $t.Limite.Tipo "residuo") (eq $t.Limite.Tipo "")}}selected{{end}}>Residuo</option>
-        {{end}}
-      </select>
-    </div>
-    <div class="form-group">
-      <label>{{if eq $.Modalita "posti"}}N. posti{{else}}Valore{{end}}</label>
-      <input type="number" name="tip_budget_valore" value="{{$t.Limite.Valore}}" class="form-control form-control-sm" step="{{if eq $.Modalita "posti"}}1{{else}}0.01{{end}}" min="0">
-    </div>
-    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-row').remove()">✕</button>
+    <div class="campo-stats" style="padding:.2rem .5rem;font-size:.82rem;min-height:1em"></div>
   </div>
   {{end}}
   </div>
@@ -104,8 +107,19 @@
     <label for="dedup-attiva" style="margin:0">Attiva deduplicazione</label>
   </div>
   <div class="form-group">
-    <label>Chiave dedup (campi separati da virgola)</label>
-    <input type="text" name="dedup_chiave" value="{{join .Deduplicazione.Chiave ","}}" class="form-control" placeholder="es. figlio_cf,annualita,tipo">
+    <label>Chiave dedup <span class="text-muted">(aggiungi i campi che identificano univocamente un record)</span></label>
+    <div id="dedup-chiave-container" style="display:flex;flex-direction:column;gap:.25rem;margin-bottom:.4rem">
+      {{range .Deduplicazione.Chiave}}{{$cur := .}}
+      <div class="dedup-campo-row" style="display:flex;gap:.5rem;align-items:center">
+        <select name="dedup_campo" class="form-control form-control-sm" style="width:auto">
+          <option value="">— campo —</option>
+          {{range $.CampiMappati}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}
+        </select>
+        <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.dedup-campo-row').remove()">✕</button>
+      </div>
+      {{end}}
+    </div>
+    <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiDedupCampo()">+ Campo</button>
   </div>
 
   <div class="form-actions" style="margin-top:1.5rem">
@@ -114,8 +128,16 @@
   </div>
 </form>
 
+<pre id="superset-data" style="display:none">{{if .SupersetJSON}}{{safeJSON .SupersetJSON}}{{else}}{}{{end}}</pre>
+<pre id="mapping-data" style="display:none">{{if .MappingJSON}}{{safeJSON .MappingJSON}}{{else}}{}{{end}}</pre>
+
 <script>
 const MODALITA = '{{.Modalita}}';
+const _motoreId = {{.Motore.ID}};
+const _espansione = '{{.Espansione}}';
+const supersetData = JSON.parse(document.getElementById('superset-data').textContent || '{}') || {};
+const mappingData  = JSON.parse(document.getElementById('mapping-data').textContent || '{}') || {};
+
 function aggiungiTipologia() {
   const campi = [{{range .CampiMappati}}'{{.}}',{{end}}];
   const opzioni = campi.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -126,17 +148,149 @@ function aggiungiTipologia() {
   const limiteLabel = isPosti ? 'Limite tipo' : 'Budget tipo';
   const valoreLabel = isPosti ? 'N. posti' : 'Valore';
   const step = isPosti ? '1' : '0.01';
-  const html = `<div class="tipologia-row card-row">
-    <div class="form-group"><label>Nome</label><input type="text" name="tip_nome" class="form-control form-control-sm" placeholder="es. rette"></div>
-    <div class="form-group"><label>Campo filtro <span class="text-muted">(opz.)</span></label><select name="tip_campo" class="form-control form-control-sm"><option value="">— tutti —</option>${opzioni}</select></div>
-    <div class="form-group"><label>Valore <span class="text-muted">(opz.)</span></label><input type="text" name="tip_valore" class="form-control form-control-sm" placeholder="es. rette"></div>
-    <div class="form-group"><label>Priorità</label><input type="number" name="tip_priorita" class="form-control form-control-sm" min="1" value="1"></div>
-    <div class="form-group"><label>${limiteLabel}</label><select name="tip_budget_tipo" class="form-control form-control-sm">${limiteOpts}</select></div>
-    <div class="form-group"><label>${valoreLabel}</label><input type="number" name="tip_budget_valore" class="form-control form-control-sm" step="${step}" min="0" value="0"></div>
-    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-row').remove()">✕</button>
+  const html = `<div class="tipologia-item" style="margin-bottom:.5rem">
+    <div class="tipologia-row card-row">
+      <div class="form-group"><label>Nome</label><input type="text" name="tip_nome" class="form-control form-control-sm" placeholder="es. rette"></div>
+      <div class="form-group"><label>Campo filtro <span class="text-muted">(opz.)</span></label><select name="tip_campo" class="form-control form-control-sm" onchange="mostraStatisticheCampo(this)"><option value="">— tutti —</option>${opzioni}</select></div>
+      <div class="form-group"><label>Valore <span class="text-muted">(opz.)</span></label><input type="text" name="tip_valore" class="form-control form-control-sm" placeholder="es. rette"></div>
+      <div class="form-group"><label>Priorità</label><input type="number" name="tip_priorita" class="form-control form-control-sm" min="1" value="1"></div>
+      <div class="form-group"><label>${limiteLabel}</label><select name="tip_budget_tipo" class="form-control form-control-sm">${limiteOpts}</select></div>
+      <div class="form-group"><label>${valoreLabel}</label><input type="number" name="tip_budget_valore" class="form-control form-control-sm" step="${step}" min="0" value="0"></div>
+      <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.tipologia-item').remove()">✕</button>
+    </div>
+    <div class="campo-stats" style="padding:.2rem .5rem;font-size:.82rem;min-height:1em"></div>
   </div>`;
   document.getElementById('tipologie-container').insertAdjacentHTML('beforeend', html);
 }
+
+function aggiungiDedupCampo() {
+  const campi = [{{range .CampiMappati}}'{{.}}',{{end}}];
+  const opzioni = campi.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('dedup-chiave-container').insertAdjacentHTML('beforeend',
+    `<div class="dedup-campo-row" style="display:flex;gap:.5rem;align-items:center">
+      <select name="dedup_campo" class="form-control form-control-sm" style="width:auto"><option value="">— campo —</option>${opzioni}</select>
+      <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.dedup-campo-row').remove()">✕</button>
+    </div>`);
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function costruisciSuperset(btn, selectDaRifar) {
+  btn.disabled = true;
+  btn.textContent = '⏳ caricamento istanze...';
+  try {
+    const resp = await fetch(`/motori/${_motoreId}/wizard/superset`, {method: 'POST'});
+    if (!resp.ok) {
+      const txt = await resp.text();
+      btn.closest('.campo-stats').innerHTML = `<span style="color:#c00">Errore: ${_esc(txt)}</span>`;
+      return;
+    }
+    // Ricarica pagina per aggiornare supersetData (come step 3)
+    window.location.reload();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '⟳ Carica da tutte le istanze';
+    const p = btn.closest('.campo-stats');
+    if (p) p.insertAdjacentHTML('beforeend', `<span style="color:#c00"> ${_esc(e.message)}</span>`);
+  }
+}
+
+function mostraStatisticheCampo(select) {
+  const campo = select.value;
+  const item = select.closest('.tipologia-item');
+  const panel = item.querySelector('.campo-stats');
+  const valoreInput = item.querySelector('[name="tip_valore"]');
+
+  // Assicura datalist collegato all'input valore
+  let dl = item.querySelector('datalist');
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = 'tip-dl-' + Math.random().toString(36).slice(2, 8);
+    item.appendChild(dl);
+  }
+  if (valoreInput && dl.id) valoreInput.setAttribute('list', dl.id);
+
+  if (!campo) {
+    panel.innerHTML = '';
+    dl.innerHTML = '';
+    if (valoreInput) valoreInput.removeAttribute('list');
+    return;
+  }
+
+  // Lookup locale da supersetData (come step 3, nessuna chiamata API)
+  const fm = mappingData[campo] || {};
+  const path = fm.path || campo;
+  const isNumerico = fm.tipo === 'float' || fm.tipo === 'int' || fm.tipo === 'count';
+
+  if (!isNumerico) {
+    // Estrai array key e leaf field dal path
+    // Formati possibili: "tiporichiesta", "anni[filter].tiporichiesta", "foo.bar.baz"
+    let arrKey = _espansione;
+    let leafField = path;
+    const dotIdx = path.lastIndexOf('.');
+    if (dotIdx >= 0) {
+      leafField = path.slice(dotIdx + 1);
+      const bracketIdx = path.indexOf('[');
+      if (bracketIdx >= 0) {
+        arrKey = path.slice(0, bracketIdx);  // "anni[...].x" → arrKey="anni"
+      } else {
+        arrKey = path.slice(0, path.indexOf('.'));  // "anni.tiporichiesta" → arrKey="anni"
+      }
+    }
+
+    // Cerca: prima arrKey derivato dal path, poi espansione configurata, poi tutti
+    const candidates = [arrKey, _espansione, ...Object.keys(supersetData)].filter((k, i, a) => k && a.indexOf(k) === i);
+    let valori = [];
+    for (const k of candidates) {
+      if (supersetData[k] && supersetData[k][leafField] && supersetData[k][leafField].length > 0) {
+        valori = supersetData[k][leafField];
+        break;
+      }
+    }
+
+    if (valori.length === 0) {
+      panel.innerHTML = '<span style="color:#999">Nessun valore nel superset. </span>';
+      const btnSup = document.createElement('button');
+      btnSup.type = 'button';
+      btnSup.className = 'btn btn-sm btn-outline-secondary';
+      btnSup.textContent = '⟳ Carica da tutte le istanze';
+      btnSup.onclick = () => costruisciSuperset(btnSup, select);
+      panel.appendChild(btnSup);
+      dl.innerHTML = '';
+      return;
+    }
+
+    const shown = valori.slice(0, 20);
+    dl.innerHTML = shown.map(v => `<option value="${_esc(v)}">`).join('');
+    const badges = shown.map(v =>
+      `<span class="badge bg-secondary" data-val="${_esc(v)}" style="cursor:pointer;margin:2px" title="Clicca per impostare come valore filtro" onclick="impostaValoreTipologia(this)">${_esc(v)}</span>`
+    ).join('');
+    const nota = valori.length > 20 ? `<span style="color:#888"> — primi 20 su ${valori.length}</span>` : '';
+    panel.innerHTML = badges + nota;
+  } else {
+    // Campo numerico: mostra indicazione (somma richiederebbe API call)
+    panel.innerHTML = `<span style="color:#888">Campo numerico (${fm.tipo || 'float'})</span>`;
+    dl.innerHTML = '';
+  }
+}
+
+function impostaValoreTipologia(badge) {
+  const val = badge.dataset.val;
+  const item = badge.closest('.tipologia-item');
+  const valInput = item.querySelector('[name="tip_valore"]');
+  if (valInput) valInput.value = val;
+  const nomeInput = item.querySelector('[name="tip_nome"]');
+  if (nomeInput && !nomeInput.value.trim()) nomeInput.value = val;
+}
+
+// Al caricamento pagina: trigger per tipologie già configurate con campo selezionato
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tipologia-item select[name="tip_campo"]').forEach(sel => {
+    if (sel.value) mostraStatisticheCampo(sel);
+  });
+});
 
 function aggiungiOrdine() {
   const campi = [{{range .CampiMappati}}'{{.}}',{{end}}];

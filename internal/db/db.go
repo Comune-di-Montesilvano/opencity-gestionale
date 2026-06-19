@@ -24,5 +24,9 @@ func Open(path string) (*sql.DB, error) {
 	// Migration idempotente: aggiunge colonne mancanti per DB pre-esistenti.
 	_, _ = db.Exec(`ALTER TABLE graduatorie_run ADD COLUMN stato TEXT NOT NULL DEFAULT 'bozza'`)
 	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN stato_motore TEXT NOT NULL DEFAULT 'bozza'`)
+	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN valori_superset TEXT NOT NULL DEFAULT '{}'`)
+	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN app_status TEXT NOT NULL DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN dati_json TEXT NOT NULL DEFAULT '{}'`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT PRIMARY KEY, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT)`)
 	return db, nil
 }

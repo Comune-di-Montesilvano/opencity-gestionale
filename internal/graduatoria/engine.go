@@ -50,6 +50,8 @@ type Istanza struct {
 
 	ForWhom string
 	NumAnni int
+
+	CampiMappati map[string]string // tutti i campi del record come stringhe, per display dinamico
 }
 
 type RigaGraduatoria struct {
@@ -59,6 +61,8 @@ type RigaGraduatoria struct {
 	Ammessa         bool
 	NoteEsclusione  string
 	OriginalID      string
+	ConRiserva      bool
+	MotiviRiserva   []string
 }
 
 func (r RigaGraduatoria) CorrispettivoNetto() float64 {
@@ -85,6 +89,18 @@ func (g *Graduatoria) TotaleAmmesse() int {
 	for _, gr := range g.Gruppi {
 		for _, r := range gr.Righe {
 			if r.Ammessa {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func (g *Graduatoria) TotaleConRiserva() int {
+	count := 0
+	for _, gr := range g.Gruppi {
+		for _, r := range gr.Righe {
+			if r.Ammessa && r.ConRiserva {
 				count++
 			}
 		}

@@ -14,7 +14,8 @@ type BandoConfig struct {
 	BudgetTotale  float64
 	ISEEMassimo   float64
 	Scadenza      time.Time
-	ExtraJSON     json.RawMessage // parametri engine-specific
+	ExtraJSON     json.RawMessage            // parametri engine-specific
+	CampiExtra    map[string]map[string]string // praticaID → campo → valore override da istruttoria
 }
 
 // ServiceEngine è l'interfaccia che ogni motore di servizio deve implementare.

@@ -66,14 +66,27 @@ func (r *Record) HasFloat(campo string) bool {
 // DerivaCampi calcola i campi derivati in base alla RimborsoConfig.
 func (r *Record) DerivaCampi(cfg RimborsoConfig) {
 	if cfg.Tipo == "netto" {
-		lordo := r.FloatMap[cfg.CampoLordo]
-		deduzione := r.FloatMap[cfg.CampoDeduzione]
+		lordo := r.floatOrStr(cfg.CampoLordo)
+		deduzione := r.floatOrStr(cfg.CampoDeduzione)
 		netto := lordo - deduzione
 		if netto < 0 {
 			netto = 0
 		}
 		r.FloatMap["corrispettivo_netto"] = netto
 	}
+}
+
+// floatOrStr legge un valore numerico da FloatMap o, se assente, da StringMap con parse.
+func (r *Record) floatOrStr(campo string) float64 {
+	if v, ok := r.FloatMap[campo]; ok && v != 0 {
+		return v
+	}
+	if s := r.StringMap[campo]; s != "" {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(s), 64); err == nil {
+			return f
+		}
+	}
+	return 0
 }
 
 // ChiaveDedup costruisce la chiave di deduplicazione come stringa composita.
@@ -266,6 +279,25 @@ func (r *Record) ToIstanza() *Istanza {
 	if t, ok := r.TimeMap["data_presentazione"]; ok {
 		ist.SubmittedAt = t.Format(time.RFC3339)
 	}
+	// Popola CampiMappati con tutti i campi del record per display dinamico nei template.
+	cm := make(map[string]string)
+	for k, v := range r.StringMap {
+		if !strings.HasPrefix(k, "__") {
+			cm[k] = v
+		}
+	}
+	for k, v := range r.FloatMap {
+		cm[k] = strconv.FormatFloat(v, 'f', 2, 64)
+	}
+	for k, v := range r.IntMap {
+		cm[k] = strconv.Itoa(v)
+	}
+	for k, v := range r.TimeMap {
+		if !v.IsZero() {
+			cm[k] = v.Format("02/01/2006")
+		}
+	}
+	ist.CampiMappati = cm
 	return ist
 }
 

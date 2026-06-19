@@ -262,15 +262,46 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"FlatJSON":         string(flatJSON),
 			"RawDataJSON":      rawDataJSON,
 			"ViewerFilter":     viewerFilter,
+			"SupersetJSON":     bando.ValoriSuperset,
 		})
 
 	case "4":
+		type StatoItem struct {
+			Code  string
+			Label string
+			Count int
+		}
+		var statiDisponibili []StatoItem
+		if bando.ValoriSuperset != "" {
+			var sup map[string]map[string][]string
+			if json.Unmarshal([]byte(bando.ValoriSuperset), &sup) == nil {
+				statusCounts := sup["$status_counts"] // map[code][]{"N"}
+				for _, code := range sup["$app"]["status"] {
+					label := code
+					if names := sup["$status_names"][code]; len(names) > 0 {
+						label = names[0] + " (" + code + ")"
+					}
+					count := 0
+					if statusCounts != nil {
+						if vals := statusCounts[code]; len(vals) > 0 {
+							count, _ = strconv.Atoi(vals[0])
+						}
+					}
+					statiDisponibili = append(statiDisponibili, StatoItem{Code: code, Label: label, Count: count})
+				}
+				sort.Slice(statiDisponibili, func(i, j int) bool {
+					return statiDisponibili[i].Code < statiDisponibili[j].Code
+				})
+			}
+		}
 		renderTemplate(w, "motore_wizard_step4.html", map[string]any{
-			"Op":           op,
-			"Motore":       bando,
-			"Filtri":       cfg.Filtri,
-			"Verifica":     cfg.Verifica,
-			"CampiMappati": campiMappati(cfg),
+			"Op":               op,
+			"Motore":           bando,
+			"Filtri":           cfg.Filtri,
+			"Verifica":         cfg.Verifica,
+			"CampiMappati":     campiMappati(cfg),
+			"Istanza":          cfg.Istanza,
+			"StatiDisponibili": statiDisponibili,
 		})
 
 	case "5":
@@ -278,6 +309,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/fine", bando.ID), http.StatusSeeOther)
 			return
 		}
+		mappingJSON, _ := json.Marshal(cfg.Mapping)
 		renderTemplate(w, "motore_wizard_step5.html", map[string]any{
 			"Op":             op,
 			"Motore":         bando,
@@ -286,6 +318,9 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"Ordinamento":    cfg.Ordinamento,
 			"Deduplicazione": cfg.Deduplicazione,
 			"CampiMappati":   campiMappati(cfg),
+			"SupersetJSON":   bando.ValoriSuperset,
+			"MappingJSON":    string(mappingJSON),
+			"Espansione":     cfg.Espansione,
 		})
 
 	case "6":
@@ -424,15 +459,21 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 		campos := r.Form["filtro_campo"]
 		ops := r.Form["filtro_op"]
 		valori := r.Form["filtro_valore"]
+		gruppi := r.Form["filtro_gruppo"]
 		var filtri []graduatoria.FiltroConfig
 		for i := range campos {
 			if i >= len(ops) || i >= len(valori) || campos[i] == "" {
 				continue
 			}
+			gruppo := 0
+			if i < len(gruppi) {
+				gruppo, _ = strconv.Atoi(strings.TrimSpace(gruppi[i]))
+			}
 			filtri = append(filtri, graduatoria.FiltroConfig{
 				Campo:  campos[i],
 				Op:     ops[i],
 				Valore: parseFilterValue(valori[i]),
+				Gruppo: gruppo,
 			})
 		}
 		cfg.Filtri = filtri
@@ -470,6 +511,14 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			Attiva:                 r.FormValue("verifica_attiva") == "1",
 			FiltriFlag:             filtriFlag,
 			VerificaCertificazione: r.FormValue("verifica_certificazione") == "1",
+		}
+
+		// Filtri istanza (stato OpenCity + date presentazione)
+		statiAmmessi := r.Form["stati_ammessi"]
+		cfg.Istanza = graduatoria.FiltriIstanzaConfig{
+			StatiAmmessi: statiAmmessi,
+			DataMassima:  strings.TrimSpace(r.FormValue("data_massima")),
+			DataMinima:   strings.TrimSpace(r.FormValue("data_minima")),
 		}
 
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
@@ -519,10 +568,18 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 		}
 		cfg.Ordinamento = ordini
 		cfg.Deduplicazione.Attiva = r.FormValue("dedup_attiva") == "1"
-		if chiaveRaw := strings.TrimSpace(r.FormValue("dedup_chiave")); chiaveRaw != "" {
-			cfg.Deduplicazione.Chiave = splitTrim(chiaveRaw, ",")
-		} else {
-			cfg.Deduplicazione.Chiave = nil
+		if err := r.ParseForm(); err == nil {
+			chiave := make([]string, 0)
+			for _, c := range r.Form["dedup_campo"] {
+				if c = strings.TrimSpace(c); c != "" {
+					chiave = append(chiave, c)
+				}
+			}
+			if len(chiave) > 0 {
+				cfg.Deduplicazione.Chiave = chiave
+			} else {
+				cfg.Deduplicazione.Chiave = nil
+			}
 		}
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
@@ -666,6 +723,339 @@ func (h *MotoriHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/motori?flash=Motore+archiviato&flashType=success", http.StatusSeeOther)
+}
+
+func (h *MotoriHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
+	id := motoreIDFromPath(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Form non valido", http.StatusBadRequest)
+		return
+	}
+	nome := strings.TrimSpace(r.FormValue("nome"))
+	if nome == "" {
+		http.Redirect(w, r, fmt.Sprintf("/motori/%d?flash=Nome+non+può+essere+vuoto&flashType=error", id), http.StatusSeeOther)
+		return
+	}
+	bando, err := db.GetBando(h.DB, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	bando.Nome = nome
+	if err := db.UpdateBando(h.DB, bando); err != nil {
+		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/motori/%d?flash=Bando+rinominato&flashType=success", id), http.StatusSeeOther)
+}
+
+// --- Superset valori campo ---
+
+// PostBuildSuperset scarica tutte le istanze del servizio e raccoglie i valori unici
+// di ogni sub-campo degli array trovati nel payload. Salva in bandi.valori_superset.
+// POST /motori/{id}/wizard/superset
+func (h *MotoriHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bando, err := db.GetBando(h.DB, bandoIDFromPath(r))
+	if err != nil {
+		http.Error(w, "motore non trovato", http.StatusNotFound)
+		return
+	}
+
+	client := opencity.NewClient(h.BaseURL, op.JWT)
+	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
+	if err != nil {
+		http.Error(w, "errore fetch istanze: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// sets[arrayPath][fieldKey] = set di valori unici
+	sets := map[string]map[string]map[string]struct{}{}
+	statusCounts := map[string]int{} // code → numero istanze
+
+	for _, rawApp := range rawApps {
+		var app opencity.Application
+		if json.Unmarshal(rawApp, &app) != nil || len(app.Data) == 0 {
+			continue
+		}
+		// Raccoglie app.Status sotto "$app"."status", labels e conteggi
+		if app.Status != "" {
+			statusCounts[app.Status]++
+			if _, ok := sets["$app"]; !ok {
+				sets["$app"] = map[string]map[string]struct{}{}
+			}
+			if _, ok := sets["$app"]["status"]; !ok {
+				sets["$app"]["status"] = map[string]struct{}{}
+			}
+			sets["$app"]["status"][app.Status] = struct{}{}
+			if app.StatusName != "" {
+				if _, ok := sets["$status_names"]; !ok {
+					sets["$status_names"] = map[string]map[string]struct{}{}
+				}
+				if _, ok := sets["$status_names"][app.Status]; !ok {
+					sets["$status_names"][app.Status] = map[string]struct{}{}
+				}
+				sets["$status_names"][app.Status][app.StatusName] = struct{}{}
+			}
+		}
+		var dataMap map[string]any
+		if json.Unmarshal(app.Data, &dataMap) != nil {
+			continue
+		}
+		for topKey, topVal := range dataMap {
+			arr, ok := topVal.([]any)
+			if !ok || len(arr) == 0 {
+				continue
+			}
+			if _, hasSet := sets[topKey]; !hasSet {
+				sets[topKey] = map[string]map[string]struct{}{}
+			}
+			for _, elem := range arr {
+				m, ok := elem.(map[string]any)
+				if !ok {
+					continue
+				}
+				for k, v := range m {
+					if v == nil {
+						continue
+					}
+					var s string
+					switch n := v.(type) {
+					case float64:
+						s = strconv.FormatFloat(n, 'f', -1, 64)
+					case bool:
+						if n {
+							s = "true"
+						} else {
+							s = "false"
+						}
+					case string:
+						s = n
+					default:
+						s = fmt.Sprintf("%v", n)
+					}
+					if s == "" {
+						continue
+					}
+					if _, hasField := sets[topKey][k]; !hasField {
+						sets[topKey][k] = map[string]struct{}{}
+					}
+					if len(sets[topKey][k]) < 200 {
+						sets[topKey][k][s] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
+	// Converti set → slice ordinata
+	superset := make(map[string]map[string][]string, len(sets))
+	for arrayPath, fields := range sets {
+		superset[arrayPath] = make(map[string][]string, len(fields))
+		for field, valSet := range fields {
+			vals := make([]string, 0, len(valSet))
+			for v := range valSet {
+				vals = append(vals, v)
+			}
+			sort.Strings(vals)
+			superset[arrayPath][field] = vals
+		}
+	}
+	// Salva conteggi per stato come "$status_counts"[code] = ["N"]
+	if len(statusCounts) > 0 {
+		counts := make(map[string][]string, len(statusCounts))
+		for code, n := range statusCounts {
+			counts[code] = []string{strconv.Itoa(n)}
+		}
+		superset["$status_counts"] = counts
+	}
+
+	b, _ := json.Marshal(superset)
+	if err := db.SaveValoriSuperset(h.DB, bando.ID, string(b)); err != nil {
+		http.Error(w, "errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	arrayCount := len(superset)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, "Superset aggiornato: %d istanze, %d array", len(rawApps), arrayCount)
+}
+
+// --- API helper wizard step 5 ---
+
+// GetStatisticheField aggrega i valori di un campo mappato su tutte le istanze del servizio.
+// Per campi stringa/testo: valori unici con conteggio. Per numerici: somma + conteggio elementi.
+// GET /motori/{id}/api/statistiche-campo?campo=tipo
+func (h *MotoriHandler) GetStatisticheField(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bando, cfg, err := loadMotoreConConfig(h, r)
+	if err != nil {
+		http.Error(w, `{"errore":"motore non trovato"}`, http.StatusNotFound)
+		return
+	}
+
+	campo := strings.TrimSpace(r.URL.Query().Get("campo"))
+	if campo == "" {
+		http.Error(w, `{"errore":"parametro campo obbligatorio"}`, http.StatusBadRequest)
+		return
+	}
+	fm, ok := cfg.Mapping[campo]
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"errore": "campo non trovato nel mapping"})
+		return
+	}
+
+	isNumerico := fm.Tipo == "float" || fm.Tipo == "int" || fm.Tipo == "count"
+
+	// Per campi stringa: cerca fm.Path nel superset DB (tutti gli array, non solo cfg.Espansione).
+	// Gestisce expand=false, espansione vuota, e mismatch di path.
+	if !isNumerico && bando.ValoriSuperset != "" && bando.ValoriSuperset != "{}" {
+		var superset map[string]map[string][]string
+		if json.Unmarshal([]byte(bando.ValoriSuperset), &superset) == nil {
+			// Cerca prima nell'array configurato, poi in tutti gli altri.
+			ordine := []string{cfg.Espansione}
+			for k := range superset {
+				if k != cfg.Espansione {
+					ordine = append(ordine, k)
+				}
+			}
+			for _, arrKey := range ordine {
+				if arrKey == "" {
+					continue
+				}
+				if vals, ok := superset[arrKey][fm.Path]; ok && len(vals) > 0 {
+					valori := vals
+					if len(valori) > 20 {
+						valori = valori[:20]
+					}
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(map[string]any{
+						"valori":          valori,
+						"conteggi":        map[string]int{},
+						"totale_istanze":  0,
+						"totale_elementi": 0,
+						"tipo_campo":      fm.Tipo,
+						"da_superset":     true,
+					})
+					return
+				}
+			}
+		}
+	}
+
+	// Fallback: fetch live da OpenCity (campi numerici o senza superset).
+	client := opencity.NewClient(h.BaseURL, op.JWT)
+	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"errore": err.Error()})
+		return
+	}
+
+	valCount := make(map[string]int)
+	var somma float64
+	totalElems := 0
+
+	for _, rawApp := range rawApps {
+		var app opencity.Application
+		if json.Unmarshal(rawApp, &app) != nil || len(app.Data) == 0 {
+			continue
+		}
+
+		espansione := cfg.Espansione
+		if fm.Expand && espansione == "" {
+			// Autodetect: cerca il path nell'array del superset già noto.
+			// Se superset è vuoto, tenta comunque con ogni chiave top-level dell'app.
+			var dm map[string]any
+			if json.Unmarshal(app.Data, &dm) == nil {
+				for k, v := range dm {
+					if _, isArr := v.([]any); isArr {
+						espansione = k
+						break
+					}
+				}
+			}
+		}
+		if fm.Expand && espansione != "" {
+			elems, err := extractor.ArrayElements(app.Data, espansione)
+			if err != nil {
+				continue
+			}
+			for _, elem := range elems {
+				totalElems++
+				if isNumerico {
+					v, err := extractor.Float(elem, fm.Path)
+					if err != nil {
+						continue
+					}
+					somma += v
+					valCount[strconv.FormatFloat(v, 'f', -1, 64)]++
+				} else {
+					v, err := extractor.Str(elem, fm.Path)
+					if err != nil || v == "" {
+						continue
+					}
+					valCount[v]++
+				}
+			}
+		} else {
+			totalElems++
+			if strings.HasPrefix(fm.Path, "$app:") {
+				continue
+			}
+			if isNumerico {
+				v, err := extractor.Float(app.Data, fm.Path)
+				if err != nil {
+					continue
+				}
+				somma += v
+				valCount[strconv.FormatFloat(v, 'f', -1, 64)]++
+			} else {
+				v, err := extractor.Str(app.Data, fm.Path)
+				if err != nil || v == "" {
+					continue
+				}
+				valCount[v]++
+			}
+		}
+	}
+
+	type kv struct {
+		Val   string
+		Count int
+	}
+	kvs := make([]kv, 0, len(valCount))
+	for v, c := range valCount {
+		kvs = append(kvs, kv{v, c})
+	}
+	sort.Slice(kvs, func(i, j int) bool {
+		if kvs[i].Count != kvs[j].Count {
+			return kvs[i].Count > kvs[j].Count
+		}
+		return kvs[i].Val < kvs[j].Val
+	})
+
+	valori := make([]string, len(kvs))
+	conteggi := make(map[string]int, len(kvs))
+	for i, kv := range kvs {
+		valori[i] = kv.Val
+		conteggi[kv.Val] = kv.Count
+	}
+
+	resp := map[string]any{
+		"valori":          valori,
+		"conteggi":        conteggi,
+		"totale_istanze":  len(rawApps),
+		"totale_elementi": totalElems,
+		"tipo_campo":      fm.Tipo,
+	}
+	if isNumerico {
+		resp["somma"] = somma
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // --- API helper wizard step 3 ---

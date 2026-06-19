@@ -50,6 +50,20 @@ var funcMap = template.FuncMap{
 	"safeJSON": func(s string) template.JS {
 		return template.JS(s)
 	},
+	"statusLabel": func(code string) string {
+		labels := map[string]string{
+			"1000":  "Bozza (1000)",
+			"2000":  "Bozza (2000)",
+			"3000":  "Inviata (3000)",
+			"4000":  "In attesa istruttoria (4000)",
+			"9000":  "Approvata (9000)",
+			"20000": "Ritirata (20000)",
+		}
+		if l, ok := labels[code]; ok {
+			return l
+		}
+		return code
+	},
 }
 
 func fileExists(path string) bool {

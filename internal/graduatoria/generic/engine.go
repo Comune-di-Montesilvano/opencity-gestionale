@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,7 +40,10 @@ func (e *Engine) Calcola(apps []opencity.Application, cfg graduatoria.BandoConfi
 
 	for i := range apps {
 		app := apps[i]
-		records, err := estraiRecord(app, ecfg)
+		if !passaFiltriIstanza(app, ecfg.Istanza) {
+			continue
+		}
+		records, err := estraiRecord(app, ecfg, cfg.CampiExtra[app.ID])
 		if err != nil {
 			continue
 		}
@@ -113,6 +117,12 @@ func buildGraduatoriaPosti(ammissibili []*graduatoria.Record, grad *graduatoria.
 			}
 			if !riga.Ammessa {
 				riga.NoteEsclusione = "posti esauriti"
+			} else {
+				motivi := rec.FlagMotivi(ecfg.Verifica)
+				if len(motivi) > 0 {
+					riga.ConRiserva = true
+					riga.MotiviRiserva = motivi
+				}
 			}
 			righe = append(righe, riga)
 		}
@@ -139,7 +149,7 @@ func buildGraduatoriaFondi(ammissibili []*graduatoria.Record, grad *graduatoria.
 		appendDuplicati(grad, dupl, ecfg.Deduplicazione.Chiave)
 
 		budget := limiteTipologia(tip.Limite, budgetTotale, residuo)
-		righe, usato := assegnaRecord(lista, budget, ecfg.Rimborso)
+		righe, usato := assegnaRecord(lista, budget, ecfg.Rimborso, ecfg.Verifica)
 		residuo -= usato
 
 		grad.Gruppi = append(grad.Gruppi, &graduatoria.GraduatoriaGruppo{
@@ -186,7 +196,17 @@ func (e *Engine) CSVRecord(categoria string, r graduatoria.RigaGraduatoria) []st
 
 // --- helpers ---
 
-func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig) ([]*graduatoria.Record, error) {
+// EstraiRecords è la versione esportata di estraiRecord, usata dall'istruttoria.
+func EstraiRecords(app opencity.Application, cfg graduatoria.EngineConfig) ([]*graduatoria.Record, error) {
+	return estraiRecord(app, cfg, nil)
+}
+
+// EstraiRecordsConExtras è come EstraiRecords ma applica override locali ai campi.
+func EstraiRecordsConExtras(app opencity.Application, cfg graduatoria.EngineConfig, extras map[string]string) ([]*graduatoria.Record, error) {
+	return estraiRecord(app, cfg, extras)
+}
+
+func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras map[string]string) ([]*graduatoria.Record, error) {
 	baseMapping := make(map[string]graduatoria.FieldMapping)
 	expandMapping := make(map[string]graduatoria.FieldMapping)
 	for nome, fm := range cfg.Mapping {
@@ -201,6 +221,7 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig) ([]*gr
 	for nome, fm := range baseMapping {
 		_ = popolaCampo(base, nome, fm, app.Data, app)
 	}
+	applicaExtras(base, extras, cfg.Mapping)
 
 	if cfg.Espansione == "" || len(expandMapping) == 0 {
 		return []*graduatoria.Record{base}, nil
@@ -220,6 +241,29 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig) ([]*gr
 		out = append(out, rec)
 	}
 	return out, nil
+}
+
+// applicaExtras sovrascrive i campi del record con i valori di override locali.
+func applicaExtras(rec *graduatoria.Record, extras map[string]string, mapping map[string]graduatoria.FieldMapping) {
+	for campo, valore := range extras {
+		fm, ok := mapping[campo]
+		if !ok {
+			rec.StringMap[campo] = valore
+			continue
+		}
+		switch fm.Tipo {
+		case "float":
+			if f, err := strconv.ParseFloat(strings.TrimSpace(valore), 64); err == nil {
+				rec.FloatMap[campo] = f
+			}
+		case "int":
+			if i, err := strconv.Atoi(strings.TrimSpace(valore)); err == nil {
+				rec.IntMap[campo] = i
+			}
+		default:
+			rec.StringMap[campo] = valore
+		}
+	}
 }
 
 var appTimeLayouts = []string{time.RFC3339, "2006-01-02T15:04:05Z07:00", "2006-01-02"}
@@ -257,11 +301,6 @@ func popolaCampo(rec *graduatoria.Record, nome string, fm graduatoria.FieldMappi
 		}
 	}
 	return nil
-}
-
-// EstraiRecords è la versione esportata di estraiRecord, usata dall'istruttoria.
-func EstraiRecords(app opencity.Application, cfg graduatoria.EngineConfig) ([]*graduatoria.Record, error) {
-	return estraiRecord(app, cfg)
 }
 
 func popolaCampoRaw(rec *graduatoria.Record, nome string, fm graduatoria.FieldMapping, data json.RawMessage) error {
@@ -317,24 +356,95 @@ func copyRecord(src *graduatoria.Record) *graduatoria.Record {
 	return dst
 }
 
+// ApplicaFiltri è la versione esportata di applicaFiltri, usata dall'istruttoria.
+func ApplicaFiltri(rec *graduatoria.Record, filtri []graduatoria.FiltroConfig) (bool, string) {
+	return applicaFiltri(rec, filtri)
+}
+
 func applicaFiltri(rec *graduatoria.Record, filtri []graduatoria.FiltroConfig) (bool, string) {
+	// Separa filtri standalone (gruppo 0) da gruppi OR (gruppo > 0).
+	gruppi := map[int][]graduatoria.FiltroConfig{}
 	for _, f := range filtri {
-		if !rec.PassaFiltro(f) {
-			return false, fmt.Sprintf("filtro %s %s %v non soddisfatto", f.Campo, f.Op, f.Valore)
+		gruppi[f.Gruppo] = append(gruppi[f.Gruppo], f)
+	}
+	for gid, lista := range gruppi {
+		if gid == 0 {
+			// AND: tutti devono passare
+			for _, f := range lista {
+				if !rec.PassaFiltro(f) {
+					return false, fmt.Sprintf("filtro %s %s %v non soddisfatto", f.Campo, f.Op, f.Valore)
+				}
+			}
+		} else {
+			// OR: almeno uno deve passare
+			ok := false
+			for _, f := range lista {
+				if rec.PassaFiltro(f) {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				campi := make([]string, 0, len(lista))
+				for _, f := range lista {
+					campi = append(campi, fmt.Sprintf("%s %s %v", f.Campo, f.Op, f.Valore))
+				}
+				return false, fmt.Sprintf("gruppo OR %d: nessuna condizione soddisfatta (%s)", gid, strings.Join(campi, " | "))
+			}
 		}
 	}
 	return true, ""
 }
 
+// passaFiltriIstanza verifica stato e date presentazione prima dell'estrazione campi.
+func passaFiltriIstanza(app opencity.Application, cfg graduatoria.FiltriIstanzaConfig) bool {
+	if len(cfg.StatiAmmessi) > 0 {
+		ok := false
+		for _, s := range cfg.StatiAmmessi {
+			if s == app.Status {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return false
+		}
+	}
+	var layouts = []string{"2006-01-02T15:04:05Z07:00", time.RFC3339, "2006-01-02"}
+	parseDate := func(s string) (time.Time, bool) {
+		for _, l := range layouts {
+			if t, err := time.Parse(l, s); err == nil {
+				return t, true
+			}
+		}
+		return time.Time{}, false
+	}
+	if cfg.DataMassima != "" {
+		if tmax, ok := parseDate(cfg.DataMassima); ok {
+			if sub, ok2 := parseDate(app.SubmittedAt); ok2 && sub.After(tmax) {
+				return false
+			}
+		}
+	}
+	if cfg.DataMinima != "" {
+		if tmin, ok := parseDate(cfg.DataMinima); ok {
+			if sub, ok2 := parseDate(app.SubmittedAt); ok2 && sub.Before(tmin) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func raggruppaPerTipologia(ammissibili []*graduatoria.Record, tipologie []graduatoria.TipologiaConfig, grad *graduatoria.Graduatoria) map[string][]*graduatoria.Record {
 	gruppi := make(map[string][]*graduatoria.Record)
 	for _, rec := range ammissibili {
-		nome := tipologiaDiRecord(rec, tipologie)
+		nome, motivo := tipologiaDiRecord(rec, tipologie)
 		if nome == "" {
 			grad.Escluse = append(grad.Escluse, graduatoria.RigaGraduatoria{
 				Istanza:        rec.ToIstanza(),
 				Ammessa:        false,
-				NoteEsclusione: "tipologia non riconosciuta",
+				NoteEsclusione: motivo,
 			})
 			continue
 		}
@@ -343,13 +453,39 @@ func raggruppaPerTipologia(ammissibili []*graduatoria.Record, tipologie []gradua
 	return gruppi
 }
 
-func tipologiaDiRecord(rec *graduatoria.Record, tipologie []graduatoria.TipologiaConfig) string {
+func tipologiaDiRecord(rec *graduatoria.Record, tipologie []graduatoria.TipologiaConfig) (string, string) {
 	for _, tip := range tipologie {
 		if tip.Campo == "" || rec.StringMap[tip.Campo] == tip.Valore {
-			return tip.Nome
+			return tip.Nome, ""
 		}
 	}
-	return ""
+	if len(tipologie) == 0 {
+		return "", "nessuna tipologia configurata"
+	}
+	// Costruisce motivo dettagliato
+	seen := map[string]bool{}
+	var nonTrovati, nonMatchati []string
+	for _, tip := range tipologie {
+		if tip.Campo == "" || seen[tip.Campo] {
+			continue
+		}
+		seen[tip.Campo] = true
+		trovato := rec.StringMap[tip.Campo]
+		if trovato == "" {
+			nonTrovati = append(nonTrovati, tip.Campo)
+		} else {
+			nonMatchati = append(nonMatchati, fmt.Sprintf("%s=%q", tip.Campo, trovato))
+		}
+	}
+	var motivo string
+	if len(nonTrovati) > 0 && len(nonMatchati) == 0 {
+		motivo = "campo non presente nel record (" + strings.Join(nonTrovati, ", ") + ") — verificare path/condizione mapping"
+	} else if len(nonMatchati) > 0 {
+		motivo = "nessuna tipologia per " + strings.Join(nonMatchati, ", ")
+	} else {
+		motivo = "tipologia non riconosciuta"
+	}
+	return "", motivo
 }
 
 func appendDuplicati(grad *graduatoria.Graduatoria, dupl []recordDuplicato, chiave []string) {
@@ -425,7 +561,7 @@ func limiteTipologia(cfg graduatoria.LimiteConfig, totale, residuo float64) floa
 	}
 }
 
-func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduatoria.RimborsoConfig) ([]graduatoria.RigaGraduatoria, float64) {
+func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduatoria.RimborsoConfig, verifica graduatoria.VerificaConfig) ([]graduatoria.RigaGraduatoria, float64) {
 	residuo := budget
 	var righe []graduatoria.RigaGraduatoria
 	for pos, rec := range lista {
@@ -433,6 +569,11 @@ func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduat
 			Posizione: pos + 1,
 			Istanza:   rec.ToIstanza(),
 			Ammessa:   true,
+		}
+		motivi := rec.FlagMotivi(verifica)
+		if len(motivi) > 0 {
+			riga.ConRiserva = true
+			riga.MotiviRiserva = motivi
 		}
 		netto := rec.FloatMap["corrispettivo_netto"]
 		if rimborso.Tipo == "lordo" {
