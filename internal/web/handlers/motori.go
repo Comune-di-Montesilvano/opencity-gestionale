@@ -829,6 +829,7 @@ func (h *MotoriHandler) PostImportBando(w http.ResponseWriter, r *http.Request) 
 		EngineConfig:          string(ecfgBytes),
 		Attivo:                true,
 		StatoMotore:           "bozza",
+		CreatedAt:             time.Now(),
 	}
 
 	newID, err := db.InsertBando(h.DB, newBando)
