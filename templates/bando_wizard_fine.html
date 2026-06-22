@@ -22,6 +22,17 @@
 <div class="wizard-layout">
   <div class="wizard-col-main">
 
+    <div class="wizard-nav">
+      {{if eq .Config.Modalita "fondi"}}
+      <a href="/bandi/{{.Bando.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
+      {{else}}
+      <a href="/bandi/{{.Bando.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+      {{end}}
+      <div class="wizard-nav-right">
+        <a href="/bandi" class="btn btn-secondary">Salva come bozza</a>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:1.5rem">
       <h3>Riepilogo configurazione</h3>
       <div class="detail-grid">
@@ -83,13 +94,7 @@
         <input type="text" name="nome" value="{{.Bando.Nome}}" class="form-control" required>
       </div>
       <div class="form-actions">
-        {{if eq .Config.Modalita "fondi"}}
-        <a href="/bandi/{{.Bando.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
-        {{else}}
-        <a href="/bandi/{{.Bando.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
-        {{end}}
         <button type="submit" class="btn btn-primary">Attiva bando ✓</button>
-        <a href="/bandi" class="btn btn-secondary">Salva come bozza</a>
       </div>
     </form>
 
