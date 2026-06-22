@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS bandi (
   engine_type   TEXT NOT NULL DEFAULT 'generic',
   engine_config   TEXT NOT NULL DEFAULT '{}',
   attivo          INTEGER NOT NULL DEFAULT 1,
-  stato_motore    TEXT NOT NULL DEFAULT 'bozza',
+  stato_bando    TEXT NOT NULL DEFAULT 'bozza',
   valori_superset TEXT NOT NULL DEFAULT '{}',
   created_at      TEXT NOT NULL
 );

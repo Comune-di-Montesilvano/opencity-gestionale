@@ -27,7 +27,7 @@ func InsertBando(db *sql.DB, b *Bando) (int64, error) {
 		stato = "bozza"
 	}
 	res, err := db.Exec(
-		`INSERT INTO bandi (service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, stato_motore, created_at)
+		`INSERT INTO bandi (service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, stato_bando, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ServiceID, b.Nome, b.BudgetTotale, b.ISEEMassimo, b.ScadenzaPresentazione,
 		b.EngineType, b.EngineConfig, boolToInt(b.Attivo), stato, b.CreatedAt.UTC().Format(time.RFC3339),
@@ -43,15 +43,15 @@ func InsertBando(db *sql.DB, b *Bando) (int64, error) {
 func ListBandi(db *sql.DB, stato string) ([]*Bando, error) {
 	if stato == "archiviato" {
 		return listBandiQuery(db,
-			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_motore,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE attivo=0 ORDER BY id DESC`)
+			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE attivo=0 ORDER BY id DESC`)
 	}
 	if stato != "" {
 		return listBandiQuery(db,
-			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_motore,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE stato_motore=? AND attivo=1 ORDER BY id DESC`,
+			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE stato_bando=? AND attivo=1 ORDER BY id DESC`,
 			stato)
 	}
 	return listBandiQuery(db,
-		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_motore,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi ORDER BY id DESC`)
+		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi ORDER BY id DESC`)
 }
 
 func listBandiQuery(db *sql.DB, q string, args ...any) ([]*Bando, error) {
@@ -73,7 +73,7 @@ func listBandiQuery(db *sql.DB, q string, args ...any) ([]*Bando, error) {
 
 func GetBando(db *sql.DB, id int64) (*Bando, error) {
 	row := db.QueryRow(
-		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_motore,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE id = ?`, id)
+		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE id = ?`, id)
 	b, err := scanBando(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("bando %d non trovato", id)
@@ -83,7 +83,7 @@ func GetBando(db *sql.DB, id int64) (*Bando, error) {
 
 func GetBandoByServiceID(db *sql.DB, serviceID string) (*Bando, error) {
 	row := db.QueryRow(
-		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_motore,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE service_id = ? AND attivo = 1`, serviceID)
+		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), created_at FROM bandi WHERE service_id = ? AND attivo = 1`, serviceID)
 	b, err := scanBando(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("bando per service_id %s non trovato", serviceID)
@@ -93,7 +93,7 @@ func GetBandoByServiceID(db *sql.DB, serviceID string) (*Bando, error) {
 
 func UpdateBando(db *sql.DB, b *Bando) error {
 	_, err := db.Exec(
-		`UPDATE bandi SET nome=?, budget_totale=?, isee_massimo=?, scadenza_presentazione=?, engine_type=?, engine_config=?, attivo=?, stato_motore=? WHERE id=?`,
+		`UPDATE bandi SET nome=?, budget_totale=?, isee_massimo=?, scadenza_presentazione=?, engine_type=?, engine_config=?, attivo=?, stato_bando=? WHERE id=?`,
 		b.Nome, b.BudgetTotale, b.ISEEMassimo, b.ScadenzaPresentazione, b.EngineType, b.EngineConfig, boolToInt(b.Attivo), b.StatoBando, b.ID,
 	)
 	return err
@@ -105,12 +105,12 @@ func UpdateEngineConfig(db *sql.DB, id int64, engineConfig string) error {
 }
 
 func AttivaMotore(db *sql.DB, id int64) error {
-	_, err := db.Exec(`UPDATE bandi SET stato_motore='attivo' WHERE id=?`, id)
+	_, err := db.Exec(`UPDATE bandi SET stato_bando='attivo' WHERE id=?`, id)
 	return err
 }
 
 func ArchiviaMotore(db *sql.DB, id int64) error {
-	_, err := db.Exec(`UPDATE bandi SET attivo=0, stato_motore='archiviato' WHERE id=?`, id)
+	_, err := db.Exec(`UPDATE bandi SET attivo=0, stato_bando='archiviato' WHERE id=?`, id)
 	return err
 }
 
@@ -145,7 +145,7 @@ func CountBandi(db *sql.DB) (int, error) {
 }
 
 func CountBandiPerStato(db *sql.DB) (map[string]int, error) {
-	rows, err := db.Query(`SELECT COALESCE(stato_motore,'bozza'), COUNT(*) FROM bandi GROUP BY stato_motore`)
+	rows, err := db.Query(`SELECT COALESCE(stato_bando,'bozza'), COUNT(*) FROM bandi GROUP BY stato_bando`)
 	if err != nil {
 		return nil, err
 	}
