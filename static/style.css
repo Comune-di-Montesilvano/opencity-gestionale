@@ -33,6 +33,8 @@ a:hover { text-decoration: underline; }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.15); }
 .form-narrow { max-width: 520px; }
 .form-actions { display: flex; gap: .75rem; margin-top: 1.25rem; }
+.wizard-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: .75rem; border-bottom: 1px solid #e2e8f0; }
+.wizard-nav-right { display: flex; gap: .5rem; }
 .filter-bar { display: flex; gap: .5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
 .filter-bar input, .filter-bar select { width: auto; }
 
