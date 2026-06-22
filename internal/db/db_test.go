@@ -110,7 +110,7 @@ func TestListBandi(t *testing.T) {
 		})
 	}
 
-	bandi, err := db.ListBandi(conn)
+	bandi, err := db.ListBandi(conn, "")
 	if err != nil {
 		t.Fatalf("ListBandi: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestCountBandiPerStato(t *testing.T) {
 			EngineType:   "generic",
 			EngineConfig: "{}",
 			Attivo:       stato != "archiviato",
-			StatoMotore:  stato,
+			StatoBando:  stato,
 			CreatedAt:    time.Now(),
 		}
 		db.InsertBando(conn, b)
