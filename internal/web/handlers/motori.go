@@ -704,6 +704,68 @@ func (h *MotoriHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// BandoExport è il formato JSON per export/import di un bando.
+type BandoExport struct {
+	Version               string                   `json:"version"`
+	ExportedAt            string                   `json:"exported_at"`
+	Nome                  string                   `json:"nome"`
+	ServiceID             string                   `json:"service_id"`
+	BudgetTotale          float64                  `json:"budget_totale"`
+	ISEEMassimo           float64                  `json:"isee_massimo"`
+	ScadenzaPresentazione string                   `json:"scadenza_presentazione"`
+	EngineType            string                   `json:"engine_type"`
+	EngineConfig          graduatoria.EngineConfig `json:"engine_config"`
+}
+
+// GetExportBando scarica la configurazione completa di un bando come JSON.
+func (h *MotoriHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	bandoID := bandoIDFromPath(r)
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
+	exp := BandoExport{
+		Version:               "1",
+		ExportedAt:            time.Now().UTC().Format(time.RFC3339),
+		Nome:                  bando.Nome,
+		ServiceID:             bando.ServiceID,
+		BudgetTotale:          bando.BudgetTotale,
+		ISEEMassimo:           bando.ISEEMassimo,
+		ScadenzaPresentazione: bando.ScadenzaPresentazione,
+		EngineType:            bando.EngineType,
+		EngineConfig:          ecfg,
+	}
+
+	out, err := json.MarshalIndent(exp, "", "  ")
+	if err != nil {
+		http.Error(w, "Errore serializzazione", http.StatusInternalServerError)
+		return
+	}
+
+	// Sanitizza nome per filename (sostituisce caratteri non-safe)
+	safeName := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '_'
+	}, bando.Nome)
+	filename := fmt.Sprintf("bando_%s.json", safeName)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Write(out)
+}
+
 // --- CRUD actions ---
 
 func (h *MotoriHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {

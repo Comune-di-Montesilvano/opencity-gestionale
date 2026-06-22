@@ -23,6 +23,7 @@
     <form method="POST" action="/motori/{{.Motore.ID}}/duplica" style="display:inline">
       <button type="submit" class="btn btn-sm">Duplica</button>
     </form>
+    <a href="/motori/{{.Motore.ID}}/export" class="btn btn-secondary btn-sm">↓ Esporta JSON</a>
     {{end}}
   </div>
 </div>
