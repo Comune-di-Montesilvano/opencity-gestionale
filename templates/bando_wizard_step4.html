@@ -20,6 +20,12 @@
 </div>
 
 <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/4">
+  <div class="wizard-nav">
+    <a href="/bandi/{{.Bando.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
+    <div class="wizard-nav-right">
+      <button type="submit" class="btn btn-primary">Salva e continua →</button>
+    </div>
+  </div>
   <h2>Filtri di ammissibilità</h2>
   <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria. Usa il campo <strong>GR</strong> per raggruppare filtri in OR: stesso numero = almeno uno deve passare; 0 = AND indipendente.</p>
 
@@ -81,11 +87,6 @@
   </div>
 
   <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltro()" style="margin-top:.5rem">+ Aggiungi filtro</button>
-
-  <div class="form-actions" style="margin-top:1.5rem">
-    <a href="/bandi/{{.Bando.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
-    <button type="submit" class="btn btn-primary">Salva e continua →</button>
-  </div>
 
   <hr style="margin:2rem 0">
 
@@ -191,6 +192,11 @@
   {{end}}
   </div>
   <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltroFlag()" style="margin-top:.4rem">+ Aggiungi criterio istruttoria</button>
+
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a href="/bandi/{{.Bando.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
+    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+  </div>
 </form>
 
 <template id="filtro-tmpl">
