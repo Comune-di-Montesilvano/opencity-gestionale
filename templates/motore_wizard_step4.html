@@ -19,7 +19,7 @@
   <span class="wizard-step">Fine</span>
 </div>
 
-<form method="POST" action="/motori/{{.Motore.ID}}/wizard/4">
+<form method="POST" action="/bandi/{{.Motore.ID}}/wizard/4">
   <h2>Filtri di ammissibilità</h2>
   <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria. Usa il campo <strong>GR</strong> per raggruppare filtri in OR: stesso numero = almeno uno deve passare; 0 = AND indipendente.</p>
 
@@ -83,7 +83,7 @@
   <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiFiltro()" style="margin-top:.5rem">+ Aggiungi filtro</button>
 
   <div class="form-actions" style="margin-top:1.5rem">
-    <a href="/motori/{{.Motore.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
+    <a href="/bandi/{{.Motore.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
     <button type="submit" class="btn btn-primary">Salva e continua →</button>
   </div>
 

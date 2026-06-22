@@ -8,7 +8,7 @@
 <div class="page-header">
   <h1>Istruttoria</h1>
   <span class="text-muted">{{.Bando.Nome}}</span>
-  <a href="/motori/{{.Bando.ID}}" class="btn btn-secondary btn-sm">← Motore</a>
+  <a href="/bandi/{{.Bando.ID}}" class="btn btn-secondary btn-sm">← Motore</a>
 </div>
 
 {{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
@@ -48,7 +48,7 @@
 {{$appStatus := .AppStatusFilter}}
 
 <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-  <form method="POST" action="/motori/{{.Bando.ID}}/istruttoria/scansiona" style="display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+  <form method="POST" action="/bandi/{{.Bando.ID}}/istruttoria/scansiona" style="display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap">
     {{if .StatiApp}}
     <div style="display:flex;gap:.5rem;align-items:center;font-size:.85rem;flex-wrap:wrap">
       <span style="color:#6b7280">Stati:</span>
@@ -64,17 +64,17 @@
     </button>
   </form>
   <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-    <a href="/motori/{{.Bando.ID}}/istruttoria{{if $appStatus}}?app_status={{$appStatus}}{{end}}"
+    <a href="/bandi/{{.Bando.ID}}/istruttoria{{if $appStatus}}?app_status={{$appStatus}}{{end}}"
        class="btn btn-sm {{if eq $stato ""}}btn-primary{{else}}btn-secondary{{end}}">Tutte</a>
-    <a href="/motori/{{.Bando.ID}}/istruttoria?stato=da_verificare{{if $appStatus}}&app_status={{$appStatus}}{{end}}"
+    <a href="/bandi/{{.Bando.ID}}/istruttoria?stato=da_verificare{{if $appStatus}}&app_status={{$appStatus}}{{end}}"
        class="btn btn-sm {{if eq $stato "da_verificare"}}btn-primary{{else}}btn-secondary{{end}}">Da verificare</a>
-    <a href="/motori/{{.Bando.ID}}/istruttoria?stato=approvata{{if $appStatus}}&app_status={{$appStatus}}{{end}}"
+    <a href="/bandi/{{.Bando.ID}}/istruttoria?stato=approvata{{if $appStatus}}&app_status={{$appStatus}}{{end}}"
        class="btn btn-sm {{if eq $stato "approvata"}}btn-primary{{else}}btn-secondary{{end}}">Approvate</a>
-    <a href="/motori/{{.Bando.ID}}/istruttoria?stato=esclusa{{if $appStatus}}&app_status={{$appStatus}}{{end}}"
+    <a href="/bandi/{{.Bando.ID}}/istruttoria?stato=esclusa{{if $appStatus}}&app_status={{$appStatus}}{{end}}"
        class="btn btn-sm {{if eq $stato "esclusa"}}btn-primary{{else}}btn-secondary{{end}}">Escluse</a>
   </div>
   {{if .StatiApp}}
-  <form method="GET" action="/motori/{{.Bando.ID}}/istruttoria" style="display:inline-flex;align-items:center;gap:.4rem">
+  <form method="GET" action="/bandi/{{.Bando.ID}}/istruttoria" style="display:inline-flex;align-items:center;gap:.4rem">
     {{if $stato}}<input type="hidden" name="stato" value="{{$stato}}">{{end}}
     <select name="app_status" onchange="this.form.submit()" class="form-control form-control-sm" style="width:auto">
       <option value="">Tutti gli stati</option>
@@ -87,7 +87,7 @@
 </div>
 
 {{if .Istruttorie}}
-<form method="POST" action="/motori/{{.Bando.ID}}/istruttoria/batch" id="batch-form">
+<form method="POST" action="/bandi/{{.Bando.ID}}/istruttoria/batch" id="batch-form">
 <table class="table">
   <thead>
     <tr>
@@ -135,7 +135,7 @@
                    placeholder="inserisci valore"
                    class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
-                   hx-post="/motori/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
+                   hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
                    hx-vals='{"campo": "{{.Campo}}"}'
                    hx-include="this"
                    hx-trigger="change"
@@ -163,7 +163,7 @@
                 class="form-control form-control-sm" style="font-size:.8rem;width:160px;resize:vertical"
                 placeholder="nota…"
                 {{if ne .Stato "da_verificare"}}disabled{{end}}
-                hx-post="/motori/{{$.Bando.ID}}/istruttoria/{{.PraticaID}}/nota"
+                hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{.PraticaID}}/nota"
                 hx-include="this"
                 hx-trigger="change"
                 hx-swap="none"
@@ -179,7 +179,7 @@
         onclick="azioneRapida({{.ID}}, 'esclusa')">✗ Escludi</button>
       {{else}}
       <button type="submit" class="btn btn-sm btn-secondary"
-        formaction="/motori/{{$.Bando.ID}}/istruttoria/{{.PraticaID}}/riapri">↩ Riapri</button>
+        formaction="/bandi/{{$.Bando.ID}}/istruttoria/{{.PraticaID}}/riapri">↩ Riapri</button>
       {{end}}
     </td>
   </tr>
@@ -218,7 +218,7 @@ function toggleAll(cb) {
 function azioneRapida(id, stato) {
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = `/motori/{{.Bando.ID}}/istruttoria/batch`;
+  form.action = `/bandi/{{.Bando.ID}}/istruttoria/batch`;
   const inp = document.createElement('input');
   inp.type = 'hidden'; inp.name = 'ids'; inp.value = id;
   const st = document.createElement('input');

@@ -7,7 +7,7 @@
 {{define "content"}}
 <div class="page-header">
   <h1>{{.Motore.Nome}}</h1>
-  <a href="/motori" class="btn btn-secondary">Lista motori</a>
+  <a href="/bandi" class="btn btn-secondary">Lista motori</a>
 </div>
 
 <div class="wizard-steps">
@@ -20,7 +20,7 @@
   <span class="wizard-step">Fine</span>
 </div>
 
-<form method="POST" action="/motori/{{.Motore.ID}}/wizard/2" style="max-width:740px">
+<form method="POST" action="/bandi/{{.Motore.ID}}/wizard/2" style="max-width:740px">
   <h2>Tipo di bando</h2>
   <p class="text-muted">Seleziona come l'engine assegna le risorse. Determina quali step del wizard saranno attivi.</p>
 

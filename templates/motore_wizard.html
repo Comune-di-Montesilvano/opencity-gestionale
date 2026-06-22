@@ -7,7 +7,7 @@
 {{define "content"}}
 <div class="page-header">
   <h1>Nuovo motore di calcolo</h1>
-  <a href="/motori" class="btn btn-secondary">Annulla</a>
+  <a href="/bandi" class="btn btn-secondary">Annulla</a>
 </div>
 
 <div class="wizard-steps">
@@ -23,7 +23,7 @@
   <h2>Connetti al servizio OpenCity</h2>
   <p class="text-muted">Carica la lista dei servizi disponibili con le tue credenziali OpenCity.</p>
   <button class="btn btn-primary"
-    hx-post="/motori/wizard/connetti"
+    hx-post="/bandi/wizard/connetti"
     hx-target="#servizi-result"
     hx-swap="innerHTML"
     hx-indicator="#connetti-spinner">

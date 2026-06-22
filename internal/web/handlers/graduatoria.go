@@ -63,7 +63,7 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 	if ecfg.Verifica.Attiva {
 		pending, _ := db.CountPending(h.DB, int(bandoID))
 		if pending > 0 {
-			http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Istruttoria+incompleta:+%d+domande+da+verificare&flashType=error", bandoID, pending), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Istruttoria+incompleta:+%d+domande+da+verificare&flashType=error", bandoID, pending), http.StatusSeeOther)
 			return
 		}
 		escluse, _ := db.ListEscluse(h.DB, int(bandoID))
@@ -128,7 +128,7 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 		Esito:     "ok",
 	})
 
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d", bandoID, runID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d", bandoID, runID), http.StatusSeeOther)
 }
 
 // GetRun — visualizza dettaglio run (indice annualità)
@@ -442,7 +442,7 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if run.Stato != "bozza" {
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d?flash=Già+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Già+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
 		return
 	}
 	if err := db.PubblicaRun(h.DB, runID); err != nil {
@@ -456,7 +456,7 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 		RunID:     runID,
 		Esito:     "ok",
 	})
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
 }
 
 // GetExportIBAN — CSV ammesse con IBAN per ufficio ragioneria (ordini bonifici).
