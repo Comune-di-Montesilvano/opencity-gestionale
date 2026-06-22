@@ -27,8 +27,11 @@ func Login(baseURL, username, password string) (string, error) {
 		return "", fmt.Errorf("auth request: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusUnauthorized {
-		return "", fmt.Errorf("credenziali non valide")
+	if err := parseErrorResponse(resp); err != nil {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return "", fmt.Errorf("credenziali non valide")
+		}
+		return "", err
 	}
 	var result struct {
 		Token string `json:"token"`
@@ -78,6 +81,49 @@ func (c *Client) post(path string, body any) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
+func parseErrorResponse(resp *http.Response) error {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	limitReader := http.MaxBytesReader(nil, resp.Body, 1024)
+	var bodyBytes bytes.Buffer
+	_, _ = bodyBytes.ReadFrom(limitReader)
+
+	var errObj struct {
+		Error       string `json:"error"`
+		Message     string `json:"message"`
+		Detail      string `json:"detail"`
+		Description string `json:"description"`
+	}
+
+	if err := json.Unmarshal(bodyBytes.Bytes(), &errObj); err == nil {
+		if errObj.Error != "" {
+			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, errObj.Error)
+		}
+		if errObj.Message != "" {
+			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, errObj.Message)
+		}
+		if errObj.Detail != "" {
+			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, errObj.Detail)
+		}
+		if errObj.Description != "" {
+			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, errObj.Description)
+		}
+	}
+
+	raw := bodyBytes.String()
+	if len(raw) > 200 {
+		raw = raw[:200] + "..."
+	}
+	if raw != "" {
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, raw)
+	}
+
+	return fmt.Errorf("HTTP %d", resp.StatusCode)
+}
+
 type PagedResponse struct {
 	Meta struct {
 		Count int `json:"count"`
@@ -99,6 +145,9 @@ func (c *Client) FetchAllApplications(serviceID string, onProgress func(fetched,
 		}
 		resp, err := c.get("/lang/api/applications", params)
 		if err != nil {
+			return nil, fmt.Errorf("fetch offset %d: %w", offset, err)
+		}
+		if err := parseErrorResponse(resp); err != nil {
 			return nil, fmt.Errorf("fetch offset %d: %w", offset, err)
 		}
 		var page PagedResponse
@@ -133,6 +182,9 @@ func (c *Client) FetchSampleApplication(serviceID string) (*Application, error) 
 		return nil, fmt.Errorf("fetch sample: %w", err)
 	}
 	defer resp.Body.Close()
+	if err := parseErrorResponse(resp); err != nil {
+		return nil, fmt.Errorf("fetch sample: %w", err)
+	}
 	var page PagedResponse
 	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
 		return nil, fmt.Errorf("fetch sample decode: %w", err)
@@ -161,6 +213,9 @@ func (c *Client) FetchApplicationAtOffset(serviceID string, offset int) (*Applic
 		return nil, 0, fmt.Errorf("fetch at offset %d: %w", offset, err)
 	}
 	defer resp.Body.Close()
+	if err := parseErrorResponse(resp); err != nil {
+		return nil, 0, fmt.Errorf("fetch at offset %d: %w", offset, err)
+	}
 	var page PagedResponse
 	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
 		return nil, 0, fmt.Errorf("decode at offset %d: %w", offset, err)
@@ -183,11 +238,11 @@ func (c *Client) FetchApplication(id string) (*Application, error) {
 		return nil, fmt.Errorf("fetch application %s: %w", id, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("istanza %s non trovata", id)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("fetch application %s: HTTP %d", id, resp.StatusCode)
+	if err := parseErrorResponse(resp); err != nil {
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("istanza %s non trovata", id)
+		}
+		return nil, fmt.Errorf("fetch application %s: %w", id, err)
 	}
 	var app Application
 	if err := json.NewDecoder(resp.Body).Decode(&app); err != nil {
@@ -214,8 +269,8 @@ func (c *Client) transition(applicationID, action, message string) error {
 		return fmt.Errorf("transition %s %s: %w", action, applicationID, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("transition %s %s: HTTP %d", action, applicationID, resp.StatusCode)
+	if err := parseErrorResponse(resp); err != nil {
+		return fmt.Errorf("transition %s %s: %w", action, applicationID, err)
 	}
 	return nil
 }
@@ -238,8 +293,11 @@ func (c *Client) GetUser(userID string) (*OperatorUser, error) {
 		return nil, fmt.Errorf("get user %s: %w", userID, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("get user: accesso negato")
+	if err := parseErrorResponse(resp); err != nil {
+		if resp.StatusCode == http.StatusForbidden {
+			return nil, fmt.Errorf("get user: accesso negato")
+		}
+		return nil, fmt.Errorf("get user %s: %w", userID, err)
 	}
 	var u OperatorUser
 	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
@@ -255,6 +313,9 @@ func (c *Client) FetchServices() ([]json.RawMessage, error) {
 		return nil, fmt.Errorf("fetch services: %w", err)
 	}
 	defer resp.Body.Close()
+	if err := parseErrorResponse(resp); err != nil {
+		return nil, fmt.Errorf("fetch services: %w", err)
+	}
 	var result []json.RawMessage
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("fetch services decode: %w", err)

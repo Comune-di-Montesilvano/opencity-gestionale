@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -40,7 +41,11 @@ func (h *AuthHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 	jwt, err := opencity.Login(h.BaseURL, username, password)
 	if err != nil {
 		middleware.RecordLoginFailure(r)
-		http.Redirect(w, r, "/login?error=Credenziali+non+valide", http.StatusSeeOther)
+		errMsg := "Credenziali+non+valide"
+		if err.Error() != "credenziali non valide" {
+			errMsg = url.QueryEscape(err.Error())
+		}
+		http.Redirect(w, r, "/login?error="+errMsg, http.StatusSeeOther)
 		return
 	}
 
