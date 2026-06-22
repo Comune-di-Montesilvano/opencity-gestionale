@@ -5,7 +5,18 @@
 {{define "content"}}
 <div class="page-header">
   <h1>Bandi</h1>
-  <a href="/motori/nuovo" class="btn btn-primary">+ Nuovo bando</a>
+  <div style="display:inline-flex; align-items:center; gap:.5rem">
+    <a href="/motori/nuovo" class="btn btn-primary">+ Nuovo bando</a>
+    <form method="POST" action="/motori/import" enctype="multipart/form-data"
+          style="display:inline-flex; align-items:center; gap:.5rem">
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer; margin:0">
+        ↑ Importa bando
+        <input type="file" name="bando_json" accept=".json" required
+               style="display:none"
+               onchange="this.closest('form').submit()">
+      </label>
+    </form>
+  </div>
 </div>
 
 <div class="stats-row">

@@ -68,6 +68,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	mux.Handle("POST /motori/{id}/duplica", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostDuplica))))
 	mux.Handle("POST /motori/{id}/archivia", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostArchivia))))
 	mux.Handle("GET /motori/{id}/export", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.GetExportBando))))
+	mux.Handle("POST /motori/import", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostImportBando))))
 	mux.Handle("POST /motori/{id}/rinomina", authMW(middleware.RequireAdmin(http.HandlerFunc(motori.PostRinomina))))
 
 	// Graduatorie

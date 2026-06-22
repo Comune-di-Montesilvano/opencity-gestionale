@@ -771,6 +771,75 @@ func (h *MotoriHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
+// PostImportBando carica un file JSON esportato e crea un nuovo bando in stato bozza.
+func (h *MotoriHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	// Limite 1 MB per il file
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		http.Redirect(w, r, "/?flash=File+troppo+grande+o+form+non+valido&flashType=error", http.StatusSeeOther)
+		return
+	}
+
+	file, _, err := r.FormFile("bando_json")
+	if err != nil {
+		http.Redirect(w, r, "/?flash=File+non+fornito&flashType=error", http.StatusSeeOther)
+		return
+	}
+	defer file.Close()
+
+	var exp BandoExport
+	if err := json.NewDecoder(file).Decode(&exp); err != nil {
+		http.Redirect(w, r, "/?flash=JSON+non+valido:+"+url.QueryEscape(err.Error())+"&flashType=error", http.StatusSeeOther)
+		return
+	}
+
+	if exp.Version != "1" {
+		http.Redirect(w, r, "/?flash=Versione+export+non+supportata&flashType=error", http.StatusSeeOther)
+		return
+	}
+	if exp.ServiceID == "" || exp.EngineType == "" {
+		http.Redirect(w, r, "/?flash=File+export+non+valido+(service_id+o+engine_type+mancante)&flashType=error", http.StatusSeeOther)
+		return
+	}
+
+	ecfgBytes, err := json.Marshal(exp.EngineConfig)
+	if err != nil {
+		http.Redirect(w, r, "/?flash=Errore+serializzazione+config&flashType=error", http.StatusSeeOther)
+		return
+	}
+
+	nome := exp.Nome
+	if nome == "" {
+		nome = "Bando importato"
+	}
+
+	newBando := &db.Bando{
+		ServiceID:             exp.ServiceID,
+		Nome:                  nome + " (importato)",
+		BudgetTotale:          exp.BudgetTotale,
+		ISEEMassimo:           exp.ISEEMassimo,
+		ScadenzaPresentazione: exp.ScadenzaPresentazione,
+		EngineType:            exp.EngineType,
+		EngineConfig:          string(ecfgBytes),
+		Attivo:                true,
+		StatoMotore:           "bozza",
+	}
+
+	newID, err := db.InsertBando(h.DB, newBando)
+	if err != nil {
+		http.Redirect(w, r, "/?flash=Errore+creazione+bando:+"+url.QueryEscape(err.Error())+"&flashType=error", http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/2?flash=Bando+importato+con+successo&flashType=success", newID), http.StatusSeeOther)
+}
+
 // --- CRUD actions ---
 
 func (h *MotoriHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {
