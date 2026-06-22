@@ -28,26 +28,26 @@ func (h *DashboardHandler) renderAdmin(w http.ResponseWriter, r *http.Request, o
 	if stato == "" {
 		stato = "attivo"
 	}
-	motori, _ := db.ListMotori(h.DB, stato)
+	motori, _ := db.ListBandi(h.DB, stato)
 	counts, _ := db.CountBandiPerStato(h.DB)
 	renderTemplate(w, "dashboard_admin.html", map[string]any{
 		"Op":     op,
-		"Motori": motori,
+		"Bandi": motori,
 		"Stato":  stato,
 		"Counts": counts,
 	})
 }
 
 func (h *DashboardHandler) renderOperatore(w http.ResponseWriter, _ *http.Request, op *middleware.OperatorCtx) {
-	motori, _ := db.ListMotori(h.DB, "attivo")
+	motori, _ := db.ListBandi(h.DB, "attivo")
 
-	type motoreConRun struct {
+	type bandoConRun struct {
 		Motore           *db.Bando
 		UltimaRun        *db.GraduatoriaRun
 		IstruttoriaStats db.IstruttoriaStats
 		VerificaAttiva   bool
 	}
-	var items []motoreConRun
+	var items []bandoConRun
 	for _, m := range motori {
 		if !op.CanAccessService(m.ServiceID) {
 			continue
@@ -63,7 +63,7 @@ func (h *DashboardHandler) renderOperatore(w http.ResponseWriter, _ *http.Reques
 		if ecfg.Verifica.Attiva {
 			istStats, _ = db.GetIstruttoriaStats(h.DB, int(m.ID))
 		}
-		items = append(items, motoreConRun{
+		items = append(items, bandoConRun{
 			Motore:           m,
 			UltimaRun:        ultima,
 			IstruttoriaStats: istStats,

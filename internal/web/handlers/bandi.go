@@ -18,7 +18,7 @@ import (
 	"opencity-gestionale/internal/web/middleware"
 )
 
-type MotoriHandler struct {
+type BandiHandler struct {
 	DB      *sql.DB
 	BaseURL string
 }
@@ -37,17 +37,17 @@ type ParametroMappato struct {
 
 // --- Lista motori ---
 
-func (h *MotoriHandler) GetLista(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetLista(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	stato := r.URL.Query().Get("stato")
 	if stato == "" {
 		stato = "attivo"
 	}
-	motori, _ := db.ListMotori(h.DB, stato)
+	motori, _ := db.ListBandi(h.DB, stato)
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "motori.html", map[string]any{
 		"Op":        op,
-		"Motori":    motori,
+		"Bandi":    motori,
 		"Stato":     stato,
 		"Flash":     flash,
 		"FlashType": flashType,
@@ -56,7 +56,7 @@ func (h *MotoriHandler) GetLista(w http.ResponseWriter, r *http.Request) {
 
 // --- Wizard step 1: connetti servizio ---
 
-func (h *MotoriHandler) GetNuovo(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetNuovo(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	renderTemplate(w, "motore_wizard.html", map[string]any{
 		"Op":      op,
@@ -65,7 +65,7 @@ func (h *MotoriHandler) GetNuovo(w http.ResponseWriter, r *http.Request) {
 }
 
 // PostConnettiServizi (HTMX) — fetch servizi da OpenCity e mostra form selezione.
-func (h *MotoriHandler) PostConnettiServizi(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostConnettiServizi(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	rawServizi, err := client.FetchServices()
@@ -98,7 +98,7 @@ func (h *MotoriHandler) PostConnettiServizi(w http.ResponseWriter, r *http.Reque
 }
 
 // PostCreaMotore — crea bando bozza dal servizio selezionato, redirect a step 2.
-func (h *MotoriHandler) PostCreaMotore(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostCreaBando(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Form non valido", http.StatusBadRequest)
 		return
@@ -117,7 +117,7 @@ func (h *MotoriHandler) PostCreaMotore(w http.ResponseWriter, r *http.Request) {
 		EngineType:            "generic",
 		EngineConfig:          "{}",
 		Attivo:                true,
-		StatoMotore:           "bozza",
+		StatoBando:           "bozza",
 		CreatedAt:             time.Now(),
 	}
 	if bando.Nome == "" {
@@ -138,7 +138,7 @@ func motoreIDFromPath(r *http.Request) int64 {
 	return id
 }
 
-func loadMotoreConConfig(h *MotoriHandler, r *http.Request) (*db.Bando, graduatoria.EngineConfig, error) {
+func loadBandoConConfig(h *BandiHandler, r *http.Request) (*db.Bando, graduatoria.EngineConfig, error) {
 	bando, err := db.GetBando(h.DB, motoreIDFromPath(r))
 	if err != nil {
 		return nil, graduatoria.EngineConfig{}, err
@@ -151,7 +151,7 @@ func loadMotoreConConfig(h *MotoriHandler, r *http.Request) (*db.Bando, graduato
 	return bando, cfg, nil
 }
 
-func saveEngineConfig(h *MotoriHandler, bandoID int64, cfg graduatoria.EngineConfig) error {
+func saveEngineConfig(h *BandiHandler, bandoID int64, cfg graduatoria.EngineConfig) error {
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return err
@@ -168,10 +168,10 @@ func campiMappati(cfg graduatoria.EngineConfig) []string {
 }
 
 // GetWizardStep — visualizza un passo del wizard (GET).
-func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	step := r.PathValue("step")
-	bando, cfg, err := loadMotoreConConfig(h, r)
+	bando, cfg, err := loadBandoConConfig(h, r)
 	if err != nil {
 		notFound(w, r)
 		return
@@ -181,7 +181,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 	case "2":
 		renderTemplate(w, "motore_wizard_step2.html", map[string]any{
 			"Op":       op,
-			"Motore":   bando,
+			"Bando":   bando,
 			"Modalita": cfg.Modalita,
 		})
 
@@ -251,7 +251,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 		renderTemplate(w, "motore_wizard_step3.html", map[string]any{
 			"Op":               op,
-			"Motore":           bando,
+			"Bando":           bando,
 			"ParametriMappati": params,
 			"CampiFlat":        flatFields,
 			"ErrCampione":      errCampione,
@@ -296,7 +296,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		}
 		renderTemplate(w, "motore_wizard_step4.html", map[string]any{
 			"Op":               op,
-			"Motore":           bando,
+			"Bando":           bando,
 			"Filtri":           cfg.Filtri,
 			"Verifica":         cfg.Verifica,
 			"CampiMappati":     campiMappati(cfg),
@@ -312,7 +312,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		mappingJSON, _ := json.Marshal(cfg.Mapping)
 		renderTemplate(w, "motore_wizard_step5.html", map[string]any{
 			"Op":             op,
-			"Motore":         bando,
+			"Bando":         bando,
 			"Modalita":       cfg.Modalita,
 			"Tipologie":      cfg.Tipologie,
 			"Ordinamento":    cfg.Ordinamento,
@@ -330,7 +330,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		}
 		renderTemplate(w, "motore_wizard_step6.html", map[string]any{
 			"Op":           op,
-			"Motore":       bando,
+			"Bando":       bando,
 			"Rimborso":     cfg.Rimborso,
 			"CampiMappati": campiMappati(cfg),
 		})
@@ -338,7 +338,7 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 	case "fine":
 		renderTemplate(w, "motore_wizard_fine.html", map[string]any{
 			"Op":     op,
-			"Motore": bando,
+			"Bando": bando,
 			"Config": cfg,
 		})
 
@@ -348,9 +348,9 @@ func (h *MotoriHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 }
 
 // PostWizardStep — salva un passo del wizard e procede al successivo (POST).
-func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 	step := r.PathValue("step")
-	bando, cfg, err := loadMotoreConConfig(h, r)
+	bando, cfg, err := loadBandoConConfig(h, r)
 	if err != nil {
 		notFound(w, r)
 		return
@@ -605,9 +605,9 @@ func (h *MotoriHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 }
 
 // PostTestEngine (HTMX) — esegue il calcolo senza salvare e restituisce preview.
-func (h *MotoriHandler) PostTestEngine(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostTestEngine(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
-	bando, cfg, err := loadMotoreConConfig(h, r)
+	bando, cfg, err := loadBandoConConfig(h, r)
 	if err != nil {
 		renderTemplate(w, "motore_wizard_test.html", map[string]any{"Errore": err.Error()})
 		return
@@ -656,7 +656,7 @@ func (h *MotoriHandler) PostTestEngine(w http.ResponseWriter, r *http.Request) {
 }
 
 // PostAttivaMotore — imposta stato_motore='attivo', redirect a dettaglio.
-func (h *MotoriHandler) PostAttivaMotore(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostAttivaBando(w http.ResponseWriter, r *http.Request) {
 	id := motoreIDFromPath(r)
 	if err := r.ParseForm(); err == nil {
 		if nome := strings.TrimSpace(r.FormValue("nome")); nome != "" {
@@ -676,7 +676,7 @@ func (h *MotoriHandler) PostAttivaMotore(w http.ResponseWriter, r *http.Request)
 
 // --- Dettaglio motore ---
 
-func (h *MotoriHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	id := motoreIDFromPath(r)
 	bando, err := db.GetBando(h.DB, id)
@@ -695,7 +695,7 @@ func (h *MotoriHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "motore_dettaglio.html", map[string]any{
 		"Op":               op,
-		"Motore":           bando,
+		"Bando":           bando,
 		"Runs":             runs,
 		"Config":           ecfg,
 		"IstruttoriaStats": istrStats,
@@ -718,7 +718,7 @@ type BandoExport struct {
 }
 
 // GetExportBando scarica la configurazione completa di un bando come JSON.
-func (h *MotoriHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	if !op.IsAdmin() {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
@@ -772,7 +772,7 @@ func (h *MotoriHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
 }
 
 // PostImportBando carica un file JSON esportato e crea un nuovo bando in stato bozza.
-func (h *MotoriHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	if !op.IsAdmin() {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
@@ -828,7 +828,7 @@ func (h *MotoriHandler) PostImportBando(w http.ResponseWriter, r *http.Request) 
 		EngineType:            exp.EngineType,
 		EngineConfig:          string(ecfgBytes),
 		Attivo:                true,
-		StatoMotore:           "bozza",
+		StatoBando:           "bozza",
 		CreatedAt:             time.Now(),
 	}
 
@@ -843,7 +843,7 @@ func (h *MotoriHandler) PostImportBando(w http.ResponseWriter, r *http.Request) 
 
 // --- CRUD actions ---
 
-func (h *MotoriHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {
 	id := motoreIDFromPath(r)
 	newID, err := db.DuplicaBando(h.DB, id)
 	if err != nil {
@@ -853,7 +853,7 @@ func (h *MotoriHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/2?flash=Motore+duplicato,+configurazione+copiata&flashType=success", newID), http.StatusSeeOther)
 }
 
-func (h *MotoriHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
 	id := motoreIDFromPath(r)
 	if err := db.ArchiviaMotore(h.DB, id); err != nil {
 		http.Error(w, "Errore archiviazione: "+err.Error(), http.StatusInternalServerError)
@@ -862,7 +862,7 @@ func (h *MotoriHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/motori?flash=Motore+archiviato&flashType=success", http.StatusSeeOther)
 }
 
-func (h *MotoriHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
 	id := motoreIDFromPath(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Form non valido", http.StatusBadRequest)
@@ -891,7 +891,7 @@ func (h *MotoriHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
 // PostBuildSuperset scarica tutte le istanze del servizio e raccoglie i valori unici
 // di ogni sub-campo degli array trovati nel payload. Salva in bandi.valori_superset.
 // POST /motori/{id}/wizard/superset
-func (h *MotoriHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	bando, err := db.GetBando(h.DB, bandoIDFromPath(r))
 	if err != nil {
@@ -1023,9 +1023,9 @@ func (h *MotoriHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request
 // GetStatisticheField aggrega i valori di un campo mappato su tutte le istanze del servizio.
 // Per campi stringa/testo: valori unici con conteggio. Per numerici: somma + conteggio elementi.
 // GET /motori/{id}/api/statistiche-campo?campo=tipo
-func (h *MotoriHandler) GetStatisticheField(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetStatisticheField(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
-	bando, cfg, err := loadMotoreConConfig(h, r)
+	bando, cfg, err := loadBandoConConfig(h, r)
 	if err != nil {
 		http.Error(w, `{"errore":"motore non trovato"}`, http.StatusNotFound)
 		return
@@ -1201,9 +1201,9 @@ func (h *MotoriHandler) GetStatisticheField(w http.ResponseWriter, r *http.Reque
 // aggregati su tutte le istanze del servizio. Usato dal wizard step 3 per popolare
 // il datalist del builder array.
 // GET /motori/{id}/api/valori-campo?array=anni&field=tiporichiesta
-func (h *MotoriHandler) GetValoriCampo(w http.ResponseWriter, r *http.Request) {
+func (h *BandiHandler) GetValoriCampo(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
-	bando, _, err := loadMotoreConConfig(h, r)
+	bando, _, err := loadBandoConConfig(h, r)
 	if err != nil {
 		http.Error(w, `{"errore":"motore non trovato"}`, http.StatusNotFound)
 		return
