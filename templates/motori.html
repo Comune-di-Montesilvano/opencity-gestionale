@@ -7,13 +7,13 @@
 {{define "content"}}
 <div class="page-header">
   <h1>Motori di calcolo</h1>
-  {{if .Op.IsAdmin}}<a href="/motori/nuovo" class="btn btn-primary">+ Nuovo motore</a>{{end}}
+  {{if .Op.IsAdmin}}<a href="/bandi/nuovo" class="btn btn-primary">+ Nuovo motore</a>{{end}}
 </div>
 
 <div class="tab-bar">
-  <a href="/motori?stato=attivo" class="tab {{if eq .Stato "attivo"}}tab-active{{end}}">Attivi</a>
-  <a href="/motori?stato=bozza" class="tab {{if eq .Stato "bozza"}}tab-active{{end}}">Bozze</a>
-  <a href="/motori?stato=archiviato" class="tab {{if eq .Stato "archiviato"}}tab-active{{end}}">Archiviati</a>
+  <a href="/bandi?stato=attivo" class="tab {{if eq .Stato "attivo"}}tab-active{{end}}">Attivi</a>
+  <a href="/bandi?stato=bozza" class="tab {{if eq .Stato "bozza"}}tab-active{{end}}">Bozze</a>
+  <a href="/bandi?stato=archiviato" class="tab {{if eq .Stato "archiviato"}}tab-active{{end}}">Archiviati</a>
 </div>
 
 {{if not .Motori}}
@@ -34,7 +34,7 @@
   <tbody>
   {{range .Motori}}
   <tr>
-    <td><a href="/motori/{{.ID}}">{{.Nome}}</a></td>
+    <td><a href="/bandi/{{.ID}}">{{.Nome}}</a></td>
     <td><code style="font-size:.75em">{{.ServiceID}}</code></td>
     <td>{{if .BudgetTotale}}€{{printf "%.2f" .BudgetTotale}}{{else}}—{{end}}</td>
     <td>{{if .ISEEMassimo}}€{{printf "%.2f" .ISEEMassimo}}{{else}}—{{end}}</td>
@@ -45,14 +45,14 @@
       {{else}}<span class="badge badge-yellow">Bozza</span>{{end}}
     </td>
     <td class="td-actions">
-      <a href="/motori/{{.ID}}" class="btn btn-sm btn-secondary">Dettaglio</a>
+      <a href="/bandi/{{.ID}}" class="btn btn-sm btn-secondary">Dettaglio</a>
       {{if $.Op.IsAdmin}}
-      <a href="/motori/{{.ID}}/wizard/2" class="btn btn-sm btn-secondary">Modifica</a>
-      <form method="POST" action="/motori/{{.ID}}/duplica" style="display:inline">
+      <a href="/bandi/{{.ID}}/wizard/2" class="btn btn-sm btn-secondary">Modifica</a>
+      <form method="POST" action="/bandi/{{.ID}}/duplica" style="display:inline">
         <button type="submit" class="btn btn-sm">Duplica</button>
       </form>
       {{if ne .StatoMotore "archiviato"}}
-      <form method="POST" action="/motori/{{.ID}}/archivia" style="display:inline">
+      <form method="POST" action="/bandi/{{.ID}}/archivia" style="display:inline">
         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo motore?')">Archivia</button>
       </form>
       {{end}}

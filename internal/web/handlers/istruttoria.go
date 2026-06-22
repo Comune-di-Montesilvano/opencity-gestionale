@@ -83,7 +83,7 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
 	if !ecfg.Verifica.Attiva {
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Verifica+non+attiva+per+questo+bando&flashType=error", bandoID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Verifica+non+attiva+per+questo+bando&flashType=error", bandoID), http.StatusSeeOther)
 		return
 	}
 
@@ -100,14 +100,14 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Errore+fetch+istanze:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Errore+fetch+istanze:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
 		return
 	}
 
 	// Pulisce i record da_verificare: la scansione reimposta lo stato da zero.
 	// Record approvata/esclusa vengono preservati.
 	if err := db.ResetDaVerificare(h.DB, int(bandoID)); err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Errore+reset:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Errore+reset:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 		Messaggio: fmt.Sprintf("%d domande flaggate", nuove),
 	})
 
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Scansione+completata:+%d+domande+flaggate&flashType=success", bandoID, nuove), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Scansione+completata:+%d+domande+flaggate&flashType=success", bandoID, nuove), http.StatusSeeOther)
 }
 
 // PostIstruttoriaBatch — approva o escludi le istruttorie selezionate.
@@ -222,7 +222,7 @@ func (h *IstruttoriaHandler) PostIstruttoriaBatch(w http.ResponseWriter, r *http
 		}
 	}
 	if len(ids) == 0 {
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=Nessuna+domanda+selezionata&flashType=error", bandoID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Nessuna+domanda+selezionata&flashType=error", bandoID), http.StatusSeeOther)
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *IstruttoriaHandler) PostIstruttoriaBatch(w http.ResponseWriter, r *http
 		_ = id
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria?flash=%d+domande+%s&flashType=success", bandoID, len(ids), stato), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=%d+domande+%s&flashType=success", bandoID, len(ids), stato), http.StatusSeeOther)
 }
 
 // PostSaveDato — salva un valore locale per un campo mancante, ri-valuta i motivi via API.
@@ -337,7 +337,7 @@ func (h *IstruttoriaHandler) PostRiapri(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/istruttoria", bandoID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria", bandoID), http.StatusSeeOther)
 }
 
 // PostSaveNota — salva nota inline su una pratica. HTMX: risponde 200 vuoto.

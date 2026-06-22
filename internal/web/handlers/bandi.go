@@ -128,7 +128,7 @@ func (h *BandiHandler) PostCreaBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore creazione motore: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/2", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2", id), http.StatusSeeOther)
 }
 
 // --- Wizard steps 2-5 + fine ---
@@ -306,7 +306,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	case "5":
 		if cfg.Modalita == "ammissione" || cfg.Modalita == "lista_attesa" {
-			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/fine", bando.ID), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/fine", bando.ID), http.StatusSeeOther)
 			return
 		}
 		mappingJSON, _ := json.Marshal(cfg.Mapping)
@@ -325,7 +325,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	case "6":
 		if cfg.Modalita != "fondi" {
-			http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/fine", bando.ID), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/fine", bando.ID), http.StatusSeeOther)
 			return
 		}
 		renderTemplate(w, "motore_wizard_step6.html", map[string]any{
@@ -367,7 +367,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/3", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/3", bando.ID), http.StatusSeeOther)
 
 	case "3":
 		cfg.Espansione = strings.TrimSpace(r.FormValue("espansione"))
@@ -434,7 +434,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 		}
 		vf := r.FormValue("viewer_filter")
 		if navOffset := strings.TrimSpace(r.FormValue("nav_to_offset")); navOffset != "" {
-			u := fmt.Sprintf("/motori/%d/wizard/3?sample_offset=%s", bando.ID, url.QueryEscape(navOffset))
+			u := fmt.Sprintf("/bandi/%d/wizard/3?sample_offset=%s", bando.ID, url.QueryEscape(navOffset))
 			if vf != "" {
 				u += "&viewer_filter=" + url.QueryEscape(vf)
 			}
@@ -446,14 +446,14 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			if offset == "" {
 				offset = "0"
 			}
-			u := fmt.Sprintf("/motori/%d/wizard/3?sample_offset=%s", bando.ID, url.QueryEscape(offset))
+			u := fmt.Sprintf("/bandi/%d/wizard/3?sample_offset=%s", bando.ID, url.QueryEscape(offset))
 			if vf != "" {
 				u += "&viewer_filter=" + url.QueryEscape(vf)
 			}
 			http.Redirect(w, r, u, http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/4", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/4", bando.ID), http.StatusSeeOther)
 
 	case "4":
 		campos := r.Form["filtro_campo"]
@@ -525,7 +525,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/5", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/5", bando.ID), http.StatusSeeOther)
 
 	case "5":
 		nomi := r.Form["tip_nome"]
@@ -585,7 +585,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/6", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/6", bando.ID), http.StatusSeeOther)
 
 	case "6":
 		cfg.Rimborso = graduatoria.RimborsoConfig{
@@ -597,7 +597,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/fine", bando.ID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/fine", bando.ID), http.StatusSeeOther)
 
 	default:
 		notFound(w, r)
@@ -671,7 +671,7 @@ func (h *BandiHandler) PostAttivaBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore attivazione: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d?flash=Motore+attivato&flashType=success", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Motore+attivato&flashType=success", id), http.StatusSeeOther)
 }
 
 // --- Dettaglio motore ---
@@ -838,7 +838,7 @@ func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/2?flash=Bando+importato+con+successo&flashType=success", newID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2?flash=Bando+importato+con+successo&flashType=success", newID), http.StatusSeeOther)
 }
 
 // --- CRUD actions ---
@@ -850,7 +850,7 @@ func (h *BandiHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore duplicazione: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d/wizard/2?flash=Motore+duplicato,+configurazione+copiata&flashType=success", newID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2?flash=Motore+duplicato,+configurazione+copiata&flashType=success", newID), http.StatusSeeOther)
 }
 
 func (h *BandiHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
@@ -859,7 +859,7 @@ func (h *BandiHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore archiviazione: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/motori?flash=Motore+archiviato&flashType=success", http.StatusSeeOther)
+	http.Redirect(w, r, "/bandi?flash=Motore+archiviato&flashType=success", http.StatusSeeOther)
 }
 
 func (h *BandiHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
@@ -870,7 +870,7 @@ func (h *BandiHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
 	}
 	nome := strings.TrimSpace(r.FormValue("nome"))
 	if nome == "" {
-		http.Redirect(w, r, fmt.Sprintf("/motori/%d?flash=Nome+non+può+essere+vuoto&flashType=error", id), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Nome+non+può+essere+vuoto&flashType=error", id), http.StatusSeeOther)
 		return
 	}
 	bando, err := db.GetBando(h.DB, id)
@@ -883,14 +883,14 @@ func (h *BandiHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/motori/%d?flash=Bando+rinominato&flashType=success", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Bando+rinominato&flashType=success", id), http.StatusSeeOther)
 }
 
 // --- Superset valori campo ---
 
 // PostBuildSuperset scarica tutte le istanze del servizio e raccoglie i valori unici
 // di ogni sub-campo degli array trovati nel payload. Salva in bandi.valori_superset.
-// POST /motori/{id}/wizard/superset
+// POST /bandi/{id}/wizard/superset
 func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	bando, err := db.GetBando(h.DB, bandoIDFromPath(r))
@@ -1022,7 +1022,7 @@ func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request)
 
 // GetStatisticheField aggrega i valori di un campo mappato su tutte le istanze del servizio.
 // Per campi stringa/testo: valori unici con conteggio. Per numerici: somma + conteggio elementi.
-// GET /motori/{id}/api/statistiche-campo?campo=tipo
+// GET /bandi/{id}/api/statistiche-campo?campo=tipo
 func (h *BandiHandler) GetStatisticheField(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	bando, cfg, err := loadBandoConConfig(h, r)
@@ -1200,7 +1200,7 @@ func (h *BandiHandler) GetStatisticheField(w http.ResponseWriter, r *http.Reques
 // GetValoriCampo recupera i valori unici di un campo all'interno di un array,
 // aggregati su tutte le istanze del servizio. Usato dal wizard step 3 per popolare
 // il datalist del builder array.
-// GET /motori/{id}/api/valori-campo?array=anni&field=tiporichiesta
+// GET /bandi/{id}/api/valori-campo?array=anni&field=tiporichiesta
 func (h *BandiHandler) GetValoriCampo(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	bando, _, err := loadBandoConConfig(h, r)

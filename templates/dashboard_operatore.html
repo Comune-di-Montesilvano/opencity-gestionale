@@ -5,20 +5,20 @@
 {{define "content"}}
 <div class="page-header">
   <h1>Dashboard</h1>
-  {{if .Op.IsAdmin}}<a href="/motori/nuovo" class="btn btn-primary">+ Nuovo motore</a>{{end}}
+  {{if .Op.IsAdmin}}<a href="/bandi/nuovo" class="btn btn-primary">+ Nuovo motore</a>{{end}}
 </div>
 
 {{if not .Items}}
 <div class="alert alert-info">
   Nessun motore attivo.
-  {{if .Op.IsAdmin}}<a href="/motori/nuovo">Crea il primo motore</a>{{end}}
+  {{if .Op.IsAdmin}}<a href="/bandi/nuovo">Crea il primo motore</a>{{end}}
 </div>
 {{else}}
 <div class="card-grid">
 {{range .Items}}
 <div class="card">
   <div class="card-header">
-    <h3><a href="/motori/{{.Motore.ID}}">{{.Motore.Nome}}</a></h3>
+    <h3><a href="/bandi/{{.Motore.ID}}">{{.Motore.Nome}}</a></h3>
     <span class="badge badge-green">Attivo</span>
     {{if and .VerificaAttiva (gt .IstruttoriaStats.DaVerificare 0)}}
     <span class="badge" style="background:#fef2f2;color:#dc2626">{{.IstruttoriaStats.DaVerificare}} da verificare</span>
@@ -27,7 +27,7 @@
   <div class="card-body">
     <p>Budget: €{{printf "%.2f" .Motore.BudgetTotale}} | ISEE max: €{{printf "%.2f" .Motore.ISEEMassimo}}</p>
     {{if .UltimaRun}}
-    <p>Ultima run: <a href="/motori/{{.Motore.ID}}/run/{{.UltimaRun.ID}}">{{.UltimaRun.CalcolataDa}} — {{.UltimaRun.CalcolataAt.Format "02/01/2006 15:04"}}</a></p>
+    <p>Ultima run: <a href="/bandi/{{.Motore.ID}}/run/{{.UltimaRun.ID}}">{{.UltimaRun.CalcolataDa}} — {{.UltimaRun.CalcolataAt.Format "02/01/2006 15:04"}}</a></p>
     <p>Ammesse: {{.UltimaRun.NumAmmesse}} | Escluse: {{.UltimaRun.NumEscluse}} | Budget: €{{printf "%.2f" .UltimaRun.BudgetUsato}}</p>
     {{else}}
     <p class="text-muted">Nessuna run calcolata</p>
@@ -35,9 +35,9 @@
   </div>
   <div class="card-footer">
     {{if and .VerificaAttiva (gt .IstruttoriaStats.DaVerificare 0)}}
-    <a href="/motori/{{.Motore.ID}}/istruttoria" class="btn btn-secondary btn-sm">Gestisci istruttoria</a>
+    <a href="/bandi/{{.Motore.ID}}/istruttoria" class="btn btn-secondary btn-sm">Gestisci istruttoria</a>
     {{else}}
-    <form method="POST" action="/motori/{{.Motore.ID}}/run" onsubmit="this.querySelector('button').disabled=true">
+    <form method="POST" action="/bandi/{{.Motore.ID}}/run" onsubmit="this.querySelector('button').disabled=true">
       <button type="submit" class="btn btn-primary btn-sm">Calcola nuova run</button>
     </form>
     {{end}}

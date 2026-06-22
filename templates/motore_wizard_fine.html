@@ -66,7 +66,7 @@
       <h3>Test calcolo</h3>
       <p class="text-muted">Verifica il risultato prima di attivare il motore. Il test non salva nulla.</p>
       <button class="btn btn-secondary"
-        hx-post="/motori/{{.Motore.ID}}/wizard/test"
+        hx-post="/bandi/{{.Motore.ID}}/wizard/test"
         hx-target="#test-result"
         hx-swap="innerHTML"
         hx-indicator="#test-spinner">
@@ -76,7 +76,7 @@
       <div id="test-result" style="margin-top:1rem"></div>
     </div>
 
-    <form method="POST" action="/motori/{{.Motore.ID}}/wizard/attiva" class="card">
+    <form method="POST" action="/bandi/{{.Motore.ID}}/wizard/attiva" class="card">
       <h3>Attiva motore</h3>
       <div class="form-group">
         <label>Nome definitivo</label>
@@ -84,12 +84,12 @@
       </div>
       <div class="form-actions">
         {{if eq .Config.Modalita "fondi"}}
-        <a href="/motori/{{.Motore.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
+        <a href="/bandi/{{.Motore.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
         {{else}}
-        <a href="/motori/{{.Motore.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+        <a href="/bandi/{{.Motore.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
         {{end}}
         <button type="submit" class="btn btn-primary">Attiva motore ✓</button>
-        <a href="/motori" class="btn btn-secondary">Salva come bozza</a>
+        <a href="/bandi" class="btn btn-secondary">Salva come bozza</a>
       </div>
     </form>
 

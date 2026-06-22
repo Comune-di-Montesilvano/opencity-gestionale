@@ -12,24 +12,24 @@
     {{else if eq .Motore.StatoMotore "archiviato"}}<span class="badge badge-gray">Archiviato</span>
     {{else}}<span class="badge badge-yellow">Bozza</span>{{end}}
     {{if .Op.IsAdmin}}
-    <a href="/motori/{{.Motore.ID}}/wizard/2" class="btn btn-secondary btn-sm">Modifica wizard</a>
+    <a href="/bandi/{{.Motore.ID}}/wizard/2" class="btn btn-secondary btn-sm">Modifica wizard</a>
     <button type="button" class="btn btn-secondary btn-sm"
       onclick="document.getElementById('rinomina-form-{{.Motore.ID}}').style.display='flex'">Rinomina</button>
     {{if ne .Motore.StatoMotore "archiviato"}}
-    <form method="POST" action="/motori/{{.Motore.ID}}/archivia" style="display:inline">
+    <form method="POST" action="/bandi/{{.Motore.ID}}/archivia" style="display:inline">
       <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo motore?')">Archivia</button>
     </form>
     {{end}}
-    <form method="POST" action="/motori/{{.Motore.ID}}/duplica" style="display:inline">
+    <form method="POST" action="/bandi/{{.Motore.ID}}/duplica" style="display:inline">
       <button type="submit" class="btn btn-sm">Duplica</button>
     </form>
-    <a href="/motori/{{.Motore.ID}}/export" class="btn btn-secondary btn-sm">↓ Esporta JSON</a>
+    <a href="/bandi/{{.Motore.ID}}/export" class="btn btn-secondary btn-sm">↓ Esporta JSON</a>
     {{end}}
   </div>
 </div>
 
 {{if .Op.IsAdmin}}
-<form id="rinomina-form-{{.Motore.ID}}" method="POST" action="/motori/{{.Motore.ID}}/rinomina"
+<form id="rinomina-form-{{.Motore.ID}}" method="POST" action="/bandi/{{.Motore.ID}}/rinomina"
       style="display:none;gap:.5rem;align-items:center;margin-bottom:1rem">
   <input type="text" name="nome" value="{{.Motore.Nome}}" class="form-control" style="max-width:300px" required>
   <button type="submit" class="btn btn-secondary btn-sm">Salva</button>
@@ -56,14 +56,14 @@
       <span class="badge badge-green" style="margin-left:.5rem">Completata</span>
       {{end}}
     </div>
-    <a href="/motori/{{.Motore.ID}}/istruttoria" class="btn btn-secondary btn-sm">Gestisci istruttoria</a>
+    <a href="/bandi/{{.Motore.ID}}/istruttoria" class="btn btn-secondary btn-sm">Gestisci istruttoria</a>
   </div>
 </div>
 {{end}}
 
 <div class="section-header">
   <h2>Graduatorie</h2>
-  <form method="POST" action="/motori/{{.Motore.ID}}/run" onsubmit="avviaCalcolo(this)">
+  <form method="POST" action="/bandi/{{.Motore.ID}}/run" onsubmit="avviaCalcolo(this)">
     {{if and .Config.Verifica.Attiva (gt .IstruttoriaStats.DaVerificare 0)}}
     <button type="submit" id="btn-calcola" class="btn btn-primary" disabled title="Completa l'istruttoria prima di calcolare">
       Calcola nuova run
@@ -99,7 +99,7 @@ function avviaCalcolo(form) {
     <td>{{.NumAmmesse}}</td>
     <td>{{.NumEscluse}}</td>
     <td>€{{printf "%.2f" .BudgetUsato}}</td>
-    <td><a href="/motori/{{$.Motore.ID}}/run/{{.ID}}" class="btn btn-sm">Visualizza</a></td>
+    <td><a href="/bandi/{{$.Motore.ID}}/run/{{.ID}}" class="btn btn-sm">Visualizza</a></td>
   </tr>
   {{end}}
   </tbody>

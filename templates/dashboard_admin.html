@@ -6,8 +6,8 @@
 <div class="page-header">
   <h1>Bandi</h1>
   <div style="display:inline-flex; align-items:center; gap:.5rem">
-    <a href="/motori/nuovo" class="btn btn-primary">+ Nuovo bando</a>
-    <form method="POST" action="/motori/import" enctype="multipart/form-data"
+    <a href="/bandi/nuovo" class="btn btn-primary">+ Nuovo bando</a>
+    <form method="POST" action="/bandi/import" enctype="multipart/form-data"
           style="display:inline-flex; align-items:center; gap:.5rem">
       <label class="btn btn-secondary btn-sm" style="cursor:pointer; margin:0">
         ↑ Importa bando
@@ -57,7 +57,7 @@
   <tbody>
   {{range .Motori}}
   <tr>
-    <td><a href="/motori/{{.ID}}">{{.Nome}}</a></td>
+    <td><a href="/bandi/{{.ID}}">{{.Nome}}</a></td>
     <td>{{if .BudgetTotale}}€{{printf "%.2f" .BudgetTotale}}{{else}}—{{end}}</td>
     <td>{{if .ISEEMassimo}}€{{printf "%.2f" .ISEEMassimo}}{{else}}—{{end}}</td>
     <td>{{if .ScadenzaPresentazione}}{{.ScadenzaPresentazione}}{{else}}—{{end}}</td>
@@ -67,13 +67,13 @@
       {{else}}<span class="badge badge-yellow">Bozza</span>{{end}}
     </td>
     <td class="td-actions">
-      <a href="/motori/{{.ID}}" class="btn btn-sm btn-secondary">Dettaglio</a>
-      <a href="/motori/{{.ID}}/wizard/2" class="btn btn-sm btn-secondary">Modifica</a>
-      <form method="POST" action="/motori/{{.ID}}/duplica" style="display:inline">
+      <a href="/bandi/{{.ID}}" class="btn btn-sm btn-secondary">Dettaglio</a>
+      <a href="/bandi/{{.ID}}/wizard/2" class="btn btn-sm btn-secondary">Modifica</a>
+      <form method="POST" action="/bandi/{{.ID}}/duplica" style="display:inline">
         <button type="submit" class="btn btn-sm">Duplica</button>
       </form>
       {{if ne .StatoMotore "archiviato"}}
-      <form method="POST" action="/motori/{{.ID}}/archivia" style="display:inline">
+      <form method="POST" action="/bandi/{{.ID}}/archivia" style="display:inline">
         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo bando?')">Archivia</button>
       </form>
       {{end}}
