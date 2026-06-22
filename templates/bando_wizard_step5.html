@@ -1,12 +1,12 @@
-{{define "motore_wizard_step5.html"}}
+{{define "bando_wizard_step5.html"}}
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 5: Tipologie{{end}}
+{{define "title"}}{{.Bando.Nome}} — Step 5: Tipologie{{end}}
 
 {{define "content"}}
 <div class="page-header">
-  <h1>{{.Motore.Nome}}</h1>
+  <h1>{{.Bando.Nome}}</h1>
 </div>
 
 <div class="wizard-steps">
@@ -19,7 +19,7 @@
   <span class="wizard-step">Fine</span>
 </div>
 
-<form method="POST" action="/bandi/{{.Motore.ID}}/wizard/5">
+<form method="POST" action="/bandi/{{.Bando.ID}}/wizard/5">
 
   <!-- Tipologie -->
   <h2>Tipologie</h2>
@@ -123,7 +123,7 @@
   </div>
 
   <div class="form-actions" style="margin-top:1.5rem">
-    <a href="/bandi/{{.Motore.ID}}/wizard/4" class="btn btn-secondary">← Indietro</a>
+    <a href="/bandi/{{.Bando.ID}}/wizard/4" class="btn btn-secondary">← Indietro</a>
     <button type="submit" class="btn btn-primary">Salva e continua →</button>
   </div>
 </form>
@@ -133,7 +133,7 @@
 
 <script>
 const MODALITA = '{{.Modalita}}';
-const _motoreId = {{.Motore.ID}};
+const _bandoId = {{.Bando.ID}};
 const _espansione = '{{.Espansione}}';
 const supersetData = JSON.parse(document.getElementById('superset-data').textContent || '{}') || {};
 const mappingData  = JSON.parse(document.getElementById('mapping-data').textContent || '{}') || {};
@@ -181,7 +181,7 @@ async function costruisciSuperset(btn, selectDaRifar) {
   btn.disabled = true;
   btn.textContent = '⏳ caricamento istanze...';
   try {
-    const resp = await fetch(`/bandi/${_motoreId}/wizard/superset`, {method: 'POST'});
+    const resp = await fetch(`/bandi/${_bandoId}/wizard/superset`, {method: 'POST'});
     if (!resp.ok) {
       const txt = await resp.text();
       btn.closest('.campo-stats').innerHTML = `<span style="color:#c00">Errore: ${_esc(txt)}</span>`;

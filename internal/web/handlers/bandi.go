@@ -45,7 +45,7 @@ func (h *BandiHandler) GetLista(w http.ResponseWriter, r *http.Request) {
 	}
 	motori, _ := db.ListBandi(h.DB, stato)
 	flash, flashType := flashFromRequest(r)
-	renderTemplate(w, "motori.html", map[string]any{
+	renderTemplate(w, "bandi.html", map[string]any{
 		"Op":        op,
 		"Bandi":    motori,
 		"Stato":     stato,
@@ -58,7 +58,7 @@ func (h *BandiHandler) GetLista(w http.ResponseWriter, r *http.Request) {
 
 func (h *BandiHandler) GetNuovo(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
-	renderTemplate(w, "motore_wizard.html", map[string]any{
+	renderTemplate(w, "bando_wizard.html", map[string]any{
 		"Op":      op,
 		"BaseURL": h.BaseURL,
 	})
@@ -70,7 +70,7 @@ func (h *BandiHandler) PostConnettiServizi(w http.ResponseWriter, r *http.Reques
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	rawServizi, err := client.FetchServices()
 	if err != nil {
-		renderTemplate(w, "motore_wizard_connetti.html", map[string]any{
+		renderTemplate(w, "bando_wizard_connetti.html", map[string]any{
 			"Errore": err.Error(),
 		})
 		return
@@ -91,7 +91,7 @@ func (h *BandiHandler) PostConnettiServizi(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	renderTemplate(w, "motore_wizard_connetti.html", map[string]any{
+	renderTemplate(w, "bando_wizard_connetti.html", map[string]any{
 		"BaseURL":  h.BaseURL,
 		"Servizi":  servizi,
 	})
@@ -179,7 +179,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	switch step {
 	case "2":
-		renderTemplate(w, "motore_wizard_step2.html", map[string]any{
+		renderTemplate(w, "bando_wizard_step2.html", map[string]any{
 			"Op":       op,
 			"Bando":   bando,
 			"Modalita": cfg.Modalita,
@@ -249,7 +249,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		renderTemplate(w, "motore_wizard_step3.html", map[string]any{
+		renderTemplate(w, "bando_wizard_step3.html", map[string]any{
 			"Op":               op,
 			"Bando":           bando,
 			"ParametriMappati": params,
@@ -294,7 +294,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		renderTemplate(w, "motore_wizard_step4.html", map[string]any{
+		renderTemplate(w, "bando_wizard_step4.html", map[string]any{
 			"Op":               op,
 			"Bando":           bando,
 			"Filtri":           cfg.Filtri,
@@ -310,7 +310,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		mappingJSON, _ := json.Marshal(cfg.Mapping)
-		renderTemplate(w, "motore_wizard_step5.html", map[string]any{
+		renderTemplate(w, "bando_wizard_step5.html", map[string]any{
 			"Op":             op,
 			"Bando":         bando,
 			"Modalita":       cfg.Modalita,
@@ -328,7 +328,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/fine", bando.ID), http.StatusSeeOther)
 			return
 		}
-		renderTemplate(w, "motore_wizard_step6.html", map[string]any{
+		renderTemplate(w, "bando_wizard_step6.html", map[string]any{
 			"Op":           op,
 			"Bando":       bando,
 			"Rimborso":     cfg.Rimborso,
@@ -336,7 +336,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		})
 
 	case "fine":
-		renderTemplate(w, "motore_wizard_fine.html", map[string]any{
+		renderTemplate(w, "bando_wizard_fine.html", map[string]any{
 			"Op":     op,
 			"Bando": bando,
 			"Config": cfg,
@@ -609,14 +609,14 @@ func (h *BandiHandler) PostTestEngine(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	bando, cfg, err := loadBandoConConfig(h, r)
 	if err != nil {
-		renderTemplate(w, "motore_wizard_test.html", map[string]any{"Errore": err.Error()})
+		renderTemplate(w, "bando_wizard_test.html", map[string]any{"Errore": err.Error()})
 		return
 	}
 
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
 	if err != nil {
-		renderTemplate(w, "motore_wizard_test.html", map[string]any{"Errore": "Fetch istanze: " + err.Error()})
+		renderTemplate(w, "bando_wizard_test.html", map[string]any{"Errore": "Fetch istanze: " + err.Error()})
 		return
 	}
 
@@ -640,16 +640,16 @@ func (h *BandiHandler) PostTestEngine(w http.ResponseWriter, r *http.Request) {
 
 	engine, err := graduatoria.GetEngine("generic")
 	if err != nil {
-		renderTemplate(w, "motore_wizard_test.html", map[string]any{"Errore": err.Error()})
+		renderTemplate(w, "bando_wizard_test.html", map[string]any{"Errore": err.Error()})
 		return
 	}
 	grad, err := engine.Calcola(apps, bandoCfg)
 	if err != nil {
-		renderTemplate(w, "motore_wizard_test.html", map[string]any{"Errore": "Calcolo: " + err.Error()})
+		renderTemplate(w, "bando_wizard_test.html", map[string]any{"Errore": "Calcolo: " + err.Error()})
 		return
 	}
 
-	renderTemplate(w, "motore_wizard_test.html", map[string]any{
+	renderTemplate(w, "bando_wizard_test.html", map[string]any{
 		"Grad":       grad,
 		"NumIstanze": len(apps),
 	})
@@ -693,7 +693,7 @@ func (h *BandiHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 	istrStats, _ := db.GetIstruttoriaStats(h.DB, int(bando.ID))
 	flash, flashType := flashFromRequest(r)
-	renderTemplate(w, "motore_dettaglio.html", map[string]any{
+	renderTemplate(w, "bando_dettaglio.html", map[string]any{
 		"Op":               op,
 		"Bando":           bando,
 		"Runs":             runs,

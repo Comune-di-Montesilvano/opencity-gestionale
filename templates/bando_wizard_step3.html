@@ -1,12 +1,12 @@
-{{define "motore_wizard_step3.html"}}
+{{define "bando_wizard_step3.html"}}
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 3: Parametri{{end}}
+{{define "title"}}{{.Bando.Nome}} — Step 3: Parametri{{end}}
 
 {{define "content"}}
 <div class="page-header">
-  <h1>{{.Motore.Nome}}</h1>
+  <h1>{{.Bando.Nome}}</h1>
 </div>
 
 <div class="wizard-steps">
@@ -21,7 +21,7 @@
 
 <div class="wizard-layout">
   <div class="wizard-col-main">
-    <form method="POST" action="/bandi/{{.Motore.ID}}/wizard/3" id="step3-form">
+    <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/3" id="step3-form">
 
       <!-- Campi nascosti di stato -->
       <input type="hidden" name="espansione" id="espansione-field" value="{{.Espansione}}">
@@ -105,7 +105,7 @@
       </div>
 
       <div class="form-actions" style="display:flex; gap:.5rem; align-items:center">
-        <a href="/bandi/{{.Motore.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
+        <a href="/bandi/{{.Bando.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
         <button type="button" class="btn btn-outline-secondary" onclick="salvaStep3()">Salva</button>
         <button type="submit" class="btn btn-primary">Continua →</button>
       </div>
@@ -117,7 +117,7 @@
     <h3>Istanza campione</h3>
 
     <div style="display:flex; gap:.25rem; align-items:center; margin-bottom:.5rem; flex-wrap:wrap">
-      <form method="GET" action="/bandi/{{.Motore.ID}}/wizard/3" style="display:flex; gap:.25rem; flex:1">
+      <form method="GET" action="/bandi/{{.Bando.ID}}/wizard/3" style="display:flex; gap:.25rem; flex:1">
         <input type="text" name="sample_id" value="{{.SampleID}}" class="form-control form-control-sm" placeholder="Incolla ID istanza...">
         <input type="hidden" name="viewer_filter" value="{{.ViewerFilter}}">
         <button type="submit" class="btn btn-sm btn-secondary">Carica</button>
@@ -256,7 +256,7 @@
 const flatData     = JSON.parse(document.getElementById('flat-data').textContent || '[]') || [];
 const rawData      = JSON.parse(document.getElementById('raw-data').textContent || '{}') || {};
 const supersetData = JSON.parse(document.getElementById('superset-data').textContent || '{}') || {};
-const _motoreId    = {{.Motore.ID}};
+const _bandoId    = {{.Bando.ID}};
 
 // flatMap per lookup rapido path → valore scalare
 const flatMap = {};
@@ -518,7 +518,7 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
     <div style="margin-bottom:12px; padding:8px; background:#f0fdf4; border-radius:4px; border:1px solid #bbf7d0">
       <div style="font-weight:600; color:#166534; margin-bottom:4px">A — Itera su tutti gli elementi (espansione)</div>
       <div style="color:#374151; margin-bottom:6px; font-size:11px">
-        Il motore espande questo array: ogni elemento diventa una riga separata nella graduatoria.<br>
+        Il bando espande questo array: ogni elemento diventa una riga separata nella graduatoria.<br>
         Poi aggiungi parametri con il path relativo (es. <code>corrispettivo</code>, <code>tiporichiesta</code>) e spunta "Espand.".
       </div>
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
@@ -744,7 +744,7 @@ async function buildSuperset(btn) {
   const status = document.getElementById('superset-status');
   if (status) status.textContent = '';
   try {
-    const resp = await fetch(`/bandi/${_motoreId}/wizard/superset`, { method: 'POST' });
+    const resp = await fetch(`/bandi/${_bandoId}/wizard/superset`, { method: 'POST' });
     const text = await resp.text();
     if (status) status.textContent = text;
     btn.textContent = '⟳ Aggiorna valori da tutte le istanze';

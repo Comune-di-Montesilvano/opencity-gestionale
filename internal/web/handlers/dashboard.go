@@ -42,7 +42,7 @@ func (h *DashboardHandler) renderOperatore(w http.ResponseWriter, _ *http.Reques
 	motori, _ := db.ListBandi(h.DB, "attivo")
 
 	type bandoConRun struct {
-		Motore           *db.Bando
+		Bando            *db.Bando
 		UltimaRun        *db.GraduatoriaRun
 		IstruttoriaStats db.IstruttoriaStats
 		VerificaAttiva   bool
@@ -64,7 +64,7 @@ func (h *DashboardHandler) renderOperatore(w http.ResponseWriter, _ *http.Reques
 			istStats, _ = db.GetIstruttoriaStats(h.DB, int(m.ID))
 		}
 		items = append(items, bandoConRun{
-			Motore:           m,
+			Bando:            m,
 			UltimaRun:        ultima,
 			IstruttoriaStats: istStats,
 			VerificaAttiva:   ecfg.Verifica.Attiva,

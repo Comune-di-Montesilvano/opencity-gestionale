@@ -1,12 +1,12 @@
-{{define "motore_wizard_step2.html"}}
+{{define "bando_wizard_step2.html"}}
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 2: Tipo bando{{end}}
+{{define "title"}}{{.Bando.Nome}} — Step 2: Tipo bando{{end}}
 
 {{define "content"}}
 <div class="page-header">
-  <h1>{{.Motore.Nome}}</h1>
+  <h1>{{.Bando.Nome}}</h1>
   <a href="/bandi" class="btn btn-secondary">Lista motori</a>
 </div>
 
@@ -20,7 +20,7 @@
   <span class="wizard-step">Fine</span>
 </div>
 
-<form method="POST" action="/bandi/{{.Motore.ID}}/wizard/2" style="max-width:740px">
+<form method="POST" action="/bandi/{{.Bando.ID}}/wizard/2" style="max-width:740px">
   <h2>Tipo di bando</h2>
   <p class="text-muted">Seleziona come l'engine assegna le risorse. Determina quali step del wizard saranno attivi.</p>
 
