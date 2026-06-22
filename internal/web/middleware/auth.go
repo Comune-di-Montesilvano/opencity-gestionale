@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -51,12 +52,20 @@ func Auth(dbConn *sql.DB) func(http.Handler) http.Handler {
 				return
 			}
 			sess, err := db.GetSessione(dbConn, cookie.Value)
-			if err != nil || sess == nil {
+			if err != nil {
+				log.Printf("[AUTH] Errore recupero sessione %q dal DB: %v", cookie.Value, err)
+				http.SetCookie(w, clearCookie())
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			if sess == nil {
+				log.Printf("[AUTH] Sessione %q non trovata nel DB", cookie.Value)
 				http.SetCookie(w, clearCookie())
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
 			if time.Now().After(sess.ScadeAt) {
+				log.Printf("[AUTH] Sessione %q scaduta (scadenza: %v, ora: %v)", sess.ID, sess.ScadeAt, time.Now())
 				db.DeleteSessione(dbConn, sess.ID)
 				http.SetCookie(w, clearCookie())
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
