@@ -55,7 +55,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 	})))
 	mux.Handle("GET /dashboard", authMW(http.HandlerFunc(dashboard.GetDashboard)))
 
-	// Motori — lista e wizard (admin only per modifica)
+	// Bandi — lista e wizard (admin only per modifica)
 	mux.Handle("GET /bandi", authMW(http.HandlerFunc(bandi.GetLista)))
 	mux.Handle("GET /bandi/nuovo", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetNuovo))))
 	mux.Handle("POST /bandi/wizard/connetti", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostConnettiServizi))))

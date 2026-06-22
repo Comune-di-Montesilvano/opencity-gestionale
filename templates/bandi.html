@@ -1,13 +1,13 @@
-{{define "motori.html"}}
+{{define "bandi.html"}}
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}Motori di calcolo{{end}}
+{{define "title"}}Bandi{{end}}
 
 {{define "content"}}
 <div class="page-header">
-  <h1>Motori di calcolo</h1>
-  {{if .Op.IsAdmin}}<a href="/bandi/nuovo" class="btn btn-primary">+ Nuovo motore</a>{{end}}
+  <h1>Bandi</h1>
+  {{if .Op.IsAdmin}}<a href="/bandi/nuovo" class="btn btn-primary">+ Nuovo bando</a>{{end}}
 </div>
 
 <div class="tab-bar">
@@ -16,8 +16,8 @@
   <a href="/bandi?stato=archiviato" class="tab {{if eq .Stato "archiviato"}}tab-active{{end}}">Archiviati</a>
 </div>
 
-{{if not .Motori}}
-<p class="text-muted" style="margin-top:1rem">Nessun motore in questo stato.</p>
+{{if not .Bandi}}
+<p class="text-muted" style="margin-top:1rem">Nessun bando in questo stato.</p>
 {{else}}
 <table class="table" style="margin-top:1rem">
   <thead>
@@ -32,7 +32,7 @@
     </tr>
   </thead>
   <tbody>
-  {{range .Motori}}
+  {{range .Bandi}}
   <tr>
     <td><a href="/bandi/{{.ID}}">{{.Nome}}</a></td>
     <td><code style="font-size:.75em">{{.ServiceID}}</code></td>
@@ -40,8 +40,8 @@
     <td>{{if .ISEEMassimo}}€{{printf "%.2f" .ISEEMassimo}}{{else}}—{{end}}</td>
     <td>{{if .ScadenzaPresentazione}}{{.ScadenzaPresentazione}}{{else}}—{{end}}</td>
     <td>
-      {{if eq .StatoMotore "attivo"}}<span class="badge badge-green">Attivo</span>
-      {{else if eq .StatoMotore "archiviato"}}<span class="badge badge-gray">Archiviato</span>
+      {{if eq .StatoBando "attivo"}}<span class="badge badge-green">Attivo</span>
+      {{else if eq .StatoBando "archiviato"}}<span class="badge badge-gray">Archiviato</span>
       {{else}}<span class="badge badge-yellow">Bozza</span>{{end}}
     </td>
     <td class="td-actions">
@@ -51,9 +51,9 @@
       <form method="POST" action="/bandi/{{.ID}}/duplica" style="display:inline">
         <button type="submit" class="btn btn-sm">Duplica</button>
       </form>
-      {{if ne .StatoMotore "archiviato"}}
+      {{if ne .StatoBando "archiviato"}}
       <form method="POST" action="/bandi/{{.ID}}/archivia" style="display:inline">
-        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo motore?')">Archivia</button>
+        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo bando?')">Archivia</button>
       </form>
       {{end}}
       {{end}}

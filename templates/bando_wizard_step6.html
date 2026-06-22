@@ -1,12 +1,12 @@
-{{define "motore_wizard_step6.html"}}
+{{define "bando_wizard_step6.html"}}
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Step 6: Rimborso{{end}}
+{{define "title"}}{{.Bando.Nome}} — Step 6: Rimborso{{end}}
 
 {{define "content"}}
 <div class="page-header">
-  <h1>{{.Motore.Nome}}</h1>
+  <h1>{{.Bando.Nome}}</h1>
 </div>
 
 <div class="wizard-steps">
@@ -19,7 +19,7 @@
   <span class="wizard-step">Fine</span>
 </div>
 
-<form method="POST" action="/bandi/{{.Motore.ID}}/wizard/6" style="max-width:560px">
+<form method="POST" action="/bandi/{{.Bando.ID}}/wizard/6" style="max-width:560px">
   <h2>Calcolo rimborso</h2>
   <p class="text-muted">Definisci come si calcola l'importo da rimborsare per ogni istanza ammessa.</p>
 
@@ -61,7 +61,7 @@
   </div>
 
   <div class="form-actions" style="margin-top:1.5rem">
-    <a href="/bandi/{{.Motore.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+    <a href="/bandi/{{.Bando.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
     <button type="submit" class="btn btn-primary">Salva e continua →</button>
   </div>
 </form>

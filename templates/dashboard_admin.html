@@ -40,7 +40,7 @@
   <a href="/dashboard?stato=archiviato" class="tab {{if eq .Stato "archiviato"}}tab-active{{end}}">Archiviati</a>
 </div>
 
-{{if not .Motori}}
+{{if not .Bandi}}
 <p class="text-muted" style="margin-top:1rem">Nessun bando in questo stato.</p>
 {{else}}
 <table class="table" style="margin-top:1rem">
@@ -55,15 +55,15 @@
     </tr>
   </thead>
   <tbody>
-  {{range .Motori}}
+  {{range .Bandi}}
   <tr>
     <td><a href="/bandi/{{.ID}}">{{.Nome}}</a></td>
     <td>{{if .BudgetTotale}}€{{printf "%.2f" .BudgetTotale}}{{else}}—{{end}}</td>
     <td>{{if .ISEEMassimo}}€{{printf "%.2f" .ISEEMassimo}}{{else}}—{{end}}</td>
     <td>{{if .ScadenzaPresentazione}}{{.ScadenzaPresentazione}}{{else}}—{{end}}</td>
     <td>
-      {{if eq .StatoMotore "attivo"}}<span class="badge badge-green">Attivo</span>
-      {{else if eq .StatoMotore "archiviato"}}<span class="badge badge-gray">Archiviato</span>
+      {{if eq .StatoBando "attivo"}}<span class="badge badge-green">Attivo</span>
+      {{else if eq .StatoBando "archiviato"}}<span class="badge badge-gray">Archiviato</span>
       {{else}}<span class="badge badge-yellow">Bozza</span>{{end}}
     </td>
     <td class="td-actions">
@@ -72,7 +72,7 @@
       <form method="POST" action="/bandi/{{.ID}}/duplica" style="display:inline">
         <button type="submit" class="btn btn-sm">Duplica</button>
       </form>
-      {{if ne .StatoMotore "archiviato"}}
+      {{if ne .StatoBando "archiviato"}}
       <form method="POST" action="/bandi/{{.ID}}/archivia" style="display:inline">
         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo bando?')">Archivia</button>
       </form>

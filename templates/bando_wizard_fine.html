@@ -1,12 +1,12 @@
-{{define "motore_wizard_fine.html"}}
+{{define "bando_wizard_fine.html"}}
 {{template "base" .}}
 {{end}}
 
-{{define "title"}}{{.Motore.Nome}} — Conferma{{end}}
+{{define "title"}}{{.Bando.Nome}} — Conferma{{end}}
 
 {{define "content"}}
 <div class="page-header">
-  <h1>{{.Motore.Nome}}</h1>
+  <h1>{{.Bando.Nome}}</h1>
 </div>
 
 <div class="wizard-steps">
@@ -25,10 +25,10 @@
     <div class="card" style="margin-bottom:1.5rem">
       <h3>Riepilogo configurazione</h3>
       <div class="detail-grid">
-        <div><strong>Servizio</strong><br><code style="font-size:.8em">{{.Motore.ServiceID}}</code></div>
+        <div><strong>Servizio</strong><br><code style="font-size:.8em">{{.Bando.ServiceID}}</code></div>
         <div><strong>Modalità</strong><br><span class="badge badge-gray">{{if .Config.Modalita}}{{.Config.Modalita}}{{else}}fondi{{end}}</span></div>
-        <div><strong>Budget</strong><br>€{{printf "%.2f" .Motore.BudgetTotale}}</div>
-        <div><strong>Scadenza</strong><br>{{.Motore.ScadenzaPresentazione}}</div>
+        <div><strong>Budget</strong><br>€{{printf "%.2f" .Bando.BudgetTotale}}</div>
+        <div><strong>Scadenza</strong><br>{{.Bando.ScadenzaPresentazione}}</div>
       </div>
 
       {{with .Config.Mapping}}
@@ -64,9 +64,9 @@
 
     <div class="card" style="margin-bottom:1.5rem">
       <h3>Test calcolo</h3>
-      <p class="text-muted">Verifica il risultato prima di attivare il motore. Il test non salva nulla.</p>
+      <p class="text-muted">Verifica il risultato prima di attivare il bando. Il test non salva nulla.</p>
       <button class="btn btn-secondary"
-        hx-post="/bandi/{{.Motore.ID}}/wizard/test"
+        hx-post="/bandi/{{.Bando.ID}}/wizard/test"
         hx-target="#test-result"
         hx-swap="innerHTML"
         hx-indicator="#test-spinner">
@@ -76,19 +76,19 @@
       <div id="test-result" style="margin-top:1rem"></div>
     </div>
 
-    <form method="POST" action="/bandi/{{.Motore.ID}}/wizard/attiva" class="card">
-      <h3>Attiva motore</h3>
+    <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/attiva" class="card">
+      <h3>Attiva bando</h3>
       <div class="form-group">
         <label>Nome definitivo</label>
-        <input type="text" name="nome" value="{{.Motore.Nome}}" class="form-control" required>
+        <input type="text" name="nome" value="{{.Bando.Nome}}" class="form-control" required>
       </div>
       <div class="form-actions">
         {{if eq .Config.Modalita "fondi"}}
-        <a href="/bandi/{{.Motore.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
+        <a href="/bandi/{{.Bando.ID}}/wizard/6" class="btn btn-secondary">← Indietro</a>
         {{else}}
-        <a href="/bandi/{{.Motore.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+        <a href="/bandi/{{.Bando.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
         {{end}}
-        <button type="submit" class="btn btn-primary">Attiva motore ✓</button>
+        <button type="submit" class="btn btn-primary">Attiva bando ✓</button>
         <a href="/bandi" class="btn btn-secondary">Salva come bozza</a>
       </div>
     </form>
