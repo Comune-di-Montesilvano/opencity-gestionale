@@ -7,15 +7,7 @@
   <h1>Bandi</h1>
   <div style="display:inline-flex; align-items:center; gap:.5rem">
     <a href="/bandi/nuovo" class="btn btn-primary">+ Nuovo bando</a>
-    <form method="POST" action="/bandi/import" enctype="multipart/form-data"
-          style="display:inline-flex; align-items:center; gap:.5rem">
-      <label class="btn btn-secondary btn-sm" style="cursor:pointer; margin:0">
-        ↑ Importa bando
-        <input type="file" name="bando_json" accept=".json" required
-               style="display:none"
-               onchange="this.closest('form').submit()">
-      </label>
-    </form>
+    <a href="/bandi/import" class="btn btn-secondary btn-sm">↑ Importa bando</a>
   </div>
 </div>
 

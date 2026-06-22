@@ -71,8 +71,11 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 	mux.Handle("POST /bandi/{id}/duplica", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostDuplica))))
 	mux.Handle("POST /bandi/{id}/archivia", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostArchivia))))
 	mux.Handle("GET /bandi/{id}/export", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetExportBando))))
+	mux.Handle("GET /bandi/import", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetImport))))
 	mux.Handle("POST /bandi/import", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostImportBando))))
 	mux.Handle("POST /bandi/{id}/rinomina", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostRinomina))))
+	mux.Handle("GET /bandi/{id}/parametri/edit", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.GetEditParametri))))
+	mux.Handle("POST /bandi/{id}/parametri/edit", authMW(middleware.RequireAdmin(http.HandlerFunc(bandi.PostEditParametri))))
 
 	// Graduatorie
 	mux.Handle("POST /bandi/{id}/run", authMW(http.HandlerFunc(grad.PostCalcola)))

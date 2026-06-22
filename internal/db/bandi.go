@@ -93,8 +93,8 @@ func GetBandoByServiceID(db *sql.DB, serviceID string) (*Bando, error) {
 
 func UpdateBando(db *sql.DB, b *Bando) error {
 	_, err := db.Exec(
-		`UPDATE bandi SET nome=?, budget_totale=?, isee_massimo=?, scadenza_presentazione=?, engine_type=?, engine_config=?, attivo=?, stato_bando=? WHERE id=?`,
-		b.Nome, b.BudgetTotale, b.ISEEMassimo, b.ScadenzaPresentazione, b.EngineType, b.EngineConfig, boolToInt(b.Attivo), b.StatoBando, b.ID,
+		`UPDATE bandi SET service_id=?, nome=?, budget_totale=?, isee_massimo=?, scadenza_presentazione=?, engine_type=?, engine_config=?, attivo=?, stato_bando=? WHERE id=?`,
+		b.ServiceID, b.Nome, b.BudgetTotale, b.ISEEMassimo, b.ScadenzaPresentazione, b.EngineType, b.EngineConfig, boolToInt(b.Attivo), b.StatoBando, b.ID,
 	)
 	return err
 }

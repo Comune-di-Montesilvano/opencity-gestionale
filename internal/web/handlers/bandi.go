@@ -771,6 +771,44 @@ func (h *BandiHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
+// GetImport carica la pagina di importazione bando mostrando la lista dei servizi disponibili.
+func (h *BandiHandler) GetImport(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	client := opencity.NewClient(h.BaseURL, op.JWT)
+	rawServizi, err := client.FetchServices()
+
+	type Servizio struct {
+		ID   string
+		Nome string
+	}
+	var servizi []Servizio
+	var errText string
+	if err != nil {
+		errText = err.Error()
+	} else {
+		for _, raw := range rawServizi {
+			var s struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			}
+			if json.Unmarshal(raw, &s) == nil && s.ID != "" {
+				servizi = append(servizi, Servizio{ID: s.ID, Nome: s.Name})
+			}
+		}
+	}
+
+	renderTemplate(w, "bando_import.html", map[string]any{
+		"Op":      op,
+		"Servizi": servizi,
+		"Errore":  errText,
+	})
+}
+
 // PostImportBando carica un file JSON esportato e crea un nuovo bando in stato bozza.
 func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
@@ -803,7 +841,13 @@ func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/?flash=Versione+export+non+supportata&flashType=error", http.StatusSeeOther)
 		return
 	}
-	if exp.ServiceID == "" || exp.EngineType == "" {
+
+	serviceID := strings.TrimSpace(r.FormValue("service_id"))
+	if serviceID == "" {
+		serviceID = exp.ServiceID
+	}
+
+	if serviceID == "" || exp.EngineType == "" {
 		http.Redirect(w, r, "/?flash=File+export+non+valido+(service_id+o+engine_type+mancante)&flashType=error", http.StatusSeeOther)
 		return
 	}
@@ -814,14 +858,19 @@ func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nome := exp.Nome
+	nome := strings.TrimSpace(r.FormValue("nome"))
 	if nome == "" {
-		nome = "Bando importato"
+		nome = exp.Nome
+		if nome == "" {
+			nome = "Bando importato"
+		} else {
+			nome = nome + " (importato)"
+		}
 	}
 
 	newBando := &db.Bando{
-		ServiceID:             exp.ServiceID,
-		Nome:                  nome + " (importato)",
+		ServiceID:             serviceID,
+		Nome:                  nome,
 		BudgetTotale:          exp.BudgetTotale,
 		ISEEMassimo:           exp.ISEEMassimo,
 		ScadenzaPresentazione: exp.ScadenzaPresentazione,
@@ -840,6 +889,89 @@ func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2?flash=Bando+importato+con+successo&flashType=success", newID), http.StatusSeeOther)
 }
+
+// GetEditParametri visualizza il form HTMX per la modifica dei parametri di un bando.
+func (h *BandiHandler) GetEditParametri(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	id := bandoIDFromPath(r)
+	bando, err := db.GetBando(h.DB, id)
+	if err != nil {
+		notFound(w, r)
+		return
+	}
+
+	client := opencity.NewClient(h.BaseURL, op.JWT)
+	rawServizi, err := client.FetchServices()
+
+	type Servizio struct {
+		ID   string
+		Nome string
+	}
+	var servizi []Servizio
+	if err == nil {
+		for _, raw := range rawServizi {
+			var s struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			}
+			if json.Unmarshal(raw, &s) == nil && s.ID != "" {
+				servizi = append(servizi, Servizio{ID: s.ID, Nome: s.Name})
+			}
+		}
+	}
+
+	renderTemplate(w, "bando_parametri_edit.html", map[string]any{
+		"Op":      op,
+		"Bando":   bando,
+		"Servizi": servizi,
+	})
+}
+
+// PostEditParametri salva le modifiche ai parametri del bando.
+func (h *BandiHandler) PostEditParametri(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	id := bandoIDFromPath(r)
+	bando, err := db.GetBando(h.DB, id)
+	if err != nil {
+		notFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Form non valido", http.StatusBadRequest)
+		return
+	}
+
+	nome := strings.TrimSpace(r.FormValue("nome"))
+	serviceID := strings.TrimSpace(r.FormValue("service_id"))
+
+	if nome == "" || serviceID == "" {
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Nome+e+Servizio+sono+obbligatori&flashType=error", id), http.StatusSeeOther)
+		return
+	}
+
+	bando.Nome = nome
+	bando.ServiceID = serviceID
+	bando.BudgetTotale = parseFloat(r.FormValue("budget_totale"))
+	bando.ISEEMassimo = parseFloat(r.FormValue("isee_massimo"))
+	bando.ScadenzaPresentazione = r.FormValue("scadenza")
+
+	if err := db.UpdateBando(h.DB, bando); err != nil {
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Errore+salvataggio:+%s&flashType=error", id, url.QueryEscape(err.Error())), http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Parametri+aggiornati&flashType=success", id), http.StatusSeeOther)
+}
+
 
 // --- CRUD actions ---
 

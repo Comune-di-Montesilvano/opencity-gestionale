@@ -14,7 +14,9 @@
     {{if .Op.IsAdmin}}
     <a href="/bandi/{{.Bando.ID}}/wizard/2" class="btn btn-secondary btn-sm">Modifica wizard</a>
     <button type="button" class="btn btn-secondary btn-sm"
-      onclick="document.getElementById('rinomina-form-{{.Bando.ID}}').style.display='flex'">Rinomina</button>
+      hx-get="/bandi/{{.Bando.ID}}/parametri/edit"
+      hx-target="#dettaglio-parametri"
+      hx-swap="outerHTML">Modifica parametri</button>
     {{if ne .Bando.StatoBando "archiviato"}}
     <form method="POST" action="/bandi/{{.Bando.ID}}/archivia" style="display:inline">
       <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Archiviare questo bando?')">Archivia</button>
@@ -28,21 +30,14 @@
   </div>
 </div>
 
-{{if .Op.IsAdmin}}
-<form id="rinomina-form-{{.Bando.ID}}" method="POST" action="/bandi/{{.Bando.ID}}/rinomina"
-      style="display:none;gap:.5rem;align-items:center;margin-bottom:1rem">
-  <input type="text" name="nome" value="{{.Bando.Nome}}" class="form-control" style="max-width:300px" required>
-  <button type="submit" class="btn btn-secondary btn-sm">Salva</button>
-  <button type="button" class="btn btn-sm" onclick="this.closest('form').style.display='none'">Annulla</button>
-</form>
-{{end}}
-
-<div class="detail-grid">
-  <div><strong>Service ID</strong><br><code style="font-size:.8em">{{.Bando.ServiceID}}</code></div>
-  <div><strong>Budget totale</strong><br>€{{printf "%.2f" .Bando.BudgetTotale}}</div>
-  <div><strong>ISEE massimo</strong><br>€{{printf "%.2f" .Bando.ISEEMassimo}}</div>
-  <div><strong>Scadenza</strong><br>{{.Bando.ScadenzaPresentazione}}</div>
-  <div><strong>Creato</strong><br>{{.Bando.CreatedAt.Format "02/01/2006"}}</div>
+<div id="dettaglio-parametri" style="margin-bottom: 2rem;">
+  <div class="detail-grid">
+    <div><strong>Service ID</strong><br><code style="font-size:.8em">{{.Bando.ServiceID}}</code></div>
+    <div><strong>Budget totale</strong><br>€{{printf "%.2f" .Bando.BudgetTotale}}</div>
+    <div><strong>ISEE massimo</strong><br>€{{printf "%.2f" .Bando.ISEEMassimo}}</div>
+    <div><strong>Scadenza</strong><br>{{.Bando.ScadenzaPresentazione}}</div>
+    <div><strong>Creato</strong><br>{{.Bando.CreatedAt.Format "02/01/2006"}}</div>
+  </div>
 </div>
 
 {{if .Config.Verifica.Attiva}}

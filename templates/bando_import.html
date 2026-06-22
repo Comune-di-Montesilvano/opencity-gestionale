@@ -1,0 +1,62 @@
+{{define "bando_import.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Importa bando{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Importa bando</h1>
+  <a href="/bandi" class="btn btn-secondary">Annulla</a>
+</div>
+
+{{if .Errore}}
+<div class="alert alert-error" style="margin-bottom:1.5rem">
+  Errore caricamento servizi OpenCity: {{.Errore}}
+</div>
+{{end}}
+
+<div class="card" style="max-width:600px">
+  <h2>Seleziona file e aggancia servizio</h2>
+  <p class="text-muted">Seleziona il file JSON esportato da un altro bando ed associalo a uno dei servizi attivi in questo comune.</p>
+
+  <form method="POST" action="/bandi/import" enctype="multipart/form-data" style="margin-top:1.5rem">
+    <div class="form-group" style="margin-bottom:1.5rem">
+      <label style="font-weight:bold; display:block; margin-bottom:.5rem">File bando (.json)</label>
+      <input type="file" name="bando_json" accept=".json" required class="form-control">
+    </div>
+
+    <div class="form-group" style="margin-bottom:1.5rem">
+      <label style="font-weight:bold; display:block; margin-bottom:.5rem">Servizio OpenCity di destinazione</label>
+      {{if not .Servizi}}
+      <p class="text-error">Nessun servizio disponibile. Impossibile importare.</p>
+      {{else}}
+      <select name="service_id" class="form-control" required style="width:100%">
+        <option value="" disabled selected>— Seleziona servizio —</option>
+        {{range .Servizi}}
+        <option value="{{.ID}}">{{.Nome}} ({{.ID}})</option>
+        {{end}}
+      </select>
+      {{end}}
+    </div>
+
+    <h3 style="margin-top:2rem">Parametri opzionali</h3>
+    <p class="text-muted" style="font-size:.85rem; margin-bottom:1rem">Lascia vuoto per utilizzare i valori presenti all'interno del file JSON importato.</p>
+    
+    <div class="form-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem">
+      <div class="form-group">
+        <label>Nome bando (personalizzato)</label>
+        <input type="text" name="nome" class="form-control" placeholder="es. Rette Mense 2025 (importato)">
+      </div>
+      <div class="form-group">
+        <label>Scadenza presentazione</label>
+        <input type="date" name="scadenza" class="form-control">
+      </div>
+    </div>
+
+    <div class="form-actions" style="margin-top:2rem">
+      <button type="submit" class="btn btn-primary" {{if not .Servizi}}disabled{{end}}>Importa configurazione bando →</button>
+    </div>
+  </form>
+</div>
+{{end}}

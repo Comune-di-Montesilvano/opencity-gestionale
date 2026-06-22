@@ -1,0 +1,40 @@
+<div id="dettaglio-parametri" class="card" style="margin-bottom: 2rem;">
+  <h3>Modifica parametri base</h3>
+  <form method="POST" action="/bandi/{{.Bando.ID}}/parametri/edit">
+    <div class="form-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem">
+      <div class="form-group" style="grid-column: span 2">
+        <label style="font-weight:bold; display:block; margin-bottom:.3rem">Nome bando</label>
+        <input type="text" name="nome" value="{{.Bando.Nome}}" class="form-control" required style="width:100%">
+      </div>
+      
+      <div class="form-group" style="grid-column: span 2">
+        <label style="font-weight:bold; display:block; margin-bottom:.3rem">Servizio OpenCity collegato</label>
+        <select name="service_id" class="form-control" required style="width:100%">
+          {{range .Servizi}}
+          <option value="{{.ID}}" {{if eq $.Bando.ServiceID .ID}}selected{{end}}>{{.Nome}} ({{.ID}})</option>
+          {{end}}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="font-weight:bold; display:block; margin-bottom:.3rem">Budget totale (€)</label>
+        <input type="number" name="budget_totale" value="{{.Bando.BudgetTotale}}" class="form-control" step="0.01" min="0" style="width:100%">
+      </div>
+
+      <div class="form-group">
+        <label style="font-weight:bold; display:block; margin-bottom:.3rem">ISEE massimo (€)</label>
+        <input type="number" name="isee_massimo" value="{{.Bando.ISEEMassimo}}" class="form-control" step="0.01" min="0" style="width:100%">
+      </div>
+
+      <div class="form-group">
+        <label style="font-weight:bold; display:block; margin-bottom:.3rem">Scadenza presentazione</label>
+        <input type="date" name="scadenza" value="{{.Bando.ScadenzaPresentazione}}" class="form-control" style="width:100%">
+      </div>
+    </div>
+    
+    <div style="display:flex; gap:.5rem; margin-top:1.5rem">
+      <button type="submit" class="btn btn-primary btn-sm">Salva modifiche</button>
+      <a href="/bandi/{{.Bando.ID}}" class="btn btn-secondary btn-sm">Annulla</a>
+    </div>
+  </form>
+</div>
