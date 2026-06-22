@@ -20,6 +20,12 @@
 </div>
 
 <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/6" style="max-width:560px">
+  <div class="wizard-nav">
+    <a href="/bandi/{{.Bando.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
+    <div class="wizard-nav-right">
+      <button type="submit" class="btn btn-primary">Salva e continua →</button>
+    </div>
+  </div>
   <h2>Calcolo rimborso</h2>
   <p class="text-muted">Definisci come si calcola l'importo da rimborsare per ogni istanza ammessa.</p>
 
@@ -58,11 +64,6 @@
       <option value="{{.}}" {{if eq . $.Rimborso.CampoDeduzione}}selected{{end}}>{{.}}</option>
       {{end}}
     </select>
-  </div>
-
-  <div class="form-actions" style="margin-top:1.5rem">
-    <a href="/bandi/{{.Bando.ID}}/wizard/5" class="btn btn-secondary">← Indietro</a>
-    <button type="submit" class="btn btn-primary">Salva e continua →</button>
   </div>
 </form>
 {{end}}
