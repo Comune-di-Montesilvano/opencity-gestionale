@@ -151,6 +151,48 @@
         {{end}}
       </div>
       {{end}}
+      {{if $.CampiVerifica}}
+      <div style="margin-top:.4rem">
+        {{range $.CampiVerifica}}
+        {{$campo := .}}
+        {{$hasDato := index $riga.Dati $campo}}
+        {{$statoKey := statoVerificaKey $campo}}
+        {{$stato := index $riga.Dati $statoKey}}
+        <div style="margin-bottom:.2rem">
+          <div style="display:flex;gap:.3rem;align-items:center">
+            <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$campo}} ✎:</span>
+            {{if $hasDato}}
+              {{if eq $stato "sovrascitto"}}
+              <span id="badge-{{$riga.ID}}-verifica-{{$campo}}"
+                    style="font-family:monospace;font-size:.8rem;background:#fffbeb;color:#92400e;padding:1px 6px;border-radius:4px;border:1px solid #fde68a">{{$hasDato}} (sovr.)</span>
+              {{else}}
+              <span id="badge-{{$riga.ID}}-verifica-{{$campo}}"
+                    style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
+              {{end}}
+              <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
+                      onclick="document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}').style.display='inline-block'">modifica</button>
+            {{end}}
+            <input type="text"
+                   id="input-{{$riga.ID}}-verifica-{{$campo}}"
+                   value="{{$hasDato}}"
+                   placeholder="valore verificato"
+                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
+                   hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
+                   hx-vals='{"campo": "{{$campo}}"}'
+                   hx-include="this"
+                   hx-trigger="change"
+                   hx-target="#motivi-{{$riga.ID}}"
+                   hx-swap="innerHTML"
+                   hx-on:htmx:before-request="this.style.opacity='.5'"
+                   hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){var b=document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}');if(!b){b=document.createElement('span');b.id='badge-{{$riga.ID}}-verifica-{{$campo}}';b.style.cssText='font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';this.parentNode.insertBefore(b,this);}b.textContent=this.value+' ✓';b.style.display='';this.style.display='none';this.style.outline='2px solid #16a34a';this.style.background='#f0fdf4';setTimeout(()=>{this.style.outline='';this.style.background=''},2500)}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2500)}"
+                   name="valore">
+            {{if not $hasDato}}<span style="font-size:.72rem;color:#9ca3af">verifica operatore</span>{{end}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+      {{end}}
     </td>
     <td>
       {{if eq .Stato "da_verificare"}}<span class="badge" style="background:#fef2f2;color:#dc2626">Da verificare</span>

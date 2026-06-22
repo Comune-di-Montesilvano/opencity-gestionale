@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -48,6 +50,14 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 	stats, _ := db.GetIstruttoriaStats(h.DB, int(bandoID))
 	statiApp, _ := db.ListStatiApp(h.DB, int(bandoID))
 
+	var campiVerifica []string
+	for nome, fm := range ecfg.Mapping {
+		if fm.VerificaPath != "" {
+			campiVerifica = append(campiVerifica, nome)
+		}
+	}
+	sort.Strings(campiVerifica)
+
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
 		"Op":              op,
@@ -61,7 +71,104 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"BaseURL":         h.BaseURL,
 		"Flash":           flash,
 		"FlashType":       flashType,
+		"CampiVerifica":   campiVerifica,
 	})
+}
+
+// EseguiScansioneIstruttoria esegue la scansione delle istanze per flaggare le domande da verificare.
+// Se statiSelezionati è vuoto, analizza tutti gli stati.
+func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando, jwtToken string, operatore string, statiSelezionati []string) (int, error) {
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
+	if !ecfg.Verifica.Attiva {
+		return 0, nil
+	}
+
+	statiSet := map[string]bool{}
+	for _, s := range statiSelezionati {
+		statiSet[s] = true
+	}
+
+	client := opencity.NewClient(baseURL, jwtToken)
+	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
+	if err != nil {
+		return 0, fmt.Errorf("fetch istanze: %w", err)
+	}
+
+	// Pulisce i record da_verificare
+	if err := db.ResetDaVerificare(dbConn, int(bando.ID)); err != nil {
+		return 0, fmt.Errorf("reset da_verificare: %w", err)
+	}
+
+	// Legge dati locali già salvati per override
+	datiLocali, _ := db.GetIstruttorieDati(dbConn, int(bando.ID))
+
+	nuove := 0
+	for _, raw := range rawApps {
+		var app opencity.Application
+		if json.Unmarshal(raw, &app) != nil {
+			continue
+		}
+		if len(statiSet) > 0 && !statiSet[app.Status] {
+			continue
+		}
+		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) {
+			continue
+		}
+		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
+		if err != nil || len(records) == 0 {
+			continue
+		}
+		var passingRecords []*graduatoria.Record
+		for _, rec := range records {
+			rec.DerivaCampi(ecfg.Rimborso)
+			if ok, _ := generic.ApplicaFiltri(rec, ecfg.Filtri); ok {
+				passingRecords = append(passingRecords, rec)
+			}
+		}
+		if len(passingRecords) == 0 {
+			continue
+		}
+		if len(ecfg.Tipologie) > 0 {
+			hasTipologia := false
+			for _, rec := range passingRecords {
+				if generic.TipologiaDiRecord(rec, ecfg.Tipologie) != "" {
+					hasTipologia = true
+					break
+				}
+			}
+			if !hasTipologia {
+				continue
+			}
+		}
+		motiviSet := map[string]struct{}{}
+		for _, rec := range passingRecords {
+			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
+				motiviSet[m] = struct{}{}
+			}
+		}
+		if len(motiviSet) == 0 {
+			continue
+		}
+		motivi := make([]string, 0, len(motiviSet))
+		for m := range motiviSet {
+			motivi = append(motivi, m)
+		}
+		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, app.Status); err == nil {
+			nuove++
+		}
+	}
+
+	db.InsertAudit(dbConn, &db.AuditAction{
+		Operatore: operatore,
+		Azione:    "istruttoria_scansione_automatica",
+		BandoID:   bando.ID,
+		Esito:     "ok",
+		Messaggio: fmt.Sprintf("%d domande flaggate (automatica)", nuove),
+	})
+
+	return nuove, nil
 }
 
 // PostScansiona — fetch tutte le app, applica FiltriFlag+PDND, popola istruttorie.
@@ -92,97 +199,12 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	statiSelezionati := r.Form["stati"]
-	statiSet := map[string]bool{}
-	for _, s := range statiSelezionati {
-		statiSet[s] = true
-	}
 
-	client := opencity.NewClient(h.BaseURL, op.JWT)
-	rawApps, err := client.FetchAllApplications(bando.ServiceID, nil)
+	nuove, err := EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, op.JWT, op.Username, statiSelezionati)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Errore+fetch+istanze:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Errore+scansione:+%s&flashType=error", bandoID, url.QueryEscape(err.Error())), http.StatusSeeOther)
 		return
 	}
-
-	// Pulisce i record da_verificare: la scansione reimposta lo stato da zero.
-	// Record approvata/esclusa vengono preservati.
-	if err := db.ResetDaVerificare(h.DB, int(bandoID)); err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Errore+reset:+%s&flashType=error", bandoID, err.Error()), http.StatusSeeOther)
-		return
-	}
-
-	// Legge dati locali già salvati per applicare override durante la scansione.
-	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
-
-	nuove := 0
-	for _, raw := range rawApps {
-		var app opencity.Application
-		if json.Unmarshal(raw, &app) != nil {
-			continue
-		}
-		// Filtra per stato se selezionato almeno uno.
-		if len(statiSet) > 0 && !statiSet[app.Status] {
-			continue
-		}
-		// Applica FiltriIstanza (stati ammessi + date) — stessa logica di Calcola().
-		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) {
-			continue
-		}
-		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
-		if err != nil || len(records) == 0 {
-			continue
-		}
-		// Salta app che verrebbero comunque escluse dai filtri ammissibilità.
-		// Accumula anche i record passanti per raccogliere solo i loro motivi.
-		var passingRecords []*graduatoria.Record
-		for _, rec := range records {
-			rec.DerivaCampi(ecfg.Rimborso)
-			if ok, _ := generic.ApplicaFiltri(rec, ecfg.Filtri); ok {
-				passingRecords = append(passingRecords, rec)
-			}
-		}
-		if len(passingRecords) == 0 {
-			continue
-		}
-		// Salta app dove nessun record passante matcha una tipologia —
-		// in calcolo andrebbero tutte in escluse, non servono verifica.
-		if len(ecfg.Tipologie) > 0 {
-			hasTipologia := false
-			for _, rec := range passingRecords {
-				if generic.TipologiaDiRecord(rec, ecfg.Tipologie) != "" {
-					hasTipologia = true
-					break
-				}
-			}
-			if !hasTipologia {
-				continue
-			}
-		}
-		motiviSet := map[string]struct{}{}
-		for _, rec := range passingRecords {
-			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
-				motiviSet[m] = struct{}{}
-			}
-		}
-		if len(motiviSet) == 0 {
-			continue
-		}
-		motivi := make([]string, 0, len(motiviSet))
-		for m := range motiviSet {
-			motivi = append(motivi, m)
-		}
-		if err := db.UpsertIstruttoria(h.DB, int(bandoID), app.ID, motivi, app.Status); err == nil {
-			nuove++
-		}
-	}
-
-	db.InsertAudit(h.DB, &db.AuditAction{
-		Operatore: op.Username,
-		Azione:    "istruttoria_scansione",
-		BandoID:   bandoID,
-		Esito:     "ok",
-		Messaggio: fmt.Sprintf("%d domande flaggate", nuove),
-	})
 
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Scansione+completata:+%d+domande+flaggate&flashType=success", bandoID, nuove), http.StatusSeeOther)
 }
@@ -273,6 +295,9 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
 	// Salva il dato locale.
 	if err := db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, campo, valore); err != nil {
 		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
@@ -281,14 +306,42 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 
 	// Ri-valuta i motivi recuperando l'app da OpenCity e applicando i dati locali aggiornati.
 	var motivi []string
-	var ecfg graduatoria.EngineConfig
-	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	if app, err := client.FetchApplication(praticaID); err == nil {
 		// Legge tutti i dati locali aggiornati per questa pratica.
 		allDati, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
 		extras := allDati[praticaID]
+
+		// Per campi verifica: determina se il valore è sovrascitto o confermato.
+		if fm, ok := ecfg.Mapping[campo]; ok && fm.VerificaPath != "" && valore != "" {
+			recOrig, _ := generic.EstraiRecordsConExtras(*app, ecfg, nil)
+			stato := "sovrascitto"
+			if len(recOrig) > 0 {
+				rec := recOrig[0]
+				origStr := ""
+				if v, ok := rec.FloatMap[campo]; ok {
+					origStr = strconv.FormatFloat(v, 'f', -1, 64)
+				} else if v, ok := rec.IntMap[campo]; ok {
+					origStr = strconv.Itoa(v)
+				} else {
+					origStr = rec.StringMap[campo]
+				}
+				if strings.TrimSpace(valore) == strings.TrimSpace(origStr) {
+					stato = "confermato"
+				}
+			}
+			_ = db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, "__stato_verifica_"+campo, stato)
+			// Rilegge extras aggiornati con lo stato verifica.
+			allDati, _ = db.GetIstruttorieDati(h.DB, int(bandoID))
+			extras = allDati[praticaID]
+		} else if valore == "" {
+			// Valore cancellato: rimuove anche il metadato stato.
+			_ = db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, "__stato_verifica_"+campo, "")
+			allDati, _ = db.GetIstruttorieDati(h.DB, int(bandoID))
+			extras = allDati[praticaID]
+		}
+
 		records, _ := generic.EstraiRecordsConExtras(*app, ecfg, extras)
 		motiviSet := map[string]struct{}{}
 		for _, rec := range records {
@@ -308,8 +361,24 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Carica dati aggiornati per il partial (include stato_verifica).
+	allDatiPost, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
+	datiPratica := allDatiPost[praticaID]
+
+	var campiVerifica []string
+	for nome, fm := range ecfg.Mapping {
+		if fm.VerificaPath != "" {
+			campiVerifica = append(campiVerifica, nome)
+		}
+	}
+	sort.Strings(campiVerifica)
+
 	renderTemplate(w, "istruttoria_dato_partial.html", map[string]any{
-		"Motivi": motivi,
+		"Motivi":        motivi,
+		"CampiVerifica": campiVerifica,
+		"Dati":          datiPratica,
+		"BandoID":       bandoID,
+		"PraticaID":     praticaID,
 	})
 }
 

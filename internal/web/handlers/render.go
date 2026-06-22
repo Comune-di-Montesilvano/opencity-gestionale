@@ -59,6 +59,9 @@ var funcMap = template.FuncMap{
 	"safeJSON": func(s string) template.JS {
 		return template.JS(s)
 	},
+	"statoVerificaKey": func(campo string) string {
+		return "__stato_verifica_" + campo
+	},
 	"statusLabel": func(code string) string {
 		labels := map[string]string{
 			"1000":  "Bozza (1000)",
