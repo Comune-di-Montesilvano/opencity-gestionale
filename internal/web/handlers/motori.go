@@ -732,7 +732,12 @@ func (h *MotoriHandler) GetExportBando(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ecfg graduatoria.EngineConfig
-	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+	if bando.EngineConfig != "" {
+		if err := json.Unmarshal([]byte(bando.EngineConfig), &ecfg); err != nil {
+			http.Error(w, "Configurazione engine corrotta: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 
 	exp := BandoExport{
 		Version:               "1",
