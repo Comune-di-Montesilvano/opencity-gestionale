@@ -163,34 +163,47 @@ func buildGraduatoriaFondi(ammissibili []*graduatoria.Record, grad *graduatoria.
 
 func (e *Engine) CSVHeaders() []string {
 	return []string{
-		"Posizione", "Ammessa", "AppID", "CF Richiedente", "CF Figlio",
-		"ISEE", "Corrispettivo", "Beneficio Ricevuto", "Importo Rimborso",
-		"Tipologia", "Annualita", "Note",
+		"Posizione", "Categoria", "Protocollo", "Data Invio",
+		"Cognome", "Nome", "Email", "Tel",
+		"CF Richiedente", "CF Figlio",
+		"ISEE", "ISEE Valido Fino",
+		"Corrispettivo", "Beneficio Ricevuto", "Importo Rimborso",
+		"Tipologia", "Annualita", "IBAN",
+		"Stato", "Note Esclusione", "Link",
 	}
 }
 
-func (e *Engine) CSVRecord(categoria string, r graduatoria.RigaGraduatoria) []string {
+func (e *Engine) CSVRecord(categoria string, r graduatoria.RigaGraduatoria, baseURL string) []string {
 	ist := r.Istanza
 	if ist == nil {
 		return []string{fmt.Sprintf("%d", r.Posizione), categoria}
 	}
-	ammessa := "no"
-	if r.Ammessa {
-		ammessa = "si"
+	link := ""
+	if baseURL != "" && ist.ID != "" {
+		link = baseURL + "/lang/it/operatori/" + ist.ID + "/detail"
 	}
 	return []string{
 		fmt.Sprintf("%d", r.Posizione),
-		ammessa,
-		ist.ID,
+		categoria,
+		ist.ProtocolNumber,
+		ist.SubmittedAt,
+		ist.RichiedenteCognome,
+		ist.RichiedenteNome,
+		ist.RichiedenteEmail,
+		ist.RichiedenteTel,
 		ist.RichiedenteCF,
 		ist.FiglioSelezionatoCF,
 		fmt.Sprintf("%.2f", ist.ISEE),
+		ist.ISEEValidoFino,
 		fmt.Sprintf("%.2f", ist.Corrispettivo),
 		fmt.Sprintf("%.2f", ist.BeneficioRicevuto),
 		fmt.Sprintf("%.2f", r.ImportoRimborso),
 		ist.TipoRichiesta,
 		fmt.Sprintf("%d", ist.Annualita),
+		ist.IBAN,
+		ist.Status,
 		r.NoteEsclusione,
+		link,
 	}
 }
 
@@ -228,8 +241,13 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras
 	}
 
 	elements, err := extractor.ArrayElements(app.Data, cfg.Espansione)
-	if err != nil || len(elements) == 0 {
+	if err != nil {
+		// Path invalido → fallback a base record (comportamento legacy)
 		return []*graduatoria.Record{base}, nil
+	}
+	if len(elements) == 0 {
+		// Espansione configurata ma nessun elemento matchante → nessun dato per questo bando
+		return nil, nil
 	}
 
 	out := make([]*graduatoria.Record, 0, len(elements))
@@ -396,7 +414,19 @@ func applicaFiltri(rec *graduatoria.Record, filtri []graduatoria.FiltroConfig) (
 	return true, ""
 }
 
-// passaFiltriIstanza verifica stato e date presentazione prima dell'estrazione campi.
+// PassaFiltriIstanza verifica stato e date presentazione prima dell'estrazione campi.
+// Esportata per uso in istruttoria scansiona.
+func PassaFiltriIstanza(app opencity.Application, cfg graduatoria.FiltriIstanzaConfig) bool {
+	return passaFiltriIstanza(app, cfg)
+}
+
+// TipologiaDiRecord ritorna il nome della tipologia che matcha il record, o "" se nessuna.
+// Esportata per uso in istruttoria scansiona (coerenza con calcolo).
+func TipologiaDiRecord(rec *graduatoria.Record, tipologie []graduatoria.TipologiaConfig) string {
+	nome, _ := tipologiaDiRecord(rec, tipologie)
+	return nome
+}
+
 func passaFiltriIstanza(app opencity.Application, cfg graduatoria.FiltriIstanzaConfig) bool {
 	if len(cfg.StatiAmmessi) > 0 {
 		ok := false

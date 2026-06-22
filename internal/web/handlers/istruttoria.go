@@ -124,24 +124,42 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 		if len(statiSet) > 0 && !statiSet[app.Status] {
 			continue
 		}
+		// Applica FiltriIstanza (stati ammessi + date) — stessa logica di Calcola().
+		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) {
+			continue
+		}
 		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
 		if err != nil || len(records) == 0 {
 			continue
 		}
 		// Salta app che verrebbero comunque escluse dai filtri ammissibilità.
-		tuttiEsclusi := true
+		// Accumula anche i record passanti per raccogliere solo i loro motivi.
+		var passingRecords []*graduatoria.Record
 		for _, rec := range records {
 			rec.DerivaCampi(ecfg.Rimborso)
 			if ok, _ := generic.ApplicaFiltri(rec, ecfg.Filtri); ok {
-				tuttiEsclusi = false
-				break
+				passingRecords = append(passingRecords, rec)
 			}
 		}
-		if tuttiEsclusi {
+		if len(passingRecords) == 0 {
 			continue
 		}
+		// Salta app dove nessun record passante matcha una tipologia —
+		// in calcolo andrebbero tutte in escluse, non servono verifica.
+		if len(ecfg.Tipologie) > 0 {
+			hasTipologia := false
+			for _, rec := range passingRecords {
+				if generic.TipologiaDiRecord(rec, ecfg.Tipologie) != "" {
+					hasTipologia = true
+					break
+				}
+			}
+			if !hasTipologia {
+				continue
+			}
+		}
 		motiviSet := map[string]struct{}{}
-		for _, rec := range records {
+		for _, rec := range passingRecords {
 			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
 				motiviSet[m] = struct{}{}
 			}

@@ -264,7 +264,7 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 		if !riga.Ammessa && riga.NoteEsclusione != "fondi esauriti" {
 			cat = "esclusa"
 		}
-		cw.Write(engine.CSVRecord(cat, riga))
+		cw.Write(engine.CSVRecord(cat, riga, h.BaseURL))
 	}
 	cw.Flush()
 }
@@ -407,45 +407,21 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	engine, _ := graduatoria.GetEngine(bando.EngineType)
+
 	filename := fmt.Sprintf("run%d_%s.csv", runID, nome)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
-	cw.Write([]string{"Posizione", "ID", "CF Richiedente", "CF Figlio", "ISEE", "Rimborso", "Ammessa", "Note"})
+	cw.Write(engine.CSVHeaders())
 	for _, riga := range righe {
-		ammessa := "no"
-		if riga.Ammessa {
-			ammessa = "si"
+		cat := nome
+		if !riga.Ammessa {
+			cat = "fuori_fondi"
 		}
-		isee := ""
-		rimborso := ""
-		cfFiglio := ""
-		cfRich := ""
-		if riga.Istanza != nil {
-			isee = fmt.Sprintf("%.2f", riga.Istanza.ISEE)
-			cfFiglio = riga.Istanza.FiglioSelezionatoCF
-			cfRich = riga.Istanza.RichiedenteCF
-		}
-		if riga.Ammessa {
-			rimborso = fmt.Sprintf("%.2f", riga.ImportoRimborso)
-		}
-		cw.Write([]string{
-			fmt.Sprintf("%d", riga.Posizione),
-			func() string {
-				if riga.Istanza != nil {
-					return riga.Istanza.ID
-				}
-				return ""
-			}(),
-			cfRich,
-			cfFiglio,
-			isee,
-			rimborso,
-			ammessa,
-			riga.NoteEsclusione,
-		})
+		cw.Write(engine.CSVRecord(cat, riga, h.BaseURL))
 	}
 	cw.Flush()
 }

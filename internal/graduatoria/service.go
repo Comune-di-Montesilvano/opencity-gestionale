@@ -32,7 +32,8 @@ type ServiceEngine interface {
 	CSVHeaders() []string
 
 	// CSVRecord serializza una riga della graduatoria in record CSV.
-	CSVRecord(categoria string, r RigaGraduatoria) []string
+	// baseURL è l'URL base OpenCity per costruire il link diretto all'istanza.
+	CSVRecord(categoria string, r RigaGraduatoria, baseURL string) []string
 }
 
 var registry = map[string]ServiceEngine{}

@@ -281,6 +281,10 @@ func ArrayElements(data json.RawMessage, path string) ([]json.RawMessage, error)
 	if err != nil {
 		return nil, err
 	}
+	// Filter-mode: "arrayKey[condition]" senza navigazione dopo → ritorna TUTTI i matching.
+	if filtered, ok, err2 := tryFilterArray(v, path); ok {
+		return filtered, err2
+	}
 	node, err := resolveNode(v, path)
 	if err != nil {
 		return nil, err
@@ -298,6 +302,114 @@ func ArrayElements(data json.RawMessage, path string) ([]json.RawMessage, error)
 		out[i] = b
 	}
 	return out, nil
+}
+
+// tryFilterArray gestisce il pattern "arrayKey[cond]" (senza '.' dopo il ']' finale).
+// Ritorna tutti gli elementi dell'array che soddisfano la condizione.
+// Ritorna (nil, false, nil) se il pattern non è rilevato (delegare a resolveNode).
+func tryFilterArray(v any, path string) ([]json.RawMessage, bool, error) {
+	idxOpen := strings.Index(path, "[")
+	if idxOpen <= 0 || !strings.HasSuffix(path, "]") {
+		return nil, false, nil
+	}
+	arrayKey := path[:idxOpen]
+	cond := path[idxOpen+1 : len(path)-1]
+
+	// Non attivare per indici numerici o aggregazioni max:/min:
+	if allDigits(cond) || strings.HasPrefix(cond, "max:") || strings.HasPrefix(cond, "min:") {
+		return nil, false, nil
+	}
+
+	condKey, condOp, condVal, ok := parseCond(cond)
+	if !ok {
+		return nil, false, nil
+	}
+
+	m, mOk := v.(map[string]any)
+	if !mOk {
+		return nil, true, fmt.Errorf("atteso oggetto per chiave %q", arrayKey)
+	}
+	val, exists := m[arrayKey]
+	if !exists {
+		return nil, true, fmt.Errorf("chiave %q non trovata", arrayKey)
+	}
+	arr, aOk := val.([]any)
+	if !aOk {
+		return nil, true, fmt.Errorf("atteso array a %q, trovato %T", arrayKey, val)
+	}
+
+	var out []json.RawMessage
+	for _, elem := range arr {
+		vKey, err := resolveNode(elem, condKey)
+		if err != nil {
+			continue
+		}
+		if matchesCond(vKey, condOp, condVal) {
+			b, _ := json.Marshal(elem)
+			out = append(out, b)
+		}
+	}
+	return out, true, nil
+}
+
+// parseCond estrae condKey, condOp, condVal da una stringa condizione come "annualita1==20242025".
+func parseCond(cond string) (key, op, val string, ok bool) {
+	for _, o := range []string{"!=", ">=", "<=", "~", ">", "<", "==", "="} {
+		idx := strings.Index(cond, o)
+		if idx >= 0 {
+			return strings.TrimSpace(cond[:idx]), o,
+				strings.Trim(strings.TrimSpace(cond[idx+len(o):]), `"'`), true
+		}
+	}
+	return "", "", "", false
+}
+
+// matchesCond confronta vKey con condVal usando condOp.
+func matchesCond(vKey any, condOp, condVal string) bool {
+	var vStr string
+	if f, ok := vKey.(float64); ok {
+		vStr = strconv.FormatFloat(f, 'f', -1, 64)
+	} else {
+		vStr = strings.TrimSpace(fmt.Sprintf("%v", vKey))
+	}
+	switch condOp {
+	case "=", "==":
+		return vStr == condVal
+	case "!=":
+		return vStr != condVal
+	case "~":
+		return strings.Contains(vStr, condVal)
+	case ">", "<", ">=", "<=":
+		vF, err1 := strconv.ParseFloat(vStr, 64)
+		cF, err2 := strconv.ParseFloat(condVal, 64)
+		if err1 != nil || err2 != nil {
+			return false
+		}
+		switch condOp {
+		case ">":
+			return vF > cF
+		case "<":
+			return vF < cF
+		case ">=":
+			return vF >= cF
+		case "<=":
+			return vF <= cF
+		}
+	}
+	return false
+}
+
+// allDigits ritorna true se s è composta solo di cifre (0-9).
+func allDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func AppField(app opencity.Application, field string) (string, error) {
