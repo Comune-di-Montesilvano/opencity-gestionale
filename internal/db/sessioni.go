@@ -44,8 +44,14 @@ func GetSessione(db *sql.DB, id string) (*Sessione, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get sessione: %w", err)
 	}
-	s.ScadeAt, _ = time.Parse(time.RFC3339, scadeStr)
-	s.CreatedAt, _ = time.Parse(time.RFC3339, createdStr)
+	s.ScadeAt, err = time.Parse(time.RFC3339, scadeStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse scade_at: %w", err)
+	}
+	s.CreatedAt, err = time.Parse(time.RFC3339, createdStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse created_at: %w", err)
+	}
 	return &s, nil
 }
 
