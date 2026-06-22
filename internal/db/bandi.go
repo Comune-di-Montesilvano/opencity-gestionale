@@ -104,12 +104,12 @@ func UpdateEngineConfig(db *sql.DB, id int64, engineConfig string) error {
 	return err
 }
 
-func AttivaMotore(db *sql.DB, id int64) error {
+func AttivaBando(db *sql.DB, id int64) error {
 	_, err := db.Exec(`UPDATE bandi SET stato_bando='attivo' WHERE id=?`, id)
 	return err
 }
 
-func ArchiviaMotore(db *sql.DB, id int64) error {
+func ArchiviaBando(db *sql.DB, id int64) error {
 	_, err := db.Exec(`UPDATE bandi SET attivo=0, stato_bando='archiviato' WHERE id=?`, id)
 	return err
 }
@@ -135,7 +135,7 @@ func DuplicaBando(db *sql.DB, id int64) (int64, error) {
 }
 
 func DisattivaBando(db *sql.DB, id int64) error {
-	return ArchiviaMotore(db, id)
+	return ArchiviaBando(db, id)
 }
 
 func CountBandi(db *sql.DB) (int, error) {

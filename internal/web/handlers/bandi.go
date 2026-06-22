@@ -35,7 +35,7 @@ type ParametroMappato struct {
 	PDNDVal  string
 }
 
-// --- Lista motori ---
+// --- Lista bandi ---
 
 func (h *BandiHandler) GetLista(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
@@ -121,11 +121,11 @@ func (h *BandiHandler) PostCreaBando(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:             time.Now(),
 	}
 	if bando.Nome == "" {
-		bando.Nome = "Motore " + serviceID[:8]
+		bando.Nome = "Bando " + serviceID[:8]
 	}
 	id, err := db.InsertBando(h.DB, bando)
 	if err != nil {
-		http.Error(w, "Errore creazione motore: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Errore creazione bando: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2", id), http.StatusSeeOther)
@@ -655,7 +655,7 @@ func (h *BandiHandler) PostTestEngine(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PostAttivaMotore — imposta stato_motore='attivo', redirect a dettaglio.
+// PostAttivaBando — imposta stato_bando='attivo', redirect a dettaglio.
 func (h *BandiHandler) PostAttivaBando(w http.ResponseWriter, r *http.Request) {
 	id := motoreIDFromPath(r)
 	if err := r.ParseForm(); err == nil {
@@ -667,14 +667,14 @@ func (h *BandiHandler) PostAttivaBando(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if err := db.AttivaMotore(h.DB, id); err != nil {
+	if err := db.AttivaBando(h.DB, id); err != nil {
 		http.Error(w, "Errore attivazione: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Motore+attivato&flashType=success", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Bando+attivato&flashType=success", id), http.StatusSeeOther)
 }
 
-// --- Dettaglio motore ---
+// --- Dettaglio bando ---
 
 func (h *BandiHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
@@ -850,16 +850,16 @@ func (h *BandiHandler) PostDuplica(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore duplicazione: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2?flash=Motore+duplicato,+configurazione+copiata&flashType=success", newID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2?flash=Bando+duplicato,+configurazione+copiata&flashType=success", newID), http.StatusSeeOther)
 }
 
 func (h *BandiHandler) PostArchivia(w http.ResponseWriter, r *http.Request) {
 	id := motoreIDFromPath(r)
-	if err := db.ArchiviaMotore(h.DB, id); err != nil {
+	if err := db.ArchiviaBando(h.DB, id); err != nil {
 		http.Error(w, "Errore archiviazione: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/bandi?flash=Motore+archiviato&flashType=success", http.StatusSeeOther)
+	http.Redirect(w, r, "/bandi?flash=Bando+archiviato&flashType=success", http.StatusSeeOther)
 }
 
 func (h *BandiHandler) PostRinomina(w http.ResponseWriter, r *http.Request) {
