@@ -23,6 +23,14 @@
   <div class="wizard-col-main">
     <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/3" id="step3-form">
 
+      <div class="wizard-nav">
+        <a href="/bandi/{{.Bando.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
+        <div class="wizard-nav-right">
+          <button type="button" class="btn btn-secondary" onclick="salvaStep3()">Salva</button>
+          <button type="submit" class="btn btn-primary">Salva e continua →</button>
+        </div>
+      </div>
+
       <!-- Campi nascosti di stato -->
       <input type="hidden" name="espansione" id="espansione-field" value="{{.Espansione}}">
       <input type="hidden" name="save_only" id="save-only-flag" value="0">
@@ -104,11 +112,12 @@
         (<code id="expand-note-name"></code>), non dal documento radice.
       </div>
 
-      <div class="form-actions" style="display:flex; gap:.5rem; align-items:center">
+      <div class="form-actions" style="margin-top:1rem">
         <a href="/bandi/{{.Bando.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
-        <button type="button" class="btn btn-outline-secondary" onclick="salvaStep3()">Salva</button>
-        <button type="submit" class="btn btn-primary">Continua →</button>
+        <button type="button" class="btn btn-secondary" onclick="salvaStep3()">Salva</button>
+        <button type="submit" class="btn btn-primary">Salva e continua →</button>
       </div>
+
     </form>
   </div>
 
