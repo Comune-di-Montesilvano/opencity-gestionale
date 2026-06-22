@@ -30,9 +30,9 @@ type ParametroMappato struct {
 	Path     string
 	Tipo     string
 	Expand   bool
-	PDNDPath string
-	PDNDOp   string
-	PDNDVal  string
+	VerificaPath string
+	VerificaOp   string
+	VerificaVal  string
 }
 
 // --- Lista bandi ---
@@ -243,9 +243,9 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 				Path:     fm.Path,
 				Tipo:     fm.Tipo,
 				Expand:   fm.Expand,
-				PDNDPath: fm.PDNDPath,
-				PDNDOp:   fm.PDNDOp,
-				PDNDVal:  fm.PDNDVal,
+				VerificaPath: fm.VerificaPath,
+				VerificaOp:   fm.VerificaOp,
+				VerificaVal:  fm.VerificaVal,
 			})
 		}
 
@@ -378,9 +378,9 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 		tipos := r.Form["p_tipo"]
 		labels := r.Form["p_label"]
 		expands := r.Form["p_expand"]
-		pdndPaths := r.Form["p_pdnd_path"]
-		pdndOps := r.Form["p_pdnd_op"]
-		pdndVals := r.Form["p_pdnd_val"]
+		verificaPaths := r.Form["p_verifica_path"]
+		verificaOps := r.Form["p_verifica_op"]
+		verificaVals := r.Form["p_verifica_val"]
 
 		for i, nome := range nomiForm {
 			nome = strings.TrimSpace(nome)
@@ -406,26 +406,26 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			if i < len(expands) && expands[i] == "1" {
 				expand = true
 			}
-			pdndPath := ""
-			if i < len(pdndPaths) {
-				pdndPath = strings.TrimSpace(pdndPaths[i])
+			verificaPath := ""
+			if i < len(verificaPaths) {
+				verificaPath = strings.TrimSpace(verificaPaths[i])
 			}
-			pdndOp := ""
-			if i < len(pdndOps) {
-				pdndOp = pdndOps[i]
+			verificaOp := ""
+			if i < len(verificaOps) {
+				verificaOp = verificaOps[i]
 			}
-			pdndVal := ""
-			if i < len(pdndVals) {
-				pdndVal = strings.TrimSpace(pdndVals[i])
+			verificaVal := ""
+			if i < len(verificaVals) {
+				verificaVal = strings.TrimSpace(verificaVals[i])
 			}
 			cfg.Mapping[nome] = graduatoria.FieldMapping{
-				Path:     path,
-				Tipo:     tipo,
-				Label:    label,
-				Expand:   expand,
-				PDNDPath: pdndPath,
-				PDNDOp:   pdndOp,
-				PDNDVal:  pdndVal,
+				Path:         path,
+				Tipo:         tipo,
+				Label:        label,
+				Expand:       expand,
+				VerificaPath: verificaPath,
+				VerificaOp:   verificaOp,
+				VerificaVal:  verificaVal,
 			}
 		}
 		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {

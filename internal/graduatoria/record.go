@@ -23,7 +23,7 @@ func (r *Record) FlagMotivi(cfg VerificaConfig) []string {
 		for key, val := range r.StringMap {
 			if strings.HasPrefix(key, "__cert_") && val == "" {
 				fieldName := strings.TrimPrefix(key, "__cert_")
-				motivi = append(motivi, "Campo \""+fieldName+"\" non certificato PDND")
+				motivi = append(motivi, "Campo \""+fieldName+"\" non verificato")
 			}
 		}
 	}

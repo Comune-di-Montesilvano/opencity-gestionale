@@ -29,5 +29,12 @@ func Open(path string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN app_status TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN dati_json TEXT NOT NULL DEFAULT '{}'`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT PRIMARY KEY, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT)`)
+	// Migrazione: rinomina chiavi PDND → Verifica nei blob engine_config
+	_, _ = db.Exec(`UPDATE bandi SET engine_config =
+		replace(replace(replace(engine_config,
+			'"pdnd_path"', '"verifica_path"'),
+			'"pdnd_op"',  '"verifica_op"'),
+			'"pdnd_val"', '"verifica_val"')
+		WHERE engine_config LIKE '%"pdnd_path"%'`)
 	return db, nil
 }

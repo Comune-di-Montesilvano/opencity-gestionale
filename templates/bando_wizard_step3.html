@@ -51,7 +51,7 @@
             <th style="width:90px">Tipo</th>
             <th>Path JSON</th>
             <th style="width:60px" title="Se spuntato: il path è relativo a ciascun elemento dell'array di espansione (non al documento radice)">Per elem.?</th>
-            <th>Condizione PDND</th>
+            <th>Verifica campo</th>
             <th style="width:32px"></th>
           </tr>
         </thead>
@@ -83,21 +83,21 @@
                 title="Espandi: questo campo è relativo a ogni elemento dell'array di espansione">
             </td>
             <td style="vertical-align:top; padding-top:6px">
-              <div class="pdnd-section" style="display:flex; flex-direction:column; gap:4px">
-                <input type="text" name="p_pdnd_path" value="{{$p.PDNDPath}}"
+              <div class="verifica-section" style="display:flex; flex-direction:column; gap:4px">
+                <input type="text" name="p_verifica_path" value="{{$p.VerificaPath}}"
                   class="form-control form-control-sm json-path-input"
                   placeholder="path campo da verificare"
                   oninput="updatePreview(this)">
                 <div style="display:flex; gap:4px; align-items:center">
-                  <select name="p_pdnd_op" class="form-control form-control-sm pdnd-op-select" onchange="updatePDNDValVisibility(this)" style="width:auto">
-                    <option value="non_vuoto" {{if or (eq $p.PDNDOp "") (eq $p.PDNDOp "non_vuoto")}}selected{{end}}>non vuoto</option>
-                    <option value="==" {{if eq $p.PDNDOp "=="}}selected{{end}}>uguale a</option>
-                    <option value="!=" {{if eq $p.PDNDOp "!="}}selected{{end}}>diverso da</option>
+                  <select name="p_verifica_op" class="form-control form-control-sm verifica-op-select" onchange="updateVerificaValVisibility(this)" style="width:auto">
+                    <option value="non_vuoto" {{if or (eq $p.VerificaOp "") (eq $p.VerificaOp "non_vuoto")}}selected{{end}}>non vuoto</option>
+                    <option value="==" {{if eq $p.VerificaOp "=="}}selected{{end}}>uguale a</option>
+                    <option value="!=" {{if eq $p.VerificaOp "!="}}selected{{end}}>diverso da</option>
                   </select>
-                  <input type="text" name="p_pdnd_val" value="{{$p.PDNDVal}}"
-                    class="form-control form-control-sm pdnd-val-input"
+                  <input type="text" name="p_verifica_val" value="{{$p.VerificaVal}}"
+                    class="form-control form-control-sm verifica-val-input"
                     placeholder="valore"
-                    style="{{if or (eq $p.PDNDOp "==") (eq $p.PDNDOp "!=")}}display:inline-block{{else}}display:none{{end}}; width:100px">
+                    style="{{if or (eq $p.VerificaOp "==") (eq $p.VerificaOp "!=")}}display:inline-block{{else}}display:none{{end}}; width:100px">
                 </div>
               </div>
             </td>
@@ -235,15 +235,15 @@
       <input type="checkbox" onchange="this.previousSibling.value = this.checked ? '1' : '0'" title="Espandi per ogni elemento dell'array di espansione">
     </td>
     <td style="vertical-align:top; padding-top:6px">
-      <div class="pdnd-section" style="display:flex; flex-direction:column; gap:4px">
-        <input type="text" name="p_pdnd_path" value="" class="form-control form-control-sm json-path-input" placeholder="path campo da verificare" oninput="updatePreview(this)">
+      <div class="verifica-section" style="display:flex; flex-direction:column; gap:4px">
+        <input type="text" name="p_verifica_path" value="" class="form-control form-control-sm json-path-input" placeholder="path campo da verificare" oninput="updatePreview(this)">
         <div style="display:flex; gap:4px; align-items:center">
-          <select name="p_pdnd_op" class="form-control form-control-sm pdnd-op-select" onchange="updatePDNDValVisibility(this)" style="width:auto">
+          <select name="p_verifica_op" class="form-control form-control-sm verifica-op-select" onchange="updateVerificaValVisibility(this)" style="width:auto">
             <option value="non_vuoto" selected>non vuoto</option>
             <option value="==">uguale a</option>
             <option value="!=">diverso da</option>
           </select>
-          <input type="text" name="p_pdnd_val" value="" class="form-control form-control-sm pdnd-val-input" placeholder="valore" style="display:none; width:100px">
+          <input type="text" name="p_verifica_val" value="" class="form-control form-control-sm verifica-val-input" placeholder="valore" style="display:none; width:100px">
         </div>
       </div>
     </td>
@@ -282,7 +282,7 @@ flatData.forEach(item => {
 let lastFocusedPathInput = null;
 
 document.addEventListener('focusin', e => {
-  if (e.target.name === 'p_path' || e.target.name === 'p_pdnd_path') lastFocusedPathInput = e.target;
+  if (e.target.name === 'p_path' || e.target.name === 'p_verifica_path') lastFocusedPathInput = e.target;
 });
 
 // Preview iniziale per tutti gli input con valore
@@ -443,12 +443,12 @@ function selectPath(path) {
   toast('Path copiato: ' + path);
 }
 
-// ── PDND ─────────────────────────────────────────────────────────────────────
+// ── Verifica campo ───────────────────────────────────────────────────────────
 
-function updatePDNDValVisibility(el) {
+function updateVerificaValVisibility(el) {
   const row = el.closest('td');
   if (!row) return;
-  const valInput = row.querySelector('.pdnd-val-input');
+  const valInput = row.querySelector('.verifica-val-input');
   if (!valInput) return;
   const needsVal = el.value === '==' || el.value === '!=';
   valInput.style.display = needsVal ? 'inline-block' : 'none';

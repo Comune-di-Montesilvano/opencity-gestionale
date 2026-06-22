@@ -28,9 +28,9 @@ type FieldMapping struct {
 	Tipo     string `json:"tipo"`                  // "float" | "int" | "string" | "count" | "time"
 	Expand   bool   `json:"expand"`                // true = relativo a elemento array espansione
 	Label    string `json:"label,omitempty"`       // nome leggibile (opzionale, default = chiave mapping)
-	PDNDPath string `json:"pdnd_path,omitempty"`   // path del campo firma/signature PDND (es. meta.signature)
-	PDNDOp   string `json:"pdnd_op,omitempty"`     // "non_vuoto" | "==" | "!=" (default: "non_vuoto")
-	PDNDVal  string `json:"pdnd_val,omitempty"`    // valore confronto (solo per "==" e "!=")
+	VerificaPath string `json:"verifica_path,omitempty"` // path campo ausiliario da valutare (es. firma PDND)
+	VerificaOp   string `json:"verifica_op,omitempty"`   // "non_vuoto" | "==" | "!=" (default: "non_vuoto")
+	VerificaVal  string `json:"verifica_val,omitempty"`  // valore confronto (solo per "==" e "!=")
 }
 
 type FiltroConfig struct {
@@ -76,8 +76,8 @@ type RimborsoConfig struct {
 type VerificaConfig struct {
 	Attiva                 bool               `json:"attiva"`
 	FiltriFlag             []FiltroFlagConfig  `json:"filtri_flag"`
-	// VerificaCertificazione=true: flag automatico per ogni campo con PDNDPath configurato
-	// ma con firma vuota (dato non proveniente da PDND/fonte certificata).
+	// VerificaCertificazione=true: flag automatico per ogni campo con VerificaPath configurato
+	// ma la condizione non è soddisfatta (dato non verificato dalla fonte configurata).
 	VerificaCertificazione bool               `json:"verifica_certificazione"`
 }
 

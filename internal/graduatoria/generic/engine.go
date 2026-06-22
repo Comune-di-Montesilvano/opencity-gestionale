@@ -281,6 +281,9 @@ func applicaExtras(rec *graduatoria.Record, extras map[string]string, mapping ma
 		default:
 			rec.StringMap[campo] = valore
 		}
+		if fm.VerificaPath != "" && valore != "" {
+			rec.StringMap["__cert_"+campo] = "override_manuale"
+		}
 	}
 }
 
@@ -308,10 +311,10 @@ func popolaCampo(rec *graduatoria.Record, nome string, fm graduatoria.FieldMappi
 			return err
 		}
 	}
-	// Se il campo ha un PDNDPath, estrai la firma di certificazione come __cert_{nome}
-	if fm.PDNDPath != "" {
-		sig, _ := extractor.Str(data, fm.PDNDPath)
-		certified := evaluatePDNDCondition(sig, fm.PDNDOp, fm.PDNDVal)
+	// Se il campo ha VerificaPath, controlla la condizione e salva __cert_{nome}
+	if fm.VerificaPath != "" {
+		sig, _ := extractor.Str(data, fm.VerificaPath)
+		certified := evaluateVerificaCondition(sig, fm.VerificaOp, fm.VerificaVal)
 		if certified {
 			rec.StringMap["__cert_"+nome] = sig
 		} else {
@@ -623,9 +626,9 @@ func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduat
 	return righe, budget - residuo
 }
 
-// evaluatePDNDCondition valuta se un valore soddisfa la condizione PDND.
-// op vuoto o "non_vuoto": certificato se val != "" (comportamento legacy).
-func evaluatePDNDCondition(val, op, expected string) bool {
+// evaluateVerificaCondition valuta se un valore soddisfa la condizione di verifica.
+// op vuoto o "non_vuoto": verificato se val != "" (comportamento default).
+func evaluateVerificaCondition(val, op, expected string) bool {
 	switch op {
 	case "==":
 		return val == expected
