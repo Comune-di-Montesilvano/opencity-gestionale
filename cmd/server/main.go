@@ -43,6 +43,29 @@ func loadDotEnv() {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		url := "http://localhost:" + port + "/health"
+		if len(os.Args) > 2 {
+			url = os.Args[2]
+		}
+		client := http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get(url)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "healthcheck failed: %v\n", err)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			fmt.Fprintf(os.Stderr, "healthcheck failed: status %d\n", resp.StatusCode)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
 	loadDotEnv()
 	cfg, err := config.Load()
 	if err != nil {
