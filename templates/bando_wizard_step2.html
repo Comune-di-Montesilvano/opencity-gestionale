@@ -21,6 +21,12 @@
 </div>
 
 <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/2" style="max-width:740px">
+  <div class="wizard-nav">
+    <a href="/bandi" class="btn btn-secondary">← Lista bandi</a>
+    <div class="wizard-nav-right">
+      <button type="submit" class="btn btn-primary" {{if not .Modalita}}disabled{{end}}>Salva e continua →</button>
+    </div>
+  </div>
   <h2>Tipo di bando</h2>
   <p class="text-muted">Seleziona come l'engine assegna le risorse. Determina quali step del wizard saranno attivi.</p>
 
@@ -65,9 +71,5 @@
     {{if eq .Modalita "lista_attesa"}}<span class="text-muted"> — Step attivi: mapping → filtri → fine</span>{{end}}
   </div>
   {{end}}
-
-  <div class="form-actions" style="margin-top:1.5rem">
-    <button type="submit" class="btn btn-primary" {{if not .Modalita}}disabled{{end}}>Salva e continua →</button>
-  </div>
 </form>
 {{end}}
