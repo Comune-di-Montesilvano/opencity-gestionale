@@ -5,11 +5,14 @@ import (
 	"net/http"
 
 	"opencity-gestionale/internal/config"
+	"opencity-gestionale/internal/opencity"
 	"opencity-gestionale/internal/web/handlers"
 	"opencity-gestionale/internal/web/middleware"
 )
 
-func NewServer(cfg *config.Config, dbConn *sql.DB) http.Handler {
+func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) http.Handler {
+	handlers.SetBranding(branding)
+
 	auth := &handlers.AuthHandler{
 		DB:             dbConn,
 		BaseURL:        cfg.OpenCityBaseURL,

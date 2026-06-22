@@ -10,6 +10,7 @@ import (
 
 	"opencity-gestionale/internal/config"
 	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/opencity"
 	"opencity-gestionale/internal/web"
 
 	_ "opencity-gestionale/internal/graduatoria/generic" // registra engine generico
@@ -68,7 +69,17 @@ func main() {
 		}
 	}()
 
-	handler := web.NewServer(cfg, dbConn)
+	branding, err := opencity.FetchBranding(cfg.OpenCityBaseURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Impossibile recuperare il branding di OpenCity: %v. Uso branding di default.\n", err)
+		branding = &opencity.Branding{
+			Nome: "Gestionale OpenCity",
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "Branding caricato con successo per: %s\n", branding.Nome)
+	}
+
+	handler := web.NewServer(cfg, dbConn, branding)
 
 	fmt.Fprintf(os.Stderr, "Gestionale OpenCity %s avviato su :%s\n", AppVersion, cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {

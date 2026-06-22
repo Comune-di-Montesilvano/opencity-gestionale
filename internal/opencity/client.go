@@ -261,3 +261,47 @@ func (c *Client) FetchServices() ([]json.RawMessage, error) {
 	}
 	return result, nil
 }
+
+type Branding struct {
+	Nome    string `json:"nome"`
+	Logo    string `json:"logo"`
+	Favicon string `json:"favicon"`
+}
+
+// FetchBranding recupera le informazioni sul branding/tenant da OpenCity.
+func FetchBranding(baseURL string) (*Branding, error) {
+	hc := &http.Client{Timeout: 10 * time.Second}
+	resp, err := hc.Get(baseURL + "/lang/api/tenants/info")
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Name string   `json:"name"`
+		Meta []string `json:"meta"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+
+	b := &Branding{
+		Nome: data.Name,
+	}
+
+	if len(data.Meta) > 0 {
+		var m struct {
+			Favicon string `json:"favicon"`
+			Logo    string `json:"logo"`
+		}
+		if err := json.Unmarshal([]byte(data.Meta[0]), &m); err == nil {
+			b.Favicon = m.Favicon
+			b.Logo = m.Logo
+		}
+	}
+
+	return b, nil
+}

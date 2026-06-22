@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{block "title" .}}Gestionale OpenCity{{end}}</title>
+<title>{{block "title" .}}Gestionale {{if .Branding.Nome}}{{.Branding.Nome}}{{else}}OpenCity{{end}}{{end}}</title>
+{{if .Branding.Favicon}}
+<link rel="icon" href="{{.Branding.Favicon}}">
+{{end}}
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/htmx.min.js"></script>
 </head>
@@ -11,7 +14,14 @@
 {{if .Op}}
 <div class="app-layout">
   <aside class="sidebar no-print">
-    <div class="sidebar-brand">Gestionale<br>OpenCity</div>
+    <div class="sidebar-brand">
+      {{if .Branding.Logo}}
+        <img src="{{.Branding.Logo}}" alt="Logo" class="sidebar-logo">
+      {{end}}
+      <div class="sidebar-brand-name">
+        {{if .Branding.Nome}}{{.Branding.Nome}}{{else}}Gestionale OpenCity{{end}}
+      </div>
+    </div>
     <nav class="sidebar-nav">
       <a href="/dashboard">Dashboard</a>
       <a href="/motori">Motori</a>

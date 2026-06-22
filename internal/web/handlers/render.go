@@ -9,13 +9,22 @@ import (
 	"strings"
 	"sync"
 
+	"opencity-gestionale/internal/opencity"
 	"opencity-gestionale/internal/web/middleware"
 )
 
 var (
 	tmplMu    sync.Mutex
 	tmplCache map[string]*template.Template
+
+	BrandingData *opencity.Branding
 )
+
+func SetBranding(b *opencity.Branding) {
+	tmplMu.Lock()
+	defer tmplMu.Unlock()
+	BrandingData = b
+}
 
 var funcMap = template.FuncMap{
 	"add":  func(a, b int) int { return a + b },
@@ -106,6 +115,18 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 		tmplMu.Lock()
 		tmplCache[name] = t
 		tmplMu.Unlock()
+	}
+
+	if data == nil {
+		data = map[string]any{}
+	}
+	if m, ok := data.(map[string]any); ok {
+		tmplMu.Lock()
+		b := BrandingData
+		tmplMu.Unlock()
+		if b != nil {
+			m["Branding"] = b
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
