@@ -11,7 +11,7 @@ services:
       OPENCITY_BASE_URL: ${OPENCITY_BASE_URL}
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-apioperator}
-      TRUST_PROXY: "true"
+      TRUST_PROXY: ${TRUST_PROXY:-false}
     healthcheck:
       test: ["CMD", "/gestionale", "-healthcheck"]
       interval: 30s
