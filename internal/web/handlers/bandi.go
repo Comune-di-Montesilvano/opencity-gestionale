@@ -14,6 +14,7 @@ import (
 	"opencity-gestionale/internal/db"
 	"opencity-gestionale/internal/graduatoria"
 	"opencity-gestionale/internal/graduatoria/extractor"
+	"opencity-gestionale/internal/graduatoria/generic"
 	"opencity-gestionale/internal/opencity"
 	"opencity-gestionale/internal/web/middleware"
 )
@@ -128,6 +129,11 @@ func (h *BandiHandler) PostCreaBando(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Errore creazione bando: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	bando.ID = id
+	op := middleware.FromContext(r.Context())
+	if op != nil {
+		EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, op.JWT, op.Username, nil)
+	}
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2", id), http.StatusSeeOther)
 }
 
@@ -151,12 +157,22 @@ func loadBandoConConfig(h *BandiHandler, r *http.Request) (*db.Bando, graduatori
 	return bando, cfg, nil
 }
 
-func saveEngineConfig(h *BandiHandler, bandoID int64, cfg graduatoria.EngineConfig) error {
+func saveEngineConfig(h *BandiHandler, r *http.Request, bandoID int64, cfg graduatoria.EngineConfig) error {
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return err
 	}
-	return db.UpdateEngineConfig(h.DB, bandoID, string(data))
+	if err := db.UpdateEngineConfig(h.DB, bandoID, string(data)); err != nil {
+		return err
+	}
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err == nil {
+		op := middleware.FromContext(r.Context())
+		if op != nil {
+			EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, op.JWT, op.Username, nil)
+		}
+	}
+	return nil
 }
 
 func campiMappati(cfg graduatoria.EngineConfig) []string {
@@ -183,6 +199,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"Op":       op,
 			"Bando":   bando,
 			"Modalita": cfg.Modalita,
+			"Istanza":  cfg.Istanza,
 		})
 
 	case "3":
@@ -363,7 +380,9 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 	switch step {
 	case "2":
 		cfg.Modalita = strings.TrimSpace(r.FormValue("modalita"))
-		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
+		cfg.Istanza.DataMinima = strings.TrimSpace(r.FormValue("data_minima"))
+		cfg.Istanza.DataMassima = strings.TrimSpace(r.FormValue("data_massima"))
+		if err := saveEngineConfig(h, r, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -428,7 +447,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 				VerificaVal:  verificaVal,
 			}
 		}
-		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
+		if err := saveEngineConfig(h, r, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -521,7 +540,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			DataMinima:   strings.TrimSpace(r.FormValue("data_minima")),
 		}
 
-		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
+		if err := saveEngineConfig(h, r, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -581,7 +600,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 				cfg.Deduplicazione.Chiave = nil
 			}
 		}
-		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
+		if err := saveEngineConfig(h, r, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -593,7 +612,7 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			CampoLordo:     r.FormValue("rimborso_campo_lordo"),
 			CampoDeduzione: r.FormValue("rimborso_campo_deduzione"),
 		}
-		if err := saveEngineConfig(h, bando.ID, cfg); err != nil {
+		if err := saveEngineConfig(h, r, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -886,6 +905,8 @@ func (h *BandiHandler) PostImportBando(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/?flash=Errore+creazione+bando:+"+url.QueryEscape(err.Error())+"&flashType=error", http.StatusSeeOther)
 		return
 	}
+	newBando.ID = newID
+	EseguiScansioneIstruttoria(h.DB, h.BaseURL, newBando, op.JWT, op.Username, nil)
 
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2?flash=Bando+importato+con+successo&flashType=success", newID), http.StatusSeeOther)
 }
@@ -968,6 +989,7 @@ func (h *BandiHandler) PostEditParametri(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Errore+salvataggio:+%s&flashType=error", id, url.QueryEscape(err.Error())), http.StatusSeeOther)
 		return
 	}
+	EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, op.JWT, op.Username, nil)
 
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Parametri+aggiornati&flashType=success", id), http.StatusSeeOther)
 }
@@ -1038,6 +1060,10 @@ func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Carica filtri istanza (date e stati) configurati nello step 2/4
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
 	// sets[arrayPath][fieldKey] = set di valori unici
 	sets := map[string]map[string]map[string]struct{}{}
 	statusCounts := map[string]int{} // code → numero istanze
@@ -1045,6 +1071,9 @@ func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request)
 	for _, rawApp := range rawApps {
 		var app opencity.Application
 		if json.Unmarshal(rawApp, &app) != nil || len(app.Data) == 0 {
+			continue
+		}
+		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) {
 			continue
 		}
 		// Raccoglie app.Status sotto "$app"."status", labels e conteggi

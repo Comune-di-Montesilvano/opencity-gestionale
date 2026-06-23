@@ -33,8 +33,13 @@
 
 {{if .Grad.Gruppi}}
 {{range .Grad.Gruppi}}
-<div class="anno-section" style="margin-bottom:1rem">
+<div class="anno-section" style="margin-bottom:1.5rem">
   <h3>{{.Nome}} ({{len .Righe}})</h3>
+  <div style="margin-bottom:.5rem; font-size:.9rem; color:#4b5563">
+    <span>Ammesse: <strong>{{.CountAmmesse}}</strong></span> | 
+    <span>Escluse: <strong>{{.CountEscluse}}</strong></span> | 
+    <span>Fondi/posti esauriti: <strong>{{.CountEsauriti}}</strong></span>
+  </div>
   <p>Budget usato: €{{printf "%.2f" .BudgetUsato}}</p>
   <a href="/bandi/{{$.Bando.ID}}/run/{{$.Run.ID}}/gruppo/{{.Nome}}" class="btn btn-secondary btn-sm">Visualizza tabella</a>
   <a href="/bandi/{{$.Bando.ID}}/run/{{$.Run.ID}}/export/gruppo/{{.Nome}}" class="btn btn-sm">CSV</a>

@@ -259,6 +259,8 @@
 <style>
 .json-path-cell:hover code { text-decoration:underline; }
 #json-viewer-body tr:hover { background:#eff6ff; }
+#json-viewer-body tr.superset-only:hover { background:#fef9c3; }
+#json-viewer-body tr.superset-sep { cursor:default; pointer-events:none; }
 </style>
 
 <script>
@@ -291,6 +293,14 @@ document.querySelectorAll('.json-path-input[name="p_path"]').forEach(inp => upda
 // Viewer: filtro iniziale se viewer_filter è popolato
 if (document.getElementById('viewer-search') && document.getElementById('viewer-search').value) {
   renderViewer();
+}
+
+// Aggiungi righe superset-only al viewer, poi ri-applica filtri se attivi
+addSupersetOnlyRows();
+if (document.getElementById('viewer-search')?.value || document.getElementById('hide-empty')?.checked) {
+  renderViewer();
+} else {
+  updateSupersetSepVisibility();
 }
 
 // Nota "Per elem." iniziale se espansione già impostata
@@ -420,17 +430,20 @@ function renderViewer() {
   const emptyVals = new Set(['', '(null)', '0']);
 
   document.querySelectorAll('#json-viewer-body tr').forEach(row => {
+    if (row.dataset.supersetSep === '1') return; // gestito dopo
     const path  = row.dataset.path || '';
     const value = row.dataset.value || '';
     const isArr = row.dataset.isarray === '1';
 
     // Filtro testo
     const matchesQ = !q || path.toLowerCase().includes(q) || (!isArr && value.toLowerCase().includes(q));
-    // Filtro vuoti (solo scalari)
-    const isEmpty = !isArr && emptyVals.has(value.trim());
+    // Filtro vuoti (solo scalari, non superset-only)
+    const isEmpty = !isArr && !row.dataset.supersetOnly && emptyVals.has(value.trim());
     const show = matchesQ && (!hideEmpty || !isEmpty);
     row.style.display = show ? '' : 'none';
   });
+
+  updateSupersetSepVisibility();
 }
 
 function selectPath(path) {
@@ -784,6 +797,107 @@ function toast(msg) {
 
 function escapeHTML(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Superset-only rows ────────────────────────────────────────────────────────
+
+function addSupersetOnlyRows() {
+  if (!supersetData || Object.keys(supersetData).length === 0) return;
+
+  const specialKeys = new Set(['$app', '$status_counts', '$status_names']);
+
+  // Raccogli array path già presenti nel campione
+  const sampleArrayPaths = new Set(flatData.filter(d => d.IsArray).map(d => d.Path));
+  // Raccogli tutti path scalari del campione
+  const samplePaths = new Set(flatData.map(d => d.Path));
+
+  // Trova array path nel superset non presenti nel campione
+  const extraArrays = Object.entries(supersetData).filter(([k]) => !specialKeys.has(k) && !sampleArrayPaths.has(k));
+
+  // Trova sub-chiavi di array già nel campione che non compaiono in ArraySampleKeys del campione
+  const extraSubKeys = []; // [{arrayPath, key}]
+  for (const [arrayPath, fields] of Object.entries(supersetData)) {
+    if (specialKeys.has(arrayPath) || !sampleArrayPaths.has(arrayPath)) continue;
+    const sampleEntry = flatArrayMap[arrayPath];
+    const sampleKeys = new Set(sampleEntry ? (sampleEntry.ArraySampleKeys || []) : []);
+    for (const key of Object.keys(fields)) {
+      if (!sampleKeys.has(key)) extraSubKeys.push({ arrayPath, key });
+    }
+  }
+
+  if (extraArrays.length === 0 && extraSubKeys.length === 0) return;
+
+  const tbody = document.getElementById('json-viewer-body');
+
+  // Separatore
+  const sep = document.createElement('tr');
+  sep.className = 'superset-sep';
+  sep.dataset.path = '';
+  sep.dataset.value = '';
+  sep.dataset.isarray = '0';
+  sep.dataset.supersetSep = '1';
+  sep.innerHTML = '<td colspan="2" style="background:#fef3c7; color:#92400e; font-size:11px; padding:3px 8px; font-weight:600; border-top:2px solid #fbbf24">Solo nel superset</td>';
+  tbody.appendChild(sep);
+
+  // Array path non nel campione
+  for (const [arrayPath, fields] of extraArrays) {
+    const keys = Object.keys(fields);
+    const tr = document.createElement('tr');
+    tr.className = 'superset-only';
+    tr.style.cursor = 'pointer';
+    tr.dataset.path = arrayPath;
+    tr.dataset.value = '';
+    tr.dataset.isarray = '1';
+    tr.dataset.supersetOnly = '1';
+    tr.innerHTML = `
+      <td class="json-path-cell">
+        <code style="font-size:.75em; display:block; word-break:break-all; color:#d97706">
+          ${escapeHTML(arrayPath)} <span style="background:#fef3c7; color:#92400e; border-radius:3px; padding:1px 4px; font-size:.85em">[Array]</span>
+        </code>
+      </td>
+      <td class="json-value" style="font-size:.82em; color:#92400e; max-width:180px; word-break:break-word">
+        <span style="font-size:10px">${keys.length} campi</span>
+      </td>`;
+    tr.addEventListener('click', () => openArrayBuilderFromViewer(arrayPath, keys));
+    tbody.appendChild(tr);
+  }
+
+  // Sub-chiavi extra in array già nel campione
+  for (const { arrayPath, key } of extraSubKeys) {
+    const tr = document.createElement('tr');
+    tr.className = 'superset-only';
+    tr.style.cursor = 'pointer';
+    tr.dataset.path = arrayPath + '.' + key;
+    tr.dataset.value = '';
+    tr.dataset.isarray = '0';
+    tr.dataset.supersetOnly = '1';
+    const vals = (supersetData[arrayPath][key] || []).slice(0, 5);
+    const valsStr = vals.join(', ') + (supersetData[arrayPath][key].length > 5 ? '…' : '');
+    tr.innerHTML = `
+      <td class="json-path-cell">
+        <code style="font-size:.75em; display:block; word-break:break-all; color:#b45309">
+          ${escapeHTML(arrayPath + '.' + key)} <span style="background:#fef3c7; color:#92400e; border-radius:3px; padding:1px 4px; font-size:.85em">sup</span>
+        </code>
+      </td>
+      <td class="json-value" style="font-size:.82em; color:#92400e; max-width:180px; word-break:break-word">
+        ${escapeHTML(valsStr)}
+      </td>`;
+    tr.addEventListener('click', () => selectPath(arrayPath + '.' + key));
+    tbody.appendChild(tr);
+  }
+}
+
+// Nasconde il separatore "Solo nel superset" se tutte le sue righe sono filtrate
+function updateSupersetSepVisibility() {
+  const sep = document.querySelector('#json-viewer-body tr[data-superset-sep="1"]');
+  if (!sep) return;
+  let anyVisible = false;
+  let el = sep.nextElementSibling;
+  while (el) {
+    if (el.dataset.supersetOnly === '1' && el.style.display !== 'none') { anyVisible = true; break; }
+    el = el.nextElementSibling;
+  }
+  sep.style.display = anyVisible ? '' : 'none';
 }
 </script>
 {{end}}

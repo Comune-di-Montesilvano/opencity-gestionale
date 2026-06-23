@@ -79,6 +79,36 @@ type GraduatoriaGruppo struct {
 	BudgetUsato float64
 }
 
+func (g *GraduatoriaGruppo) CountAmmesse() int {
+	c := 0
+	for _, r := range g.Righe {
+		if r.Ammessa {
+			c++
+		}
+	}
+	return c
+}
+
+func (g *GraduatoriaGruppo) CountEscluse() int {
+	c := 0
+	for _, r := range g.Righe {
+		if !r.Ammessa && r.NoteEsclusione != "fondi esauriti" && r.NoteEsclusione != "posti esauriti" {
+			c++
+		}
+	}
+	return c
+}
+
+func (g *GraduatoriaGruppo) CountEsauriti() int {
+	c := 0
+	for _, r := range g.Righe {
+		if !r.Ammessa && (r.NoteEsclusione == "fondi esauriti" || r.NoteEsclusione == "posti esauriti") {
+			c++
+		}
+	}
+	return c
+}
+
 type Graduatoria struct {
 	Gruppi  []*GraduatoriaGruppo
 	Escluse []RigaGraduatoria

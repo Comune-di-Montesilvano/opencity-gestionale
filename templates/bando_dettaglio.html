@@ -59,15 +59,11 @@
 <div class="section-header">
   <h2>Graduatorie</h2>
   <form method="POST" action="/bandi/{{.Bando.ID}}/run" onsubmit="avviaCalcolo(this)">
-    {{if and .Config.Verifica.Attiva (gt .IstruttoriaStats.DaVerificare 0)}}
-    <button type="submit" id="btn-calcola" class="btn btn-primary" disabled title="Completa l'istruttoria prima di calcolare">
-      Calcola nuova run
-    </button>
-    <span class="text-muted" style="font-size:.85rem"> — istruttoria incompleta</span>
-    {{else}}
     <button type="submit" id="btn-calcola" class="btn btn-primary">Calcola nuova run</button>
-    <span id="calcolo-spinner" style="display:none" class="text-muted"> Calcolo in corso (30–60 sec)…</span>
+    {{if and .Config.Verifica.Attiva (gt .IstruttoriaStats.DaVerificare 0)}}
+    <span class="text-error" style="font-size:.85rem; margin-left:.5rem">⚠️ Istruttoria incompleta ({{.IstruttoriaStats.DaVerificare}} pendenti). Il calcolo sarà provvisorio.</span>
     {{end}}
+    <span id="calcolo-spinner" style="display:none" class="text-muted"> Calcolo in corso (30–60 sec)…</span>
   </form>
 </div>
 <script>

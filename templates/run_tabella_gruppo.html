@@ -13,6 +13,13 @@
   </div>
 </div>
 
+<div style="display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap">
+  <button onclick="filterTable('all', this)" class="btn btn-sm btn-filter btn-primary">Tutte ({{len .Righe}})</button>
+  <button onclick="filterTable('ammesse', this)" class="btn btn-sm btn-filter btn-secondary">Ammesse ({{.Gruppo.CountAmmesse}})</button>
+  <button onclick="filterTable('escluse', this)" class="btn btn-sm btn-filter btn-secondary">Escluse ({{.Gruppo.CountEscluse}})</button>
+  <button onclick="filterTable('esauriti', this)" class="btn btn-sm btn-filter btn-secondary">Fondi/posti esauriti ({{.Gruppo.CountEsauriti}})</button>
+</div>
+
 <div id="batch-controls" style="display:none" class="batch-bar">
   <span id="batch-count">0 selezionate</span>
   <button class="btn btn-sm btn-secondary" onclick="selectAll()">Seleziona tutte</button>
@@ -36,7 +43,8 @@
   <tbody>
   {{range .Righe}}
   {{$riga := .}}
-  <tr class="{{if .Ammessa}}row-ammessa{{else}}row-esclusa{{end}}">
+  <tr class="{{if .Ammessa}}row-ammessa{{else}}row-esclusa{{end}} riga-graduatoria" 
+      data-status="{{if .Ammessa}}ammesse{{else}}{{if or (eq .NoteEsclusione "fondi esauriti") (eq .NoteEsclusione "posti esauriti")}}esauriti{{else}}escluse{{end}}{{end}}">
     <td>
       {{if .Ammessa}}<input type="checkbox" class="pratica-check" value="{{if .Istanza}}{{.Istanza.ID}}{{end}}" onchange="updateCount()">{{end}}
     </td>
@@ -80,6 +88,25 @@
 
 <script>
 let currentAction = '';
+
+function filterTable(status, btn) {
+  document.querySelectorAll('.btn-filter').forEach(b => {
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-secondary');
+  });
+  if (btn) {
+    btn.classList.remove('btn-secondary');
+    btn.classList.add('btn-primary');
+  }
+
+  document.querySelectorAll('.riga-graduatoria').forEach(row => {
+    if (status === 'all' || row.getAttribute('data-status') === status) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
 
 function updateCount() {
   const checked = document.querySelectorAll('.pratica-check:checked').length;

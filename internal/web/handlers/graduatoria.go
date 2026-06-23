@@ -57,15 +57,10 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Istruttoria: blocca calcolo se ci sono domande da_verificare, filtra escluse.
+	// Istruttoria: filtra escluse se attiva.
 	var ecfg graduatoria.EngineConfig
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 	if ecfg.Verifica.Attiva {
-		pending, _ := db.CountPending(h.DB, int(bandoID))
-		if pending > 0 {
-			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Istruttoria+incompleta:+%d+domande+da+verificare&flashType=error", bandoID, pending), http.StatusSeeOther)
-			return
-		}
 		escluse, _ := db.ListEscluse(h.DB, int(bandoID))
 		if len(escluse) > 0 {
 			excludeSet := make(map[string]bool, len(escluse))
@@ -353,12 +348,17 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
-	var righe []graduatoria.RigaGraduatoria
+	var gruppo *graduatoria.GraduatoriaGruppo
 	for _, g := range grad.Gruppi {
 		if g.Nome == nome {
-			righe = g.Righe
+			gruppo = g
 			break
 		}
+	}
+
+	if gruppo == nil {
+		http.NotFound(w, r)
+		return
 	}
 
 	renderTemplate(w, "run_tabella_gruppo.html", map[string]any{
@@ -366,7 +366,8 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 		"Bando":       bando,
 		"Run":         run,
 		"Nome":        nome,
-		"Righe":       righe,
+		"Gruppo":      gruppo,
+		"Righe":       gruppo.Righe,
 		"RunID":       runID,
 		"BandoID":     bandoID,
 		"BaseURL":     h.BaseURL,

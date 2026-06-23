@@ -71,5 +71,19 @@
     {{if eq .Modalita "lista_attesa"}}<span class="text-muted"> — Step attivi: mapping → filtri → fine</span>{{end}}
   </div>
   {{end}}
+
+  <hr style="margin:1.5rem 0">
+  <h2>Periodo di presentazione</h2>
+  <p class="text-muted" style="font-size:.88em">Filtra le istanze per data di presentazione. Applicato al calcolo graduatoria, all'istruttoria e alla costruzione del superset (viewer campi). Lascia vuoto per includere tutte le date.</p>
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+    <div>
+      <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.25rem">Dal</label>
+      <input type="date" name="data_minima" value="{{.Istanza.DataMinima}}" class="form-control form-control-sm" style="width:160px">
+    </div>
+    <div>
+      <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.25rem">Al</label>
+      <input type="date" name="data_massima" value="{{.Istanza.DataMassima}}" class="form-control form-control-sm" style="width:160px">
+    </div>
+  </div>
 </form>
 {{end}}
