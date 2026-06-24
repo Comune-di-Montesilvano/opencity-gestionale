@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -59,7 +60,23 @@ func flatten(v any, prefix string, out *[]FieldPreview, depth int) {
 				vals := make(map[string]string, len(m))
 				for k, v := range m {
 					keys = append(keys, k)
-					s := strings.TrimSpace(fmt.Sprintf("%v", v))
+					var s string
+					switch fv := v.(type) {
+					case float64:
+						if fv == float64(int64(fv)) {
+							s = fmt.Sprintf("%.0f", fv)
+						} else {
+							s = strconv.FormatFloat(fv, 'f', -1, 64)
+						}
+					case bool:
+						if fv {
+							s = "true"
+						} else {
+							s = "false"
+						}
+					default:
+						s = strings.TrimSpace(fmt.Sprintf("%v", fv))
+					}
 					if len(s) > 60 {
 						s = s[:60] + "…"
 					}
