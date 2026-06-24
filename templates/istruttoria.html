@@ -109,8 +109,8 @@
       <a href="{{$.BaseURL}}/lang/it/operatori/{{.PraticaID}}/detail" target="_blank"
          style="font-family:monospace;color:#1d4ed8" title="{{.PraticaID}}">{{.PraticaID | printf "%.8s"}}…</a>
       {{if .AppStatus}}<br><span style="font-size:.75rem;color:#9ca3af">stato: {{.AppStatus}}</span>{{end}}
-      {{$rcf := index $.RichiedenteCF .PraticaID}}{{if $rcf}}<br><span style="font-family:monospace;font-size:.75rem;color:#374151" title="CF richiedente">{{cfOscurato $rcf}}</span>{{end}}
-      {{$fcf := index $.FiglioCF .PraticaID}}{{if $fcf}}<br><span style="font-family:monospace;font-size:.75rem;color:#6b7280" title="CF figlio">{{cfOscurato $fcf}}</span>{{end}}
+      {{$rcf := index $.RichiedenteCF .PraticaID}}{{if $rcf}}<br><span style="font-family:monospace;font-size:.75rem;color:#374151" title="CF richiedente">{{cfOscurato $rcf}}</span> <button type="button" title="Copia CF richiedente" onclick="copyCF(this,'{{$rcf}}')" style="font-size:.7rem;padding:1px 5px;border:1px solid #d1d5db;border-radius:3px;background:#f9fafb;cursor:pointer;color:#374151">📋</button>{{end}}
+      {{$fcf := index $.FiglioCF .PraticaID}}{{if $fcf}}<br><span style="font-family:monospace;font-size:.75rem;color:#6b7280" title="CF figlio">{{cfOscurato $fcf}}</span> <button type="button" title="Copia CF figlio" onclick="copyCF(this,'{{$fcf}}')" style="font-size:.7rem;padding:1px 5px;border:1px solid #d1d5db;border-radius:3px;background:#f9fafb;cursor:pointer;color:#6b7280">📋</button>{{end}}
     </td>
     <td>
       <div id="motivi-{{.ID}}">
@@ -267,6 +267,14 @@
   </div>
 </div>
 <script>
+function copyCF(btn, cf) {
+  navigator.clipboard.writeText(cf).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = '#16a34a';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  });
+}
 function toggleAll(cb) {
   document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
 }
