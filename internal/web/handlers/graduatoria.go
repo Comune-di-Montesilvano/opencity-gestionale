@@ -21,6 +21,59 @@ type GraduatoriaHandler struct {
 	BaseURL string
 }
 
+// csvSistemaCols sono le colonne sistema sempre presenti nell'export CSV.
+var csvSistemaCols = []string{
+	"Posizione", "Categoria", "Protocollo", "Data Invio",
+	"Stato", "Importo Rimborso", "Note Esclusione", "Link",
+}
+
+func csvHeadersDynamic(dinamiche []string) []string {
+	headers := make([]string, len(csvSistemaCols))
+	copy(headers, csvSistemaCols)
+	return append(headers, dinamiche...)
+}
+
+func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL string, dinamiche []string) []string {
+	ist := r.Istanza
+	link := ""
+	if ist != nil && baseURL != "" && ist.ID != "" {
+		link = baseURL + "/lang/it/operatori/" + ist.ID + "/detail"
+	}
+	importo := ""
+	if r.Ammessa {
+		importo = fmt.Sprintf("%.2f", r.ImportoRimborso)
+	}
+	protocollo := ""
+	dataInvio := ""
+	stato := ""
+	if ist != nil {
+		protocollo = ist.ProtocolNumber
+		dataInvio = ist.SubmittedAt
+		if t, err := time.Parse(time.RFC3339, dataInvio); err == nil {
+			dataInvio = t.Format("02/01/2006")
+		}
+		stato = ist.Status
+	}
+	row := []string{
+		fmt.Sprintf("%d", r.Posizione),
+		categoria,
+		protocollo,
+		dataInvio,
+		stato,
+		importo,
+		r.NoteEsclusione,
+		link,
+	}
+	for _, col := range dinamiche {
+		val := ""
+		if ist != nil {
+			val = ist.CampiMappati[col]
+		}
+		row = append(row, val)
+	}
+	return row
+}
+
 // PostCalcola — calcola nuova run per un bando
 func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
@@ -237,8 +290,6 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	engine, _ := graduatoria.GetEngine(bando.EngineType)
-
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
@@ -247,19 +298,22 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 		righe = grad.Escluse
 	}
 
+	var exportColonne []string
+	json.Unmarshal([]byte(bando.ExportColonne), &exportColonne)
+
 	filename := fmt.Sprintf("run%d_%d_%s.csv", runID, anno, tipo)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
-	cw.Write(engine.CSVHeaders())
+	_ = cw.Write(csvHeadersDynamic(exportColonne))
 	for _, riga := range righe {
 		cat := tipo
 		if !riga.Ammessa && riga.NoteEsclusione != "fondi esauriti" {
 			cat = "esclusa"
 		}
-		cw.Write(engine.CSVRecord(cat, riga, h.BaseURL))
+		_ = cw.Write(csvRecordDynamic(cat, riga, h.BaseURL, exportColonne))
 	}
 	cw.Flush()
 }
@@ -415,7 +469,8 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	engine, _ := graduatoria.GetEngine(bando.EngineType)
+	var exportColonne []string
+	json.Unmarshal([]byte(bando.ExportColonne), &exportColonne)
 
 	filename := fmt.Sprintf("run%d_%s.csv", runID, nome)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -423,13 +478,13 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
-	cw.Write(engine.CSVHeaders())
+	_ = cw.Write(csvHeadersDynamic(exportColonne))
 	for _, riga := range righe {
 		cat := nome
 		if !riga.Ammessa {
 			cat = "fuori_fondi"
 		}
-		cw.Write(engine.CSVRecord(cat, riga, h.BaseURL))
+		_ = cw.Write(csvRecordDynamic(cat, riga, h.BaseURL, exportColonne))
 	}
 	cw.Flush()
 }
