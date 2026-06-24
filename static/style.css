@@ -194,3 +194,24 @@ code { background: #f1f5f9; padding: .1rem .35rem; border-radius: 3px; font-size
   .stampa-sezione { page-break-inside: avoid; }
   h3, h4 { page-break-after: avoid; }
 }
+
+/* ===== HELP BADGE ===== */
+.help-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6c757d;
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  vertical-align: middle;
+  margin-left: 5px;
+  line-height: 1;
+}
+.help-badge:hover { background: #495057; }

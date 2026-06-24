@@ -22,7 +22,12 @@
   </div>
 
   <!-- Tipologie -->
-  <h2>Tipologie</h2>
+  <h2>Tipologie
+    <button type="button" class="help-badge"
+      data-bs-toggle="popover" data-bs-placement="right"
+      data-bs-title="Tipologie"
+      data-bs-content="Suddivide la graduatoria in categorie (es. rette, mensa). Ogni tipologia può avere un budget separato o condiviso. Le istanze vengono assegnate alla tipologia in base al valore del campo configurato.">?</button>
+  </h2>
   {{if eq .Modalita "posti"}}
   <p class="text-muted">Definisci le categorie di istanze e il numero di posti disponibili per ciascuna.</p>
   {{else}}
@@ -53,7 +58,12 @@
         <input type="number" name="tip_priorita" value="{{$t.Priorita}}" class="form-control form-control-sm" min="1" placeholder="1">
       </div>
       <div class="form-group">
-        <label>{{if eq $.Modalita "posti"}}Limite tipo{{else}}Budget tipo{{end}}</label>
+        <label>{{if eq $.Modalita "posti"}}Limite tipo{{else}}Budget tipo{{end}}
+          <button type="button" class="help-badge"
+            data-bs-toggle="popover" data-bs-placement="right"
+            data-bs-title="Tipo limite"
+            data-bs-content="&lt;b&gt;Residuo&lt;/b&gt;: importo rimane fino a budget esaurito.&lt;br&gt;&lt;b&gt;Fisso&lt;/b&gt;: importo fisso per istanza (es. 500€).&lt;br&gt;&lt;b&gt;Percentuale&lt;/b&gt;: percentuale di un campo (es. 50% del corrispettivo).&lt;br&gt;&lt;b&gt;Posti&lt;/b&gt;: max N candidati.">?</button>
+        </label>
         <select name="tip_budget_tipo" class="form-control form-control-sm">
           {{if eq $.Modalita "posti"}}
           <option value="posti" {{if eq $t.Limite.Tipo "posti"}}selected{{end}}>Numero posti</option>
@@ -99,7 +109,12 @@
   <button type="button" class="btn btn-sm btn-secondary" onclick="aggiungiOrdine()">+ Aggiungi criterio</button>
 
   <!-- Deduplicazione -->
-  <h2 style="margin-top:2rem">Deduplicazione</h2>
+  <h2 style="margin-top:2rem">Deduplicazione
+    <button type="button" class="help-badge"
+      data-bs-toggle="popover" data-bs-placement="right"
+      data-bs-title="Deduplicazione"
+      data-bs-content="Se attiva, tra istanze con la stessa chiave (es. stesso figlio + stessa annualità + stesso tipo) viene mantenuta solo la prima in ordine di graduatoria. Le altre vengono spostate nelle escluse con motivo &apos;duplicato&apos;.">?</button>
+  </h2>
   <p class="text-muted">Se attiva, mantiene una sola istanza per chiave. La prima nell'ordinamento vince.</p>
 
   <div class="form-group" style="display:flex;align-items:center;gap:.75rem">

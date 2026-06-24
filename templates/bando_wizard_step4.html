@@ -19,7 +19,12 @@
       <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
     </div>
   </div>
-  <h2>Filtri di ammissibilità</h2>
+  <h2>Filtri di ammissibilità
+    <button type="button" class="help-badge"
+      data-bs-toggle="popover" data-bs-placement="right"
+      data-bs-title="Filtri ammissibilità"
+      data-bs-content="Le istanze che NON passano questi filtri vengono escluse dalla graduatoria. Esempio: ISEE ≤ 40.000 € esclude chi supera la soglia. Più filtri sulla stessa riga sono in AND; stesso numero di gruppo &gt; 0 = OR.">?</button>
+  </h2>
   <p class="text-muted">Le istanze che non soddisfano tutti i filtri vengono escluse dalla graduatoria. Usa il campo <strong>GR</strong> per raggruppare filtri in OR: stesso numero = almeno uno deve passare; 0 = AND indipendente.</p>
 
   <div id="filtri-container">
@@ -71,7 +76,12 @@
       </optgroup>
     </select>
     <input type="text" name="filtro_valore" value="{{$f.Valore}}" class="form-control form-control-sm" placeholder="valore">
-    <span style="font-size:.78rem;color:#6b7280;white-space:nowrap">GR</span>
+    <span style="font-size:.78rem;color:#6b7280;white-space:nowrap">GR
+      <button type="button" class="help-badge"
+        data-bs-toggle="popover" data-bs-placement="right"
+        data-bs-title="Raggruppamento OR"
+        data-bs-content="Filtri con stesso numero di gruppo (&gt; 0) si combinano in OR: basta che uno passi. I gruppi diversi si combinano in AND tra loro. Gruppo 0 = filtro AND autonomo. Esempio: gruppo 1 su &apos;comune=A&apos; e &apos;comune=B&apos; ammette residenti in entrambi.">?</button>
+    </span>
     <input type="number" name="filtro_gruppo" value="{{$f.Gruppo}}" min="0" max="99"
            class="form-control form-control-sm" style="width:52px;flex:0 0 52px;min-width:0" title="Gruppo OR: stesso numero = oppure; 0 = e">
     <button type="button" class="btn btn-sm btn-danger" onclick="rimuoviFiltro(this)">✕</button>
@@ -83,7 +93,12 @@
 
   <hr style="margin:2rem 0">
 
-  <h2>Istanze — filtri pre-estrazione</h2>
+  <h2>Istanze — filtri pre-estrazione
+    <button type="button" class="help-badge"
+      data-bs-toggle="popover" data-bs-placement="right"
+      data-bs-title="Filtri istanza (pre-estrazione)"
+      data-bs-content="Filtrano le applicazioni per data invio e stato PRIMA di estrarre i campi. Esempio: accettare solo istanze inviate dopo il 01/01/2026 o in stato &apos;inviata&apos; (3000). Le istanze scartate qui non appaiono neanche tra le escluse.">?</button>
+  </h2>
   <p class="text-muted">Filtri applicati prima dell'estrazione dei campi form. Le istanze escluse qui non appaiono nemmeno tra le escluse dalla graduatoria.</p>
 
   {{if .StatiDisponibili}}
@@ -124,7 +139,12 @@
 
   <hr style="margin:2rem 0">
 
-  <h2>Istruttoria — verifica manuale pre-calcolo</h2>
+  <h2>Istruttoria — verifica manuale pre-calcolo
+    <button type="button" class="help-badge"
+      data-bs-toggle="popover" data-bs-placement="right"
+      data-bs-title="Filtri istruttoria (flag)"
+      data-bs-content="Le istanze che passano questi filtri vengono segnalate per revisione manuale (non escluse automaticamente). Esempio: ISEE non certificato PDND. Aggiungere un Motivo per spiegare all&apos;operatore cosa verificare.">?</button>
+  </h2>
   <p class="text-muted">Le domande che soddisfano questi criteri vengono flaggate per revisione manuale. Il calcolo graduatoria è bloccato finché non sono tutte smarcate.</p>
 
   <div style="margin-bottom:1rem">

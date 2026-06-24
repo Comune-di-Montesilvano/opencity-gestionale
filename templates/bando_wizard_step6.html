@@ -23,7 +23,12 @@
   <p class="text-muted">Definisci come si calcola l'importo da rimborsare per ogni istanza ammessa.</p>
 
   <div class="form-group">
-    <label>Tipo calcolo</label>
+    <label>Tipo calcolo
+      <button type="button" class="help-badge"
+        data-bs-toggle="popover" data-bs-placement="right"
+        data-bs-title="Tipo rimborso"
+        data-bs-content="&lt;b&gt;Lordo&lt;/b&gt;: rimborsa il campo lordo direttamente (es. corrispettivo pagato).&lt;br&gt;&lt;b&gt;Netto&lt;/b&gt;: rimborsa lordo meno deduzione (es. corrispettivo pagato meno Bonus Nidi già ricevuto). Il campo netto viene calcolato automaticamente.">?</button>
+    </label>
     <div style="display:flex;gap:1.5rem;margin-top:.25rem">
       <label style="display:flex;align-items:center;gap:.4rem">
         <input type="radio" name="rimborso_tipo" value="netto"

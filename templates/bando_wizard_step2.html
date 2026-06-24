@@ -29,6 +29,10 @@
       <input type="radio" name="modalita" value="fondi" {{if eq .Modalita "fondi"}}checked{{end}} style="display:none" onchange="this.form.submit()">
       <div style="font-size:1.75rem;margin-bottom:.5rem">💰</div>
       <strong>Assegnazione fondi</strong>
+      <button type="button" class="help-badge"
+        data-bs-toggle="popover" data-bs-placement="right"
+        data-bs-title="Modalità Fondi"
+        data-bs-content="Rimborso in euro per ogni istanza ammessa, fino ad esaurimento del budget. Esempio: rimborso rette scolastiche. Richiede la configurazione del budget e del tipo di rimborso (step 6).">?</button>
       <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Rimborso € per ogni istanza ammessa, fino a esaurimento budget. Supporta rimborso parziale.</p>
     </label>
 
@@ -36,6 +40,10 @@
       <input type="radio" name="modalita" value="posti" {{if eq .Modalita "posti"}}checked{{end}} style="display:none" onchange="this.form.submit()">
       <div style="font-size:1.75rem;margin-bottom:.5rem">🎫</div>
       <strong>Posti limitati</strong>
+      <button type="button" class="help-badge"
+        data-bs-toggle="popover" data-bs-placement="right"
+        data-bs-title="Modalità Posti"
+        data-bs-content="I primi N candidati in graduatoria vengono ammessi, senza importo. Esempio: posti in un centro estivo. Richiede la configurazione del numero massimo di posti (step 5).">?</button>
       <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Primi N ammessi, senza rimborso monetario. Es. trasporto scolastico, centri estivi.</p>
     </label>
 
@@ -43,6 +51,10 @@
       <input type="radio" name="modalita" value="ammissione" {{if eq .Modalita "ammissione"}}checked{{end}} style="display:none" onchange="this.form.submit()">
       <div style="font-size:1.75rem;margin-bottom:.5rem">✅</div>
       <strong>Ammissione libera</strong>
+      <button type="button" class="help-badge"
+        data-bs-toggle="popover" data-bs-placement="right"
+        data-bs-title="Modalità Ammissione"
+        data-bs-content="Tutti i candidati che soddisfano i filtri vengono ammessi, senza graduatoria né importo. Esempio: agevolazione tariffaria. Non richiede step tipologie né rimborso.">?</button>
       <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Tutti che superano i requisiti sono ammessi. No limite di posti o budget.</p>
     </label>
 
@@ -50,6 +62,10 @@
       <input type="radio" name="modalita" value="lista_attesa" {{if eq .Modalita "lista_attesa"}}checked{{end}} style="display:none" onchange="this.form.submit()">
       <div style="font-size:1.75rem;margin-bottom:.5rem">📋</div>
       <strong>Lista d'attesa</strong>
+      <button type="button" class="help-badge"
+        data-bs-toggle="popover" data-bs-placement="right"
+        data-bs-title="Lista d&apos;attesa"
+        data-bs-content="Come ammissione, ma i candidati vengono ordinati secondo un criterio configurabile. Tutti ammessi, con posizione in lista. Non richiede step tipologie né rimborso.">?</button>
       <p class="text-muted" style="font-size:.88em;margin:.4rem 0 0">Come ammissione libera ma ordinata per criterio (es. data domanda). Tutti risultano ammessi in ordine.</p>
     </label>
 

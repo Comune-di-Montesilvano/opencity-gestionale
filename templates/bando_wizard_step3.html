@@ -40,10 +40,30 @@
           <tr>
             <th style="width:140px">Nome logico</th>
             <th style="width:120px">Label (opz.)</th>
-            <th style="width:90px">Tipo</th>
-            <th>Path JSON</th>
-            <th style="width:60px" title="Se spuntato: il path è relativo a ciascun elemento dell'array di espansione (non al documento radice)">Per elem.?</th>
-            <th>Verifica campo</th>
+            <th style="width:90px">Tipo
+              <button type="button" class="help-badge"
+                data-bs-toggle="popover" data-bs-placement="top"
+                data-bs-title="Tipo campo"
+                data-bs-content="&lt;b&gt;float&lt;/b&gt;: numero decimale (es. ISEE).&lt;br&gt;&lt;b&gt;int&lt;/b&gt;: intero (es. anno, numero figli).&lt;br&gt;&lt;b&gt;string&lt;/b&gt;: testo (es. CF, tipo richiesta).&lt;br&gt;&lt;b&gt;time&lt;/b&gt;: data (confronti con prima_di/dopo_di).&lt;br&gt;&lt;b&gt;count&lt;/b&gt;: lunghezza array.">?</button>
+            </th>
+            <th>Path JSON
+              <button type="button" class="help-badge"
+                data-bs-toggle="popover" data-bs-placement="top"
+                data-bs-title="Path JSON"
+                data-bs-content="Percorso dot-notation nel payload Form.IO. Esempi: &lt;code&gt;ordinary_economic_situation_indicator.isee&lt;/code&gt; per ISEE, &lt;code&gt;$app:submitted_at&lt;/code&gt; per data invio, &lt;code&gt;anni[annualita1=20232024].corrispettivo&lt;/code&gt; per un elemento array specifico.">?</button>
+            </th>
+            <th style="width:60px" title="Se spuntato: il path è relativo a ciascun elemento dell'array di espansione (non al documento radice)">Per elem.?
+              <button type="button" class="help-badge"
+                data-bs-toggle="popover" data-bs-placement="top"
+                data-bs-title="Per elemento array"
+                data-bs-content="Spunta se il campo appartiene all'array di espansione (es. ogni anno scolastico). Il motore creerà un record per ogni elemento dell'array, con questo campo relativo all'elemento corrente.">?</button>
+            </th>
+            <th>Verifica campo
+              <button type="button" class="help-badge"
+                data-bs-toggle="popover" data-bs-placement="top"
+                data-bs-title="Verifica campo (PDND)"
+                data-bs-content="Path opzionale per verificare la certificazione del campo. Esempio: &lt;code&gt;ordinary_economic_situation_indicator.meta.signature&lt;/code&gt; — se valorizzato indica ISEE certificato PDND. Operatore e valore atteso determinano quando il campo è considerato certificato.">?</button>
+            </th>
             <th style="width:32px"></th>
           </tr>
         </thead>
