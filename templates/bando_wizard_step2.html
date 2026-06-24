@@ -24,7 +24,8 @@
   <div class="wizard-nav">
     <a href="/bandi" class="btn btn-secondary">← Lista bandi</a>
     <div class="wizard-nav-right">
-      <button type="submit" class="btn btn-primary" {{if not .Modalita}}disabled{{end}}>Salva e continua →</button>
+      <button type="submit" name="save_only" value="1" class="btn btn-outline-secondary" onclick="setLoading(this)">Salva</button>
+      <button type="submit" class="btn btn-primary" {{if not .Modalita}}disabled{{end}} onclick="setLoading(this)">Salva e continua →</button>
     </div>
   </div>
   <h2>Tipo di bando</h2>
@@ -86,4 +87,13 @@
     </div>
   </div>
 </form>
+
+<script>
+function setLoading(btn) {
+  setTimeout(function() {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + (btn.name === 'save_only' ? 'Salvataggio…' : 'Elaborazione…');
+  }, 10);
+}
+</script>
 {{end}}

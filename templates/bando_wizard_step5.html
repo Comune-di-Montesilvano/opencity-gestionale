@@ -24,7 +24,8 @@
   <div class="wizard-nav">
     <a href="/bandi/{{.Bando.ID}}/wizard/4" class="btn btn-secondary">← Indietro</a>
     <div class="wizard-nav-right">
-      <button type="submit" class="btn btn-primary">Salva e continua →</button>
+      <button type="submit" name="save_only" value="1" class="btn btn-outline-secondary" onclick="setLoading(this)">Salva</button>
+      <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
     </div>
   </div>
 
@@ -131,7 +132,8 @@
 
   <div class="form-actions" style="margin-top:1.5rem">
     <a href="/bandi/{{.Bando.ID}}/wizard/4" class="btn btn-secondary">← Indietro</a>
-    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+    <button type="submit" name="save_only" value="1" class="btn btn-outline-secondary" onclick="setLoading(this)">Salva</button>
+    <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
   </div>
 </form>
 
@@ -308,6 +310,13 @@ function aggiungiOrdine() {
     <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.ordine-row').remove()">✕</button>
   </div>`;
   document.getElementById('ordini-container').insertAdjacentHTML('beforeend', html);
+}
+
+function setLoading(btn) {
+  setTimeout(function() {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + (btn.name === 'save_only' ? 'Salvataggio…' : 'Elaborazione…');
+  }, 10);
 }
 </script>
 {{end}}

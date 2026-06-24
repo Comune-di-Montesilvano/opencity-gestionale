@@ -26,8 +26,8 @@
       <div class="wizard-nav">
         <a href="/bandi/{{.Bando.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
         <div class="wizard-nav-right">
-          <button type="button" class="btn btn-secondary" onclick="salvaStep3()">Salva</button>
-          <button type="submit" class="btn btn-primary">Salva e continua →</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="salvaStep3(); setLoading(this)">Salva</button>
+          <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
         </div>
       </div>
 
@@ -114,8 +114,8 @@
 
       <div class="form-actions" style="margin-top:1rem">
         <a href="/bandi/{{.Bando.ID}}/wizard/2" class="btn btn-secondary">← Indietro</a>
-        <button type="button" class="btn btn-secondary" onclick="salvaStep3()">Salva</button>
-        <button type="submit" class="btn btn-primary">Salva e continua →</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="salvaStep3(); setLoading(this)">Salva</button>
+        <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
       </div>
 
     </form>
@@ -898,6 +898,13 @@ function updateSupersetSepVisibility() {
     el = el.nextElementSibling;
   }
   sep.style.display = anyVisible ? '' : 'none';
+}
+
+function setLoading(btn) {
+  setTimeout(function() {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + (btn.name === 'save_only' ? 'Salvataggio…' : 'Elaborazione…');
+  }, 10);
 }
 </script>
 {{end}}

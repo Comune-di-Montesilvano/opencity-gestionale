@@ -388,6 +388,10 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if r.FormValue("save_only") == "1" {
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/2", bando.ID), http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/3", bando.ID), http.StatusSeeOther)
 
 	case "3":
@@ -546,6 +550,10 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if r.FormValue("save_only") == "1" {
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/4", bando.ID), http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/5", bando.ID), http.StatusSeeOther)
 
 	case "5":
@@ -606,6 +614,10 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if r.FormValue("save_only") == "1" {
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/5", bando.ID), http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/6", bando.ID), http.StatusSeeOther)
 
 	case "6":
@@ -616,6 +628,10 @@ func (h *BandiHandler) PostWizardStep(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := saveEngineConfig(h, r, bando.ID, cfg); err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if r.FormValue("save_only") == "1" {
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/6", bando.ID), http.StatusSeeOther)
 			return
 		}
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/fine", bando.ID), http.StatusSeeOther)

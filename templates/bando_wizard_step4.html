@@ -23,7 +23,8 @@
   <div class="wizard-nav">
     <a href="/bandi/{{.Bando.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
     <div class="wizard-nav-right">
-      <button type="submit" class="btn btn-primary">Salva e continua →</button>
+      <button type="submit" name="save_only" value="1" class="btn btn-outline-secondary" onclick="setLoading(this)">Salva</button>
+      <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
     </div>
   </div>
   <h2>Filtri di ammissibilità</h2>
@@ -184,7 +185,8 @@
 
   <div class="form-actions" style="margin-top:1.5rem">
     <a href="/bandi/{{.Bando.ID}}/wizard/3" class="btn btn-secondary">← Indietro</a>
-    <button type="submit" class="btn btn-primary">Salva e continua →</button>
+    <button type="submit" name="save_only" value="1" class="btn btn-outline-secondary" onclick="setLoading(this)">Salva</button>
+    <button type="submit" class="btn btn-primary" onclick="setLoading(this)">Salva e continua →</button>
   </div>
 </form>
 
@@ -315,6 +317,13 @@ function aggiornaValore(sel) {
     };
     input.placeholder = hints[sel.value] || 'valore';
   }
+}
+
+function setLoading(btn) {
+  setTimeout(function() {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + (btn.name === 'save_only' ? 'Salvataggio…' : 'Elaborazione…');
+  }, 10);
 }
 </script>
 {{end}}
