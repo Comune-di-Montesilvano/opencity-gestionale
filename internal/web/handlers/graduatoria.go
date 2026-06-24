@@ -558,6 +558,19 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 		"CF Figlio", "Annualità", "Tipologia", "Importo (€)", "IBAN", "Intestatario IBAN",
 	})
 
+	// fallbackCampo prova lo struct Istanza poi CampiMappati con chiavi alternative.
+	fallbackCampo := func(structVal string, ist *graduatoria.Istanza, chiavi ...string) string {
+		if structVal != "" {
+			return structVal
+		}
+		for _, k := range chiavi {
+			if v := ist.CampiMappati[k]; v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+
 	pos := 0
 	for _, g := range grad.Gruppi {
 		for _, riga := range g.Righe {
@@ -566,22 +579,24 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 			}
 			pos++
 			ist := riga.Istanza
-			annualita := ""
-			if ist.Annualita != 0 {
-				annualita = fmt.Sprintf("%d", ist.Annualita)
-			}
+			annualita := fallbackCampo(func() string {
+				if ist.Annualita != 0 {
+					return fmt.Sprintf("%d", ist.Annualita)
+				}
+				return ""
+			}(), ist, "annualita", "annualita1", "anno")
 			cw.Write([]string{
 				fmt.Sprintf("%d", pos),
 				ist.ProtocolNumber,
-				ist.RichiedenteCF,
-				ist.RichiedenteCognome,
-				ist.RichiedenteNome,
-				ist.FiglioSelezionatoCF,
+				fallbackCampo(ist.RichiedenteCF, ist, "richiedente_cf", "richiedente"),
+				fallbackCampo(ist.RichiedenteCognome, ist, "richiedente_cognome", "cognome"),
+				fallbackCampo(ist.RichiedenteNome, ist, "richiedente_nome", "nome"),
+				fallbackCampo(ist.FiglioSelezionatoCF, ist, "figlio_cf", "figlio"),
 				annualita,
 				g.Nome,
 				fmt.Sprintf("%.2f", riga.ImportoRimborso),
-				ist.IBAN,
-				ist.IBANIntestatario,
+				fallbackCampo(ist.IBAN, ist, "iban"),
+				fallbackCampo(ist.IBANIntestatario, ist, "iban_intestatario", "intestatario"),
 			})
 		}
 	}

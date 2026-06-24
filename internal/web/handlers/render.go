@@ -86,6 +86,14 @@ var funcMap = template.FuncMap{
 		}
 		return false
 	},
+	"primoNonVuoto": func(vals ...string) string {
+		for _, v := range vals {
+			if v != "" {
+				return v
+			}
+		}
+		return ""
+	},
 }
 
 func fileExists(path string) bool {
