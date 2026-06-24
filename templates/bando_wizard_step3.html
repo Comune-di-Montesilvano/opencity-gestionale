@@ -171,6 +171,9 @@
       <label style="display:flex; align-items:center; gap:4px; font-size:12px; white-space:nowrap; cursor:pointer">
         <input type="checkbox" id="hide-empty" onchange="renderViewer()"> Nascondi vuoti
       </label>
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; white-space:nowrap; cursor:pointer">
+        <input type="checkbox" id="solo-superset-check" onchange="renderViewer()"> Solo superset
+      </label>
     </div>
 
     <div class="json-viewer" style="border:1px solid #e2e8f0; border-radius:6px; max-height:60vh; overflow-y:auto">
@@ -289,6 +292,22 @@ if (document.getElementById('viewer-search') && document.getElementById('viewer-
 
 // Aggiungi righe superset-only al viewer, poi ri-applica filtri se attivi
 addSupersetOnlyRows();
+
+// Marca le righe del campione con data-in-superset
+document.querySelectorAll('#json-viewer-body tr[data-path]').forEach(function(row) {
+  if (row.dataset.supersetOnly === '1' || row.dataset.supersetSep === '1') return;
+  const path = row.dataset.path || '';
+  const dot = path.indexOf('.');
+  let inSup = false;
+  if (dot !== -1 && supersetData) {
+    const arr = path.slice(0, dot), field = path.slice(dot + 1);
+    inSup = !!(supersetData[arr] && supersetData[arr][field] !== undefined);
+  } else if (path && supersetData) {
+    inSup = !!(supersetData[path]);
+  }
+  row.dataset.inSuperset = inSup ? '1' : '0';
+});
+
 if (document.getElementById('viewer-search')?.value || document.getElementById('hide-empty')?.checked) {
   renderViewer();
 } else {
@@ -419,6 +438,7 @@ function onViewerFilterInput(val) {
 function renderViewer() {
   const q = (document.getElementById('viewer-search')?.value || '').toLowerCase();
   const hideEmpty = document.getElementById('hide-empty')?.checked || false;
+  const soloSup = document.getElementById('solo-superset-check')?.checked || false;
   const emptyVals = new Set(['', '(null)', '0']);
 
   document.querySelectorAll('#json-viewer-body tr').forEach(row => {
@@ -431,7 +451,9 @@ function renderViewer() {
     const matchesQ = !q || path.toLowerCase().includes(q) || (!isArr && value.toLowerCase().includes(q));
     // Filtro vuoti (solo scalari, non superset-only)
     const isEmpty = !isArr && !row.dataset.supersetOnly && emptyVals.has(value.trim());
-    const show = matchesQ && (!hideEmpty || !isEmpty);
+    // Filtro solo superset
+    const inSup = row.dataset.inSuperset === '1' || row.dataset.supersetOnly === '1';
+    const show = matchesQ && (!hideEmpty || !isEmpty) && (!soloSup || inSup);
     row.style.display = show ? '' : 'none';
   });
 
