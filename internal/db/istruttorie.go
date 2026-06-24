@@ -109,7 +109,7 @@ func GetIstruttoriaByPratica(db *sql.DB, bandoID int, praticaID string) (*Istrut
 	err := db.QueryRow(`
 		SELECT i.id, i.bando_id, i.pratica_id, i.motivi_json, i.stato,
 		       COALESCE(i.nota,''), COALESCE(i.operatore,''), COALESCE(i.aggiornato_il,''),
-		       COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(id.nota,'')
+		       COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(i.nota_lavoro,'')
 		FROM istruttorie i
 		LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id
 		WHERE i.bando_id=? AND i.pratica_id=?`,
@@ -132,7 +132,7 @@ func GetIstruttoriaByPratica(db *sql.DB, bandoID int, praticaID string) (*Istrut
 func ListIstruttorie(db *sql.DB, bandoID int, statoFilter, appStatusFilter string) ([]Istruttoria, error) {
 	q := `SELECT i.id, i.bando_id, i.pratica_id, i.motivi_json, i.stato,
 	             COALESCE(i.nota,''), COALESCE(i.operatore,''), COALESCE(i.aggiornato_il,''),
-	             COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(id.nota,'')
+	             COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(i.nota_lavoro,'')
 	      FROM istruttorie i
 	      LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id
 	      WHERE i.bando_id = ?`
@@ -234,13 +234,11 @@ func GetIstruttoriaStats(db *sql.DB, bandoID int) (IstruttoriaStats, error) {
 	return s, rows.Err()
 }
 
-// SaveNota salva la nota di lavoro cross-bando in istruttorie_dati.
+// SaveNota salva la nota di lavoro per-bando in istruttorie.nota_lavoro.
 func SaveNota(db *sql.DB, bandoID int, praticaID, nota string) error {
-	_, err := db.Exec(`
-		INSERT INTO istruttorie_dati (pratica_id, nota, aggiornato_il)
-		VALUES (?, ?, ?)
-		ON CONFLICT(pratica_id) DO UPDATE SET nota=excluded.nota, aggiornato_il=excluded.aggiornato_il`,
-		praticaID, nota, time.Now().Format(time.RFC3339),
+	_, err := db.Exec(
+		`UPDATE istruttorie SET nota_lavoro=?, aggiornato_il=? WHERE bando_id=? AND pratica_id=?`,
+		nota, time.Now().Format(time.RFC3339), bandoID, praticaID,
 	)
 	return err
 }
@@ -285,6 +283,43 @@ func HasDatiOverride(db *sql.DB, ids []int) bool {
 		WHERE i.id IN (`+ph+`) AND id2.dati_json NOT IN ('{}', '')`,
 		args...).Scan(&n)
 	return n > 0
+}
+
+// NoteAltroBando rappresenta una nota di lavoro proveniente da un bando diverso.
+type NoteAltroBando struct {
+	BandoNome string
+	Nota      string
+}
+
+// GetNoteAltriBandi restituisce le note di lavoro salvate per le stesse pratiche in ALTRI bandi.
+// Utile per mostrare contesto cross-bando senza sovrascriverle.
+func GetNoteAltriBandi(db *sql.DB, bandoID int, praticaIDs []string) (map[string][]NoteAltroBando, error) {
+	if len(praticaIDs) == 0 {
+		return nil, nil
+	}
+	ph := strings.Repeat("?,", len(praticaIDs))
+	ph = ph[:len(ph)-1]
+	args := []any{bandoID}
+	for _, id := range praticaIDs {
+		args = append(args, id)
+	}
+	rows, err := db.Query(`
+		SELECT i.pratica_id, COALESCE(b.nome, 'Bando '||i.bando_id), i.nota_lavoro
+		FROM istruttorie i
+		LEFT JOIN bandi b ON b.id = i.bando_id
+		WHERE i.bando_id != ? AND i.pratica_id IN (`+ph+`) AND i.nota_lavoro != ''
+		ORDER BY i.pratica_id, b.nome`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]NoteAltroBando{}
+	for rows.Next() {
+		var pid, nome, nota string
+		rows.Scan(&pid, &nome, &nota)
+		out[pid] = append(out[pid], NoteAltroBando{BandoNome: nome, Nota: nota})
+	}
+	return out, rows.Err()
 }
 
 func ListEscluse(db *sql.DB, bandoID int) ([]string, error) {

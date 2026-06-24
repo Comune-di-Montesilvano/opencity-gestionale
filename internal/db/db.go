@@ -30,6 +30,15 @@ func Open(path string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN app_status TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN dati_json TEXT NOT NULL DEFAULT '{}'`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT PRIMARY KEY, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT)`)
+	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN nota_lavoro TEXT NOT NULL DEFAULT ''`)
+	// Migra note esistenti cross-bando → per-bando (una-tantum, non sovrascrive note già migrate).
+	_, _ = db.Exec(`UPDATE istruttorie SET nota_lavoro = (
+		SELECT nota FROM istruttorie_dati
+		WHERE istruttorie_dati.pratica_id = istruttorie.pratica_id AND nota != ''
+	) WHERE nota_lavoro = '' AND EXISTS (
+		SELECT 1 FROM istruttorie_dati
+		WHERE istruttorie_dati.pratica_id = istruttorie.pratica_id AND nota != ''
+	)`)
 	// Migrazione: rinomina chiavi PDND → Verifica nei blob engine_config
 	_, _ = db.Exec(`UPDATE bandi SET engine_config =
 		replace(replace(replace(engine_config,

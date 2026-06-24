@@ -114,6 +114,12 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	var praticaIDs []string
+	for _, ist := range istruttorie {
+		praticaIDs = append(praticaIDs, ist.PraticaID)
+	}
+	noteAltriBandi, _ := db.GetNoteAltriBandi(h.DB, int(bandoID), praticaIDs)
+
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
 		"Op":              op,
@@ -132,6 +138,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"CampiDichiarati":  campiDichiarati,
 		"RichiedenteCF":    richiedenteCF,
 		"FiglioCF":         figlioCF,
+		"NoteAltriBandi":   noteAltriBandi,
 	})
 }
 

@@ -217,6 +217,16 @@
                 hx-on:htmx:before-request="this.style.opacity='.5'"
                 hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){this.style.outline='2px solid #16a34a';setTimeout(()=>this.style.outline='',2000)}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2000)}"
                 name="nota">{{.NotaLavoro}}</textarea>
+      {{$altriBandi := index $.NoteAltriBandi .PraticaID}}
+      {{if $altriBandi}}
+      <div style="margin-top:.3rem">
+        {{range $altriBandi}}
+        <div style="font-size:.72rem;color:#9ca3af;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;margin-top:2px" title="Nota da altro bando">
+          <span style="color:#64748b;font-weight:600">{{.BandoNome}}:</span> {{.Nota}}
+        </div>
+        {{end}}
+      </div>
+      {{end}}
     </td>
     <td style="white-space:nowrap">
       {{if eq .Stato "da_verificare"}}
