@@ -64,17 +64,52 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 	}
 	sort.Strings(campiVerifica)
 
-	// Domande "fuori fondi/posti" dall'ultima run — placeholder per istruttoria futura.
+	// Campi dichiarati e CF da mostrare in istruttoria senza aprire la domanda.
+	// Fonte: CampiMappati dell'ultima run calcolata (snapshot affidabile, nessun fetch API).
+	campiDichiarati := map[string]map[string]string{} // praticaID → CampiMappati
+	richiedenteCF := map[string]string{}              // praticaID → CF richiedente oscurato
+	figlioCF := map[string]string{}                   // praticaID → CF figlio oscurato
 	var fuoriFondi []RigaFuoriFondi
 	if run, err := db.GetLatestRun(h.DB, bando.ID); err == nil && run != nil {
 		var grad graduatoria.Graduatoria
 		if json.Unmarshal([]byte(run.DatiJSON), &grad) == nil {
+			addRiga := func(r graduatoria.RigaGraduatoria) {
+				if r.Istanza == nil || r.Istanza.ID == "" {
+					return
+				}
+				pid := r.Istanza.ID
+				campiDichiarati[pid] = r.Istanza.CampiMappati
+				// CF richiedente: prova chiavi comuni
+				for _, k := range []string{"richiedente_cf", "richiedente"} {
+					if v := r.Istanza.CampiMappati[k]; v != "" {
+						richiedenteCF[pid] = v
+						break
+					}
+				}
+				if v := r.Istanza.RichiedenteCF; v != "" {
+					richiedenteCF[pid] = v
+				}
+				// CF figlio
+				for _, k := range []string{"figlio_cf", "figlio"} {
+					if v := r.Istanza.CampiMappati[k]; v != "" {
+						figlioCF[pid] = v
+						break
+					}
+				}
+				if v := r.Istanza.FiglioSelezionatoCF; v != "" {
+					figlioCF[pid] = v
+				}
+			}
 			for _, g := range grad.Gruppi {
 				for _, r := range g.Righe {
+					addRiga(r)
 					if !r.Ammessa && (r.NoteEsclusione == "fondi esauriti" || r.NoteEsclusione == "posti esauriti") {
 						fuoriFondi = append(fuoriFondi, RigaFuoriFondi{Gruppo: g.Nome, Riga: r})
 					}
 				}
+			}
+			for _, r := range grad.Escluse {
+				addRiga(r)
 			}
 		}
 	}
@@ -92,8 +127,11 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"BaseURL":         h.BaseURL,
 		"Flash":           flash,
 		"FlashType":       flashType,
-		"CampiVerifica":   campiVerifica,
-		"FuoriFondi":      fuoriFondi,
+		"CampiVerifica":    campiVerifica,
+		"FuoriFondi":       fuoriFondi,
+		"CampiDichiarati":  campiDichiarati,
+		"RichiedenteCF":    richiedenteCF,
+		"FiglioCF":         figlioCF,
 	})
 }
 
@@ -180,10 +218,9 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, app.Status); err == nil {
 			nuove++
 		}
-		// Salva metadati utili all'operatore durante l'istruttoria (cross-bando in istruttorie_dati).
+		// Salva CF richiedente/figlio cross-bando — usato come fallback in istruttoria prima di una run.
 		if len(passingRecords) > 0 {
 			rec := passingRecords[0]
-			// CF richiedente e figlio — per evitare di dover aprire la domanda
 			for _, k := range []string{"richiedente_cf", "richiedente"} {
 				if v := rec.StringMap[k]; v != "" {
 					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, "__richiedente_cf", v) //nolint
@@ -194,21 +231,6 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 				if v := rec.StringMap[k]; v != "" {
 					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, "__figlio_cf", v) //nolint
 					break
-				}
-			}
-			// Valori dichiarati per i campi cert non verificati
-			for nome, fm := range ecfg.Mapping {
-				if fm.VerificaPath == "" {
-					continue
-				}
-				if certVal := rec.StringMap["__cert_"+nome]; certVal != "" {
-					continue // già verificato dalla fonte
-				}
-				declKey := "__decl_" + nome
-				if sv := rec.StringMap[nome]; sv != "" {
-					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, declKey, sv) //nolint
-				} else if fv, ok := rec.FloatMap[nome]; ok {
-					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, declKey, strconv.FormatFloat(fv, 'f', 2, 64)) //nolint
 				}
 			}
 		}
