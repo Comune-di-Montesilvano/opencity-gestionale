@@ -294,16 +294,23 @@ func (h *GraduatoriaHandler) GetStampa(w http.ResponseWriter, r *http.Request) {
 
 	// Colonne selezionate da query param (default se assenti).
 	colParam := r.URL.Query()["col"]
+	var exportColonne []string
+	json.Unmarshal([]byte(bando.ExportColonne), &exportColonne)
 	if len(colParam) == 0 {
-		colParam = []string{"posizione", "protocollo", "cf", "isee", "importo", "ammessa"}
+		if len(exportColonne) > 0 {
+			colParam = exportColonne
+		} else {
+			colParam = []string{"posizione", "importo", "ammessa"}
+		}
 	}
 
 	renderTemplate(w, "run_stampa.html", map[string]any{
-		"Op":      op,
-		"Bando":   bando,
-		"Run":     run,
-		"Grad":    &grad,
-		"Colonne": colParam,
+		"Op":            op,
+		"Bando":         bando,
+		"Run":           run,
+		"Grad":          &grad,
+		"Colonne":       colParam,
+		"ExportColonne": exportColonne,
 	})
 }
 

@@ -29,9 +29,6 @@
           <input type="checkbox" name="col" value="cf_figlio" {{if hasCol .Colonne "cf_figlio"}}checked{{end}}> CF figlio (oscurato)
         </label>
         <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
-          <input type="checkbox" name="col" value="isee" {{if hasCol .Colonne "isee"}}checked{{end}}> ISEE
-        </label>
-        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
           <input type="checkbox" name="col" value="importo" {{if hasCol .Colonne "importo"}}checked{{end}}> Importo assegnato
         </label>
         <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
@@ -40,6 +37,12 @@
         <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
           <input type="checkbox" name="col" value="note" {{if hasCol .Colonne "note"}}checked{{end}}> Note
         </label>
+        <!-- Colonne dinamiche (dal superset bando) -->
+        {{range $.ExportColonne}}
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
+          <input type="checkbox" name="col" value="{{.}}" {{if hasCol $.Colonne .}}checked{{end}}> {{.}}
+        </label>
+        {{end}}
       </div>
     </div>
     <div style="display:flex;gap:.5rem">
@@ -69,23 +72,24 @@
           {{if hasCol $.Colonne "protocollo"}}<th>Protocollo</th>{{end}}
           {{if hasCol $.Colonne "cf"}}<th>CF richiedente</th>{{end}}
           {{if hasCol $.Colonne "cf_figlio"}}<th>CF figlio</th>{{end}}
-          {{if hasCol $.Colonne "isee"}}<th>ISEE (€)</th>{{end}}
           {{if hasCol $.Colonne "importo"}}<th>Importo (€)</th>{{end}}
           {{if hasCol $.Colonne "ammessa"}}<th>Stato</th>{{end}}
           {{if hasCol $.Colonne "note"}}<th>Note</th>{{end}}
+          {{range $.ExportColonne}}<th>{{.}}</th>{{end}}
         </tr>
       </thead>
       <tbody>
       {{range .Righe}}
       <tr{{if not .Ammessa}} class="stampa-esclusa"{{end}}>
         {{if hasCol $.Colonne "posizione"}}<td>{{.Posizione}}</td>{{end}}
-        {{if hasCol $.Colonne "protocollo"}}<td>{{if .Istanza}}{{protocolloBreve .Istanza.ID}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "protocollo"}}<td>{{if .Istanza}}{{.Istanza.ProtocolNumber}}{{end}}</td>{{end}}
         {{if hasCol $.Colonne "cf"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.RichiedenteCF}}{{end}}</td>{{end}}
         {{if hasCol $.Colonne "cf_figlio"}}<td>{{if .Istanza}}{{cfOscurato .Istanza.FiglioSelezionatoCF}}{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "isee"}}<td>{{if .Istanza}}{{printf "%.2f" .Istanza.ISEE}}{{end}}</td>{{end}}
         {{if hasCol $.Colonne "importo"}}<td>{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
         {{if hasCol $.Colonne "ammessa"}}<td>{{if .Ammessa}}✓{{else}}✗{{end}}</td>{{end}}
         {{if hasCol $.Colonne "note"}}<td>{{.NoteEsclusione}}</td>{{end}}
+        {{$ist := .Istanza}}
+        {{range $.ExportColonne}}<td>{{if $ist}}{{index $ist.CampiMappati .}}{{end}}</td>{{end}}
       </tr>
       {{end}}
       </tbody>
