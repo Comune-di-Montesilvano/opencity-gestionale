@@ -15,7 +15,8 @@ import (
 
 var (
 	tmplMu    sync.Mutex
-	tmplCache *template.Template // singolo set ParseGlob per tutti i template
+	tmplCache *template.Template // ParseGlob set condiviso — partials unici (wizard-nav ecc.)
+	tmplDir   string             // directory template scoperta al primo caricamento
 
 	BrandingData *opencity.Branding
 )
@@ -94,26 +95,41 @@ func fileExists(path string) bool {
 
 func renderTemplate(w http.ResponseWriter, name string, data any) {
 	tmplMu.Lock()
-	t := tmplCache
+	shared := tmplCache
+	dir := tmplDir
 	tmplMu.Unlock()
 
-	if t == nil {
+	if shared == nil {
 		// Prova prima ./templates (dev locale), poi /templates (Docker distroless).
-		dir := "templates"
+		dir = "templates"
 		if m, _ := filepath.Glob(filepath.Join(dir, "*.html")); len(m) == 0 {
 			dir = "/templates"
 		}
 
 		var err error
-		t, err = template.New("").Funcs(funcMap).ParseGlob(filepath.Join(dir, "*.html"))
+		shared, err = template.New("").Funcs(funcMap).ParseGlob(filepath.Join(dir, "*.html"))
 		if err != nil {
 			http.Error(w, "Errore caricamento template: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		tmplMu.Lock()
-		tmplCache = t
+		tmplCache = shared
+		tmplDir = dir
 		tmplMu.Unlock()
+	}
+
+	// Clone il set condiviso (mantiene tutti i partial: wizard-nav ecc.) e
+	// ri-parsa il file specifico per far "vincere" il suo {{define "content"}}
+	// invece di quello dell'ultimo file caricato alfabeticamente da ParseGlob.
+	t, err := shared.Clone()
+	if err != nil {
+		http.Error(w, "Errore clone template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if _, err = t.ParseFiles(filepath.Join(dir, name)); err != nil {
+		http.Error(w, "Errore caricamento template: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if data == nil {
@@ -138,6 +154,7 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 func ReloadTemplates() {
 	tmplMu.Lock()
 	tmplCache = nil
+	tmplDir = ""
 	tmplMu.Unlock()
 }
 
