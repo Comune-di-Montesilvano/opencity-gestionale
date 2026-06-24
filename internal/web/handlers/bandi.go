@@ -169,7 +169,9 @@ func saveEngineConfig(h *BandiHandler, r *http.Request, bandoID int64, cfg gradu
 	if err == nil {
 		op := middleware.FromContext(r.Context())
 		if op != nil {
-			EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, op.JWT, op.Username, nil)
+			jwt := op.JWT
+			username := op.Username
+			go EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, jwt, username, nil)
 		}
 	}
 	return nil
