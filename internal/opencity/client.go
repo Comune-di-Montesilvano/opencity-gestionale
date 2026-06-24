@@ -252,6 +252,37 @@ func (c *Client) FetchApplication(id string) (*Application, error) {
 }
 
 
+// FetchApplicationsByStatus recupera le prime N istanze di un servizio filtrate per stato.
+func (c *Client) FetchApplicationsByStatus(serviceID, status string, limit int) ([]Application, error) {
+	params := url.Values{
+		"version":    {"2"},
+		"service_id": {serviceID},
+		"status":     {status},
+		"limit":      {fmt.Sprintf("%d", limit)},
+		"offset":     {"0"},
+	}
+	resp, err := c.get("/lang/api/applications", params)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if err := parseErrorResponse(resp); err != nil {
+		return nil, err
+	}
+	var page PagedResponse
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		return nil, err
+	}
+	apps := make([]Application, 0, len(page.Data))
+	for _, raw := range page.Data {
+		var app Application
+		if json.Unmarshal(raw, &app) == nil {
+			apps = append(apps, app)
+		}
+	}
+	return apps, nil
+}
+
 // Approve accetta una pratica su OpenCity con il messaggio fornito.
 func (c *Client) Approve(applicationID, message string) error {
 	return c.transition(applicationID, "accept", message)

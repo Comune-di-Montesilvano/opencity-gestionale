@@ -327,10 +327,16 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 		})
 
 	case "4":
+		type AppEsempio struct {
+			ID             string
+			ProtocolNumber string
+			URL            string
+		}
 		type StatoItem struct {
-			Code  string
-			Label string
-			Count int
+			Code   string
+			Label  string
+			Count  int
+			Esempi []AppEsempio
 		}
 		var statiDisponibili []StatoItem
 		if bando.ValoriSuperset != "" {
@@ -353,6 +359,21 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 				sort.Slice(statiDisponibili, func(i, j int) bool {
 					return statiDisponibili[i].Code < statiDisponibili[j].Code
 				})
+				// Fetch up to 3 example applications per status
+				client := opencity.NewClient(h.BaseURL, op.JWT)
+				for i := range statiDisponibili {
+					apps, err := client.FetchApplicationsByStatus(bando.ServiceID, statiDisponibili[i].Code, 3)
+					if err != nil {
+						continue
+					}
+					for _, app := range apps {
+						statiDisponibili[i].Esempi = append(statiDisponibili[i].Esempi, AppEsempio{
+							ID:             app.ID,
+							ProtocolNumber: app.ProtocolNumber,
+							URL:            h.BaseURL + "/lang/applications/" + app.ID,
+						})
+					}
+				}
 			}
 		}
 		isEdit4 := bando.StatoBando == "attivo"

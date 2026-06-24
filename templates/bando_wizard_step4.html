@@ -94,12 +94,24 @@
       {{$statiAmmessi := .Istanza.StatiAmmessi}}
       {{range .StatiDisponibili}}
       {{$code := .Code}}
-      <label style="display:flex;align-items:center;gap:.4rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:.3rem .7rem;font-size:.85rem;cursor:pointer">
-        <input type="checkbox" name="stati_ammessi" value="{{.Code}}"
-          {{range $statiAmmessi}}{{if eq . $code}}checked{{end}}{{end}}>
-        {{.Label}}
-        {{if gt .Count 0}}<span style="background:#e2e8f0;color:#475569;border-radius:999px;padding:.05rem .45rem;font-size:.75rem;font-weight:600">{{.Count}}</span>{{end}}
-      </label>
+      <div style="display:flex;flex-direction:column;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:.3rem .7rem;font-size:.85rem">
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+          <input type="checkbox" name="stati_ammessi" value="{{.Code}}"
+            {{range $statiAmmessi}}{{if eq . $code}}checked{{end}}{{end}}>
+          {{.Label}}
+          {{if gt .Count 0}}<span style="background:#e2e8f0;color:#475569;border-radius:999px;padding:.05rem .45rem;font-size:.75rem;font-weight:600">{{.Count}}</span>{{end}}
+        </label>
+        {{if .Esempi}}
+        <details style="margin-top:3px;margin-left:20px">
+          <summary style="cursor:pointer;color:#6b7280;font-size:.8em">{{len .Esempi}} esempi</summary>
+          <ul style="margin:3px 0;padding-left:18px;font-size:.8em">
+          {{range .Esempi}}
+            <li><a href="{{.URL}}" target="_blank" rel="noopener">{{if .ProtocolNumber}}{{.ProtocolNumber}}{{else}}{{.ID}}{{end}}</a></li>
+          {{end}}
+          </ul>
+        </details>
+        {{end}}
+      </div>
       {{end}}
     </div>
   </div>
@@ -125,7 +137,7 @@
   <div style="margin-bottom:.75rem">
     <label style="display:flex;align-items:center;gap:.5rem">
       <input type="checkbox" name="verifica_certificazione" value="1" {{if .Verifica.VerificaCertificazione}}checked{{end}}>
-      Flag automatico per campi con PDND Path non valorizzato (dati non certificati)
+      Segnalazione automatica: istanze con verifica PDND non compilata
     </label>
   </div>
 
