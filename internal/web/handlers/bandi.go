@@ -370,7 +370,7 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 						statiDisponibili[i].Esempi = append(statiDisponibili[i].Esempi, AppEsempio{
 							ID:             app.ID,
 							ProtocolNumber: app.ProtocolNumber,
-							URL:            h.BaseURL + "/lang/applications/" + app.ID,
+							URL:            h.BaseURL + "/lang/it/operatori/" + app.ID + "/detail",
 						})
 					}
 				}
