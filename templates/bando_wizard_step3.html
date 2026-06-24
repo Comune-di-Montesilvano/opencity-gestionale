@@ -9,15 +9,7 @@
   <h1>{{.Bando.Nome}}</h1>
 </div>
 
-<div class="wizard-steps">
-  <span class="wizard-step">1. Servizio</span>
-  <span class="wizard-step">2. Tipo bando</span>
-  <span class="wizard-step wizard-step-active">3. Parametri</span>
-  <span class="wizard-step">4. Filtri</span>
-  <span class="wizard-step">5. Tipologie</span>
-  <span class="wizard-step">6. Rimborso</span>
-  <span class="wizard-step">Fine</span>
-</div>
+{{template "wizard-nav" .}}
 
 <div class="wizard-layout">
   <div class="wizard-col-main">

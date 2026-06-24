@@ -36,6 +36,40 @@ type ParametroMappato struct {
 	VerificaVal  string
 }
 
+// WizardNavItem rappresenta un elemento della barra di navigazione del wizard.
+type WizardNavItem struct {
+	Step   string // "2"…"6", "fine"
+	Label  string
+	Active bool
+	URL    string // "" se non navigabile
+}
+
+// buildWizardNav costruisce la slice di WizardNavItem per il partial wizard-nav.
+// navLinks=true rende ogni step cliccabile (edit mode o step 6 in creation).
+func buildWizardNav(bandoID int64, stepCorrente string, navLinks bool) []WizardNavItem {
+	steps := []struct{ step, label string }{
+		{"2", "Tipo bando"},
+		{"3", "Parametri"},
+		{"4", "Filtri"},
+		{"5", "Tipologie"},
+		{"6", "Rimborso"},
+		{"fine", "Fine"},
+	}
+	items := make([]WizardNavItem, 0, len(steps))
+	for _, s := range steps {
+		item := WizardNavItem{
+			Step:   s.step,
+			Label:  s.label,
+			Active: s.step == stepCorrente,
+		}
+		if navLinks {
+			item.URL = fmt.Sprintf("/bandi/%d/wizard/%s", bandoID, s.step)
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
 // --- Lista bandi ---
 
 func (h *BandiHandler) GetLista(w http.ResponseWriter, r *http.Request) {
@@ -197,11 +231,15 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 
 	switch step {
 	case "2":
+		isEdit := bando.StatoBando == "attivo"
+		navLinks := isEdit || step == "6"
 		renderTemplate(w, "bando_wizard_step2.html", map[string]any{
-			"Op":       op,
-			"Bando":   bando,
-			"Modalita": cfg.Modalita,
-			"Istanza":  cfg.Istanza,
+			"Op":           op,
+			"Bando":        bando,
+			"Modalita":     cfg.Modalita,
+			"Istanza":      cfg.Istanza,
+			"StepCorrente": step,
+			"WizardNav":    buildWizardNav(bando.ID, step, navLinks),
 		})
 
 	case "3":
@@ -268,9 +306,11 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		isEdit3 := bando.StatoBando == "attivo"
+		navLinks3 := isEdit3 || step == "6"
 		renderTemplate(w, "bando_wizard_step3.html", map[string]any{
 			"Op":               op,
-			"Bando":           bando,
+			"Bando":            bando,
 			"ParametriMappati": params,
 			"CampiFlat":        flatFields,
 			"ErrCampione":      errCampione,
@@ -282,6 +322,8 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"RawDataJSON":      rawDataJSON,
 			"ViewerFilter":     viewerFilter,
 			"SupersetJSON":     bando.ValoriSuperset,
+			"StepCorrente":     step,
+			"WizardNav":        buildWizardNav(bando.ID, step, navLinks3),
 		})
 
 	case "4":
@@ -313,14 +355,18 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+		isEdit4 := bando.StatoBando == "attivo"
+		navLinks4 := isEdit4 || step == "6"
 		renderTemplate(w, "bando_wizard_step4.html", map[string]any{
 			"Op":               op,
-			"Bando":           bando,
+			"Bando":            bando,
 			"Filtri":           cfg.Filtri,
 			"Verifica":         cfg.Verifica,
 			"CampiMappati":     campiMappati(cfg),
 			"Istanza":          cfg.Istanza,
 			"StatiDisponibili": statiDisponibili,
+			"StepCorrente":     step,
+			"WizardNav":        buildWizardNav(bando.ID, step, navLinks4),
 		})
 
 	case "5":
@@ -329,9 +375,11 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		mappingJSON, _ := json.Marshal(cfg.Mapping)
+		isEdit5 := bando.StatoBando == "attivo"
+		navLinks5 := isEdit5 || step == "6"
 		renderTemplate(w, "bando_wizard_step5.html", map[string]any{
 			"Op":             op,
-			"Bando":         bando,
+			"Bando":          bando,
 			"Modalita":       cfg.Modalita,
 			"Tipologie":      cfg.Tipologie,
 			"Ordinamento":    cfg.Ordinamento,
@@ -340,6 +388,8 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			"SupersetJSON":   bando.ValoriSuperset,
 			"MappingJSON":    string(mappingJSON),
 			"Espansione":     cfg.Espansione,
+			"StepCorrente":   step,
+			"WizardNav":      buildWizardNav(bando.ID, step, navLinks5),
 		})
 
 	case "6":
@@ -347,18 +397,26 @@ func (h *BandiHandler) GetWizardStep(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/wizard/fine", bando.ID), http.StatusSeeOther)
 			return
 		}
+		isEdit6 := bando.StatoBando == "attivo"
+		navLinks6 := isEdit6 || step == "6"
 		renderTemplate(w, "bando_wizard_step6.html", map[string]any{
 			"Op":           op,
-			"Bando":       bando,
+			"Bando":        bando,
 			"Rimborso":     cfg.Rimborso,
 			"CampiMappati": campiMappati(cfg),
+			"StepCorrente": step,
+			"WizardNav":    buildWizardNav(bando.ID, step, navLinks6),
 		})
 
 	case "fine":
+		isEditFine := bando.StatoBando == "attivo"
+		navLinksFine := isEditFine || step == "6"
 		renderTemplate(w, "bando_wizard_fine.html", map[string]any{
-			"Op":     op,
-			"Bando": bando,
-			"Config": cfg,
+			"Op":           op,
+			"Bando":        bando,
+			"Config":       cfg,
+			"StepCorrente": step,
+			"WizardNav":    buildWizardNav(bando.ID, step, navLinksFine),
 		})
 
 	default:

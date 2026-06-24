@@ -1,0 +1,13 @@
+{{define "wizard-nav"}}
+<div class="wizard-steps">
+  {{$cur := .StepCorrente}}
+  <span class="wizard-step{{if eq $cur "1"}} wizard-step-active{{end}}">1. Servizio</span>
+  {{range .WizardNav}}
+    {{if .URL}}
+      <a href="{{.URL}}" class="wizard-step wizard-step-link{{if .Active}} wizard-step-active{{end}}">{{if eq .Step "fine"}}{{.Label}}{{else}}{{.Step}}. {{.Label}}{{end}}</a>
+    {{else}}
+      <span class="wizard-step{{if .Active}} wizard-step-active{{end}}">{{if eq .Step "fine"}}{{.Label}}{{else}}{{.Step}}. {{.Label}}{{end}}</span>
+    {{end}}
+  {{end}}
+</div>
+{{end}}

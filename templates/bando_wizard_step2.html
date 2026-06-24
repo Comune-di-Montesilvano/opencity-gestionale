@@ -10,15 +10,7 @@
   <a href="/bandi" class="btn btn-secondary">Lista bandi</a>
 </div>
 
-<div class="wizard-steps">
-  <span class="wizard-step">1. Servizio</span>
-  <span class="wizard-step wizard-step-active">2. Tipo bando</span>
-  <span class="wizard-step">3. Mapping</span>
-  <span class="wizard-step">4. Filtri</span>
-  <span class="wizard-step">5. Tipologie</span>
-  <span class="wizard-step">6. Rimborso</span>
-  <span class="wizard-step">Fine</span>
-</div>
+{{template "wizard-nav" .}}
 
 <form method="POST" action="/bandi/{{.Bando.ID}}/wizard/2" style="max-width:740px">
   <div class="wizard-nav">
