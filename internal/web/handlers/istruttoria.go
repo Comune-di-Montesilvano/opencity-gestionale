@@ -119,6 +119,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		praticaIDs = append(praticaIDs, ist.PraticaID)
 	}
 	noteAltriBandi, _ := db.GetNoteAltriBandi(h.DB, int(bandoID), praticaIDs)
+	altriBandi, _ := db.GetAltriBandiPerPratiche(h.DB, int(bandoID), praticaIDs)
 
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
@@ -139,6 +140,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"RichiedenteCF":    richiedenteCF,
 		"FiglioCF":         figlioCF,
 		"NoteAltriBandi":   noteAltriBandi,
+		"AltriBandi":       altriBandi,
 	})
 }
 
@@ -163,13 +165,13 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		return 0, fmt.Errorf("fetch istanze: %w", err)
 	}
 
-	// Pulisce i record da_verificare
+	// Legge dati locali già salvati per override PRIMA del reset (altrimenti la INNER JOIN con istruttorie fallisce per le righe cancellate)
+	datiLocali, _ := db.GetIstruttorieDati(dbConn, int(bando.ID))
+
+	// Pulisce i record da_verificare (preservando quelli con note o dati locali)
 	if err := db.ResetDaVerificare(dbConn, int(bando.ID)); err != nil {
 		return 0, fmt.Errorf("reset da_verificare: %w", err)
 	}
-
-	// Legge dati locali già salvati per override
-	datiLocali, _ := db.GetIstruttorieDati(dbConn, int(bando.ID))
 
 	nuove := 0
 	for _, raw := range rawApps {
@@ -469,12 +471,18 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 	}
 	sort.Strings(campiVerifica)
 
+	stato := "da_verificare"
+	if ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID); err == nil {
+		stato = ist.Stato
+	}
+
 	renderTemplate(w, "istruttoria_dato_partial.html", map[string]any{
 		"Motivi":        motivi,
 		"CampiVerifica": campiVerifica,
 		"Dati":          datiPratica,
 		"BandoID":       bandoID,
 		"PraticaID":     praticaID,
+		"Stato":         stato,
 	})
 }
 

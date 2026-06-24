@@ -191,10 +191,30 @@ func ListStatiApp(db *sql.DB, bandoID int) ([]string, error) {
 	return out, rows.Err()
 }
 
-// ResetDaVerificare cancella tutti i record "da_verificare" per un bando.
-// Usato da PostScansiona per fare una scansione pulita dopo modifiche alla config.
+// ResetDaVerificare resetta o cancella i record "da_verificare" per un bando.
+// Preserva i record che hanno note di lavoro (nota_lavoro) o dati locali (istruttorie_dati) per evitare perdite di dati.
 func ResetDaVerificare(db *sql.DB, bandoID int) error {
-	_, err := db.Exec(`DELETE FROM istruttorie WHERE bando_id=? AND stato='da_verificare'`, bandoID)
+	// 1. Resetta i motivi per le pratiche 'da_verificare' che hanno note o dati locali
+	_, err := db.Exec(`
+		UPDATE istruttorie 
+		SET motivi_json = '[]' 
+		WHERE bando_id = ? AND stato = 'da_verificare' AND (
+			COALESCE(nota_lavoro, '') != '' OR EXISTS (
+				SELECT 1 FROM istruttorie_dati id 
+				WHERE id.pratica_id = istruttorie.pratica_id AND id.dati_json NOT IN ('{}', '')
+			)
+		)`, bandoID)
+	if err != nil {
+		return err
+	}
+
+	// 2. Rimuove le pratiche 'da_verificare' che NON hanno note né dati locali
+	_, err = db.Exec(`
+		DELETE FROM istruttorie 
+		WHERE bando_id = ? AND stato = 'da_verificare' AND COALESCE(nota_lavoro, '') = '' AND NOT EXISTS (
+			SELECT 1 FROM istruttorie_dati id 
+			WHERE id.pratica_id = istruttorie.pratica_id AND id.dati_json NOT IN ('{}', '')
+		)`, bandoID)
 	return err
 }
 
@@ -291,8 +311,8 @@ type NoteAltroBando struct {
 	Nota      string
 }
 
-// GetNoteAltriBandi restituisce le note di lavoro salvate per le stesse pratiche in ALTRI bandi.
-// Utile per mostrare contesto cross-bando senza sovrascriverle.
+// GetNoteAltriBandi restituisce le note salvate per le stesse pratiche in ALTRI bandi (abbinando per ID pratica).
+// Recupera sia le note di lavoro (nota_lavoro) sia le motivazioni di stato (nota).
 func GetNoteAltriBandi(db *sql.DB, bandoID int, praticaIDs []string) (map[string][]NoteAltroBando, error) {
 	if len(praticaIDs) == 0 {
 		return nil, nil
@@ -303,21 +323,67 @@ func GetNoteAltriBandi(db *sql.DB, bandoID int, praticaIDs []string) (map[string
 	for _, id := range praticaIDs {
 		args = append(args, id)
 	}
+
 	rows, err := db.Query(`
-		SELECT i.pratica_id, COALESCE(b.nome, 'Bando '||i.bando_id), i.nota_lavoro
+		SELECT i.pratica_id, COALESCE(b.nome, 'Bando '||i.bando_id), COALESCE(i.nota_lavoro, ''), COALESCE(i.nota, ''), i.stato
 		FROM istruttorie i
 		LEFT JOIN bandi b ON b.id = i.bando_id
-		WHERE i.bando_id != ? AND i.pratica_id IN (`+ph+`) AND i.nota_lavoro != ''
+		WHERE i.bando_id != ? AND i.pratica_id IN (`+ph+`) AND (COALESCE(i.nota_lavoro, '') != '' OR COALESCE(i.nota, '') != '')
 		ORDER BY i.pratica_id, b.nome`, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := map[string][]NoteAltroBando{}
 	for rows.Next() {
-		var pid, nome, nota string
-		rows.Scan(&pid, &nome, &nota)
-		out[pid] = append(out[pid], NoteAltroBando{BandoNome: nome, Nota: nota})
+		var pid, bandoNome, notaLavoro, notaStato, stato string
+		if err := rows.Scan(&pid, &bandoNome, &notaLavoro, &notaStato, &stato); err == nil {
+			if notaLavoro != "" {
+				out[pid] = append(out[pid], NoteAltroBando{
+					BandoNome: bandoNome,
+					Nota:      notaLavoro,
+				})
+			}
+			if notaStato != "" {
+				out[pid] = append(out[pid], NoteAltroBando{
+					BandoNome: bandoNome,
+					Nota:      "[" + stato + "] " + notaStato,
+				})
+			}
+		}
+	}
+	return out, rows.Err()
+}
+
+func GetAltriBandiPerPratiche(db *sql.DB, bandoID int, praticaIDs []string) (map[string][]string, error) {
+	if len(praticaIDs) == 0 {
+		return nil, nil
+	}
+	ph := strings.Repeat("?,", len(praticaIDs))
+	ph = ph[:len(ph)-1]
+	args := []any{bandoID}
+	for _, id := range praticaIDs {
+		args = append(args, id)
+	}
+
+	rows, err := db.Query(`
+		SELECT i.pratica_id, COALESCE(b.nome, 'Bando '||i.bando_id)
+		FROM istruttorie i
+		LEFT JOIN bandi b ON b.id = i.bando_id
+		WHERE i.bando_id != ? AND i.pratica_id IN (`+ph+`)
+		ORDER BY i.pratica_id, b.nome`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[string][]string{}
+	for rows.Next() {
+		var pid, bandoNome string
+		if err := rows.Scan(&pid, &bandoNome); err == nil {
+			out[pid] = append(out[pid], bandoNome)
+		}
 	}
 	return out, rows.Err()
 }
@@ -336,3 +402,19 @@ func ListEscluse(db *sql.DB, bandoID int) ([]string, error) {
 	}
 	return out, rows.Err()
 }
+
+func ListApprovate(db *sql.DB, bandoID int) ([]string, error) {
+	rows, err := db.Query(`SELECT pratica_id FROM istruttorie WHERE bando_id=? AND stato='approvata'`, bandoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+

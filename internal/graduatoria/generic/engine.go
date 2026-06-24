@@ -68,9 +68,9 @@ func (e *Engine) Calcola(apps []opencity.Application, cfg graduatoria.BandoConfi
 	case "ammissione", "lista_attesa":
 		return buildGraduatoriaAmmissione(ammissibili, grad, ecfg), nil
 	case "posti":
-		return buildGraduatoriaPosti(ammissibili, grad, ecfg), nil
+		return buildGraduatoriaPosti(ammissibili, grad, ecfg, cfg.Approvate), nil
 	default: // "fondi" o non specificato
-		return buildGraduatoriaFondi(ammissibili, grad, ecfg, cfg.BudgetTotale), nil
+		return buildGraduatoriaFondi(ammissibili, grad, ecfg, cfg.BudgetTotale, cfg.Approvate), nil
 	}
 }
 
@@ -94,7 +94,7 @@ func buildGraduatoriaAmmissione(ammissibili []*graduatoria.Record, grad *graduat
 	return grad
 }
 
-func buildGraduatoriaPosti(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig) *graduatoria.Graduatoria {
+func buildGraduatoriaPosti(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig, approvate map[string]bool) *graduatoria.Graduatoria {
 	sort.Slice(ecfg.Tipologie, func(i, j int) bool {
 		return ecfg.Tipologie[i].Priorita < ecfg.Tipologie[j].Priorita
 	})
@@ -119,7 +119,7 @@ func buildGraduatoriaPosti(ammissibili []*graduatoria.Record, grad *graduatoria.
 				riga.NoteEsclusione = "posti esauriti"
 			} else {
 				motivi := rec.FlagMotivi(ecfg.Verifica)
-				if len(motivi) > 0 {
+				if len(motivi) > 0 && !approvate[rec.AppID] {
 					riga.ConRiserva = true
 					riga.MotiviRiserva = motivi
 				}
@@ -134,7 +134,7 @@ func buildGraduatoriaPosti(ammissibili []*graduatoria.Record, grad *graduatoria.
 	return grad
 }
 
-func buildGraduatoriaFondi(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig, budgetTotale float64) *graduatoria.Graduatoria {
+func buildGraduatoriaFondi(ammissibili []*graduatoria.Record, grad *graduatoria.Graduatoria, ecfg graduatoria.EngineConfig, budgetTotale float64, approvate map[string]bool) *graduatoria.Graduatoria {
 	sort.Slice(ecfg.Tipologie, func(i, j int) bool {
 		return ecfg.Tipologie[i].Priorita < ecfg.Tipologie[j].Priorita
 	})
@@ -149,7 +149,7 @@ func buildGraduatoriaFondi(ammissibili []*graduatoria.Record, grad *graduatoria.
 		appendDuplicati(grad, dupl, ecfg.Deduplicazione.Chiave)
 
 		budget := limiteTipologia(tip.Limite, budgetTotale, residuo)
-		righe, usato := assegnaRecord(lista, budget, ecfg.Rimborso, ecfg.Verifica)
+		righe, usato := assegnaRecord(lista, budget, ecfg.Rimborso, ecfg.Verifica, approvate)
 		residuo -= usato
 
 		grad.Gruppi = append(grad.Gruppi, &graduatoria.GraduatoriaGruppo{
@@ -613,7 +613,7 @@ func limiteTipologia(cfg graduatoria.LimiteConfig, totale, residuo float64) floa
 	}
 }
 
-func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduatoria.RimborsoConfig, verifica graduatoria.VerificaConfig) ([]graduatoria.RigaGraduatoria, float64) {
+func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduatoria.RimborsoConfig, verifica graduatoria.VerificaConfig, approvate map[string]bool) ([]graduatoria.RigaGraduatoria, float64) {
 	residuo := budget
 	var righe []graduatoria.RigaGraduatoria
 	for pos, rec := range lista {
@@ -623,7 +623,7 @@ func assegnaRecord(lista []*graduatoria.Record, budget float64, rimborso graduat
 			Ammessa:   true,
 		}
 		motivi := rec.FlagMotivi(verifica)
-		if len(motivi) > 0 {
+		if len(motivi) > 0 && !approvate[rec.AppID] {
 			riga.ConRiserva = true
 			riga.MotiviRiserva = motivi
 		}

@@ -141,6 +141,13 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 	if overrides, err := db.GetIstruttorieDati(h.DB, int(bandoID)); err == nil && len(overrides) > 0 {
 		cfg.CampiExtra = overrides
 	}
+	approvateSet := make(map[string]bool)
+	if approvateList, err := db.ListApprovate(h.DB, int(bandoID)); err == nil {
+		for _, id := range approvateList {
+			approvateSet[id] = true
+		}
+	}
+	cfg.Approvate = approvateSet
 
 	grad, err := engine.Calcola(apps, cfg)
 	if err != nil {
@@ -197,10 +204,6 @@ func (h *GraduatoriaHandler) GetRun(w http.ResponseWriter, r *http.Request) {
 	}
 	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
-		return
-	}
-	if !op.IsAdmin() && run.Stato == "bozza" {
-		http.Error(w, "Graduatoria non ancora pubblicata", http.StatusForbidden)
 		return
 	}
 
@@ -341,10 +344,6 @@ func (h *GraduatoriaHandler) GetStampa(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
 		return
 	}
-	if !op.IsAdmin() && run.Stato == "bozza" {
-		http.Error(w, "Graduatoria non ancora pubblicata", http.StatusForbidden)
-		return
-	}
 
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
@@ -402,10 +401,6 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 	}
 	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
-		return
-	}
-	if !op.IsAdmin() && run.Stato == "bozza" {
-		http.Error(w, "Graduatoria non ancora pubblicata", http.StatusForbidden)
 		return
 	}
 

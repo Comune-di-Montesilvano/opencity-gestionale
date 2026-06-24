@@ -16,6 +16,7 @@ type BandoConfig struct {
 	Scadenza      time.Time
 	ExtraJSON     json.RawMessage            // parametri engine-specific
 	CampiExtra    map[string]map[string]string // praticaID → campo → valore override da istruttoria
+	Approvate     map[string]bool            // praticaID → true se approvata in istruttoria
 }
 
 // ServiceEngine è l'interfaccia che ogni motore di servizio deve implementare.
