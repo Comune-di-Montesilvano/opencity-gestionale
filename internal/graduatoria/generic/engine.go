@@ -246,7 +246,12 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras
 	}
 	if _, mapped := cfg.Mapping["data_invio"]; !mapped {
 		if base.StringMap["data_invio"] == "" {
-			base.StringMap["data_invio"] = app.SubmittedAt
+			// Formatta come dd/mm/yyyy per coerenza con csvRecordDynamic e template
+			if t, err := time.Parse(time.RFC3339, app.SubmittedAt); err == nil {
+				base.StringMap["data_invio"] = t.Format("02/01/2006")
+			} else {
+				base.StringMap["data_invio"] = app.SubmittedAt
+			}
 		}
 	}
 
