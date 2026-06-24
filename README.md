@@ -4,6 +4,14 @@ Gestionale web per la gestione di bandi e graduatorie su [OpenCity Italia](https
 
 Sviluppato per il **Comune di Montesilvano** — adattabile a qualsiasi ente che utilizzi OpenCity Italia.
 
+## Screenshots
+
+### Dashboard del Bando
+![Dashboard del Bando](docs/screenshots/dashboard.png)
+
+### Gestione Istruttoria
+![Gestione Istruttoria](docs/screenshots/istruttoria.png)
+
 ## Funzionalità
 
 - **Wizard motore di calcolo** — configura un nuovo bando in 7 step guidati: connetti servizio → scegli tipo bando → mappa campi → filtri → tipologie → rimborso → test e attiva
