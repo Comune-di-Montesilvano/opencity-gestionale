@@ -1105,6 +1105,12 @@ func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request)
 			if !ok || len(arr) == 0 {
 				continue
 			}
+			// Salta array di file (Form.IO upload): primo elemento ha chiave "url"
+			if m0, ok := arr[0].(map[string]any); ok {
+				if _, hasURL := m0["url"]; hasURL {
+					continue // allegati: non utili nel superset
+				}
+			}
 			if _, hasSet := sets[topKey]; !hasSet {
 				sets[topKey] = map[string]map[string]struct{}{}
 			}

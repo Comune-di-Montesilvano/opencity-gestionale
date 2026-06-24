@@ -194,7 +194,7 @@
             onclick="{{if .IsArray}}openArrayBuilderFromViewer('{{.Path}}', {{jsonKeys .ArraySampleKeys}}){{else}}selectPath('{{.Path}}'){{end}}">
           <td class="json-path-cell">
             <code style="font-size:.75em; display:block; word-break:break-all; color:{{if .IsFileArray}}#d97706{{else if .IsArray}}#7c3aed{{else}}#2563eb{{end}}">
-              {{.Path}}{{if .IsFileArray}} <span style="background:#fef3c7; color:#92400e; border-radius:3px; padding:1px 4px; font-size:.85em">[File]</span>{{else if .IsArray}} <span style="background:#ede9fe; color:#6d28d9; border-radius:3px; padding:1px 4px; font-size:.85em">[Array]</span>{{end}}
+              {{.Path}}{{if .IsFileArray}} <span class="badge" style="background:#e8a838;color:#fff;font-size:0.7em;vertical-align:middle;margin-left:4px">📎 Allegato</span>{{else if .IsArray}} <span style="background:#ede9fe; color:#6d28d9; border-radius:3px; padding:1px 4px; font-size:.85em">[Array]</span>{{end}}
             </code>
           </td>
           <td class="json-value" style="font-size:.82em; color:#555; max-width:180px; word-break:break-word">
@@ -514,12 +514,12 @@ function openArrayBuilderFromViewer(arrayPrefix, keys) {
       </div>`;
   }
 
-  // File array: mostra link download
+  // File array: mostra link download + avviso non incluso nel superset
   let fileSection = '';
   if (isFile && values['url']) {
-    fileSection = `<div style="background:#fef3c7; border-radius:4px; padding:6px 8px; margin-bottom:10px">
-      <strong>Allegato:</strong> <a href="${escapeHTML(values['url'])}" target="_blank" style="color:#d97706">Apri ↗</a>
-      ${values['name'] ? ' — ' + escapeHTML(values['name']) : ''}
+    fileSection = `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:8px 12px;margin-bottom:10px;font-size:0.88em">
+      <strong>Campo allegato</strong> — visualizzabile solo su singola istanza, non incluso nel superset.<br>
+      <a href="${escapeHTML(values['url'])}" target="_blank" style="color:#d97706;font-size:.85em">Apri allegato ↗</a>${values['name'] ? ' — ' + escapeHTML(values['name']) : ''}
     </div>`;
   }
 
