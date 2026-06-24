@@ -22,6 +22,12 @@ type IstruttoriaHandler struct {
 	BaseURL string
 }
 
+// RigaFuoriFondi raggruppa una riga "fuori fondi/posti" con il nome del gruppo di appartenenza.
+type RigaFuoriFondi struct {
+	Gruppo string
+	Riga   graduatoria.RigaGraduatoria
+}
+
 // GetIstruttoria — dashboard istruttoria per un bando.
 func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
@@ -58,6 +64,21 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 	}
 	sort.Strings(campiVerifica)
 
+	// Domande "fuori fondi/posti" dall'ultima run — placeholder per istruttoria futura.
+	var fuoriFondi []RigaFuoriFondi
+	if run, err := db.GetLatestRun(h.DB, bando.ID); err == nil && run != nil {
+		var grad graduatoria.Graduatoria
+		if json.Unmarshal([]byte(run.DatiJSON), &grad) == nil {
+			for _, g := range grad.Gruppi {
+				for _, r := range g.Righe {
+					if !r.Ammessa && (r.NoteEsclusione == "fondi esauriti" || r.NoteEsclusione == "posti esauriti") {
+						fuoriFondi = append(fuoriFondi, RigaFuoriFondi{Gruppo: g.Nome, Riga: r})
+					}
+				}
+			}
+		}
+	}
+
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
 		"Op":              op,
@@ -72,6 +93,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"Flash":           flash,
 		"FlashType":       flashType,
 		"CampiVerifica":   campiVerifica,
+		"FuoriFondi":      fuoriFondi,
 	})
 }
 
@@ -253,6 +275,15 @@ func (h *IstruttoriaHandler) PostIstruttoriaBatch(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Auto-rescan condizionale:
+	// - esclusa → sempre (qualcuno esce dalla pool, la graduatoria scala)
+	// - approvata → solo se ci sono dati locali modificati (override che influenzano il calcolo)
+	deveRescan := stato == "esclusa" || (stato == "approvata" && db.HasDatiOverride(h.DB, ids))
+	if deveRescan {
+		statiApp, _ := db.ListStatiApp(h.DB, int(bandoID))
+		EseguiScansioneIstruttoria(h.DB, h.BaseURL, bando, op.JWT, op.Username, statiApp) //nolint
+	}
+
 	for _, id := range ids {
 		db.InsertAudit(h.DB, &db.AuditAction{
 			Operatore: op.Username,
@@ -264,7 +295,11 @@ func (h *IstruttoriaHandler) PostIstruttoriaBatch(w http.ResponseWriter, r *http
 		_ = id
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=%d+domande+%s&flashType=success", bandoID, len(ids), stato), http.StatusSeeOther)
+	flashMsg := fmt.Sprintf("%d+domande+%s", len(ids), stato)
+	if deveRescan {
+		flashMsg += "+—+istruttoria+aggiornata"
+	}
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=%s&flashType=success", bandoID, flashMsg), http.StatusSeeOther)
 }
 
 // PostSaveDato — salva un valore locale per un campo mancante, ri-valuta i motivi via API.

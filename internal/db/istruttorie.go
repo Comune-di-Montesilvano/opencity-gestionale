@@ -266,6 +266,27 @@ func BatchSetStato(db *sql.DB, ids []int, stato, nota, operatore string) error {
 	return err
 }
 
+// HasDatiOverride controlla se almeno una delle istruttorie (per ID) ha override in istruttorie_dati.
+// Usato per decidere se serve auto-rescan dopo batch-approve.
+func HasDatiOverride(db *sql.DB, ids []int) bool {
+	if len(ids) == 0 {
+		return false
+	}
+	ph := strings.Repeat("?,", len(ids))
+	ph = ph[:len(ph)-1]
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	var n int
+	db.QueryRow(`
+		SELECT COUNT(*) FROM istruttorie_dati id2
+		JOIN istruttorie i ON i.pratica_id = id2.pratica_id
+		WHERE i.id IN (`+ph+`) AND id2.dati_json NOT IN ('{}', '')`,
+		args...).Scan(&n)
+	return n > 0
+}
+
 func ListEscluse(db *sql.DB, bandoID int) ([]string, error) {
 	rows, err := db.Query(`SELECT pratica_id FROM istruttorie WHERE bando_id=? AND stato='esclusa'`, bandoID)
 	if err != nil {

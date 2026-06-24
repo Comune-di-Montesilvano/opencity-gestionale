@@ -254,16 +254,17 @@ func (h *GraduatoriaHandler) GetRunTabella(w http.ResponseWriter, r *http.Reques
 	}
 
 	renderTemplate(w, "run_tabella.html", map[string]any{
-		"Op":          op,
-		"Bando":       bando,
-		"Run":         run,
-		"Anno":        anno,
-		"Tipo":        tipo,
-		"Righe":       righe,
-		"RunID":       runID,
-		"BandoID":     bandoID,
-		"BaseURL":     h.BaseURL,
-		"MappingKeys": mappingKeysFromBando(bando.EngineConfig),
+		"Op":               op,
+		"Bando":            bando,
+		"Run":              run,
+		"Anno":             anno,
+		"Tipo":             tipo,
+		"Righe":            righe,
+		"RunID":            runID,
+		"BandoID":          bandoID,
+		"BaseURL":          h.BaseURL,
+		"MappingKeys":      mappingKeysFromBando(bando.EngineConfig),
+		"IstruttoriaStato": istruttoriaStatoMap(h.DB, bandoID),
 	})
 }
 
@@ -423,16 +424,17 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 	}
 
 	renderTemplate(w, "run_tabella_gruppo.html", map[string]any{
-		"Op":          op,
-		"Bando":       bando,
-		"Run":         run,
-		"Nome":        nome,
-		"Gruppo":      gruppo,
-		"Righe":       gruppo.Righe,
-		"RunID":       runID,
-		"BandoID":     bandoID,
-		"BaseURL":     h.BaseURL,
-		"MappingKeys": mappingKeysFromBando(bando.EngineConfig),
+		"Op":               op,
+		"Bando":            bando,
+		"Run":              run,
+		"Nome":             nome,
+		"Gruppo":           gruppo,
+		"Righe":            gruppo.Righe,
+		"RunID":            runID,
+		"BandoID":          bandoID,
+		"BaseURL":          h.BaseURL,
+		"MappingKeys":      mappingKeysFromBando(bando.EngineConfig),
+		"IstruttoriaStato": istruttoriaStatoMap(h.DB, bandoID),
 	})
 }
 

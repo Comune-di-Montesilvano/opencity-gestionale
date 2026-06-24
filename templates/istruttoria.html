@@ -273,4 +273,31 @@ function azioneRapida(id, stato) {
   form.submit();
 }
 </script>
+
+{{if .FuoriFondi}}
+<div style="margin-top:2rem;border:1px dashed #cbd5e1;border-radius:8px;padding:1rem;background:#f8fafc">
+  <h3 style="margin:0 0 .5rem;color:#64748b;font-size:1rem">
+    Domande in riserva — fuori fondi/posti ({{len .FuoriFondi}})
+  </h3>
+  <p style="font-size:12px;color:#94a3b8;margin:0 0 .75rem">
+    Queste domande hanno superato i filtri di ammissibilità ma il budget era esaurito nell'ultima run calcolata.
+    Se una domanda ammessa venisse esclusa, scalerebbero e potrebbero necessitare di istruttoria.
+  </p>
+  <table class="table table-sm" style="font-size:13px">
+    <thead>
+      <tr><th>#</th><th>Gruppo</th><th>Protocollo</th><th>Motivo</th></tr>
+    </thead>
+    <tbody>
+    {{range .FuoriFondi}}
+    <tr style="color:#94a3b8">
+      <td>{{.Riga.Posizione}}</td>
+      <td>{{.Gruppo}}</td>
+      <td>{{if .Riga.Istanza}}{{.Riga.Istanza.ProtocolNumber}}{{end}}</td>
+      <td><span class="badge badge-gray">{{.Riga.NoteEsclusione}}</span></td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
 {{end}}

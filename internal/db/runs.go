@@ -58,6 +58,18 @@ func ListRuns(db *sql.DB, bandoID int64, soloPublicate ...bool) ([]*GraduatoriaR
 	return out, rows.Err()
 }
 
+// GetLatestRun restituisce la run più recente per un bando (nil se nessuna).
+func GetLatestRun(db *sql.DB, bandoID int64) (*GraduatoriaRun, error) {
+	row := db.QueryRow(
+		`SELECT id, bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, COALESCE(note,''), COALESCE(stato,'bozza')
+		 FROM graduatorie_run WHERE bando_id = ? ORDER BY id DESC LIMIT 1`, bandoID)
+	r, err := scanRun(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return r, err
+}
+
 func GetRun(db *sql.DB, id int64) (*GraduatoriaRun, error) {
 	row := db.QueryRow(
 		`SELECT id, bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, COALESCE(note,''), COALESCE(stato,'bozza')

@@ -57,7 +57,15 @@
     </td>
     {{range $.MappingKeys}}<td>{{if $riga.Istanza}}{{index $riga.Istanza.CampiMappati .}}{{end}}</td>{{end}}
     <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
-    <td>{{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}</td>
+    <td>
+      {{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}
+      {{if .Istanza}}{{$statoIst := index $.IstruttoriaStato .Istanza.ID}}
+        {{if eq $statoIst "approvata"}}<span class="badge badge-green" style="font-size:10px;margin-left:4px">✓ Verificata</span>
+        {{else if eq $statoIst "da_verificare"}}<span class="badge" style="font-size:10px;margin-left:4px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">⚠ Da verif.</span>
+        {{else if eq $statoIst "esclusa"}}<span class="badge badge-red" style="font-size:10px;margin-left:4px">✗ Escl.verif.</span>
+        {{end}}
+      {{end}}
+    </td>
     <td>{{.NoteEsclusione}}</td>
     <td>
       {{if .Istanza}}
