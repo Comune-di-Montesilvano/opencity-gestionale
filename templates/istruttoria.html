@@ -156,6 +156,7 @@
         {{range $.CampiVerifica}}
         {{$campo := .}}
         {{$hasDato := index $riga.Dati $campo}}
+        {{if or (isCertFallito $riga.Motivi $campo) $hasDato}}
         {{$statoKey := statoVerificaKey $campo}}
         {{$stato := index $riga.Dati $statoKey}}
         <div style="margin-bottom:.2rem">
@@ -190,7 +191,8 @@
             {{if not $hasDato}}<span style="font-size:.72rem;color:#9ca3af">verifica operatore</span>{{end}}
           </div>
         </div>
-        {{end}}
+        {{end}}{{/* fine if isCertFallito */}}
+        {{end}}{{/* fine range CampiVerifica */}}
       </div>
       {{end}}
     </td>

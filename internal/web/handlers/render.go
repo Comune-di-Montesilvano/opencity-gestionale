@@ -15,7 +15,7 @@ import (
 
 var (
 	tmplMu    sync.Mutex
-	tmplCache map[string]*template.Template
+	tmplCache *template.Template // singolo set ParseGlob per tutti i template
 
 	BrandingData *opencity.Branding
 )
@@ -76,6 +76,15 @@ var funcMap = template.FuncMap{
 		}
 		return code
 	},
+	"isCertFallito": func(motivi []string, campo string) bool {
+		needle := `Campo "` + campo + `" non certificato`
+		for _, m := range motivi {
+			if m == needle {
+				return true
+			}
+		}
+		return false
+	},
 }
 
 func fileExists(path string) bool {
@@ -85,38 +94,25 @@ func fileExists(path string) bool {
 
 func renderTemplate(w http.ResponseWriter, name string, data any) {
 	tmplMu.Lock()
-	if tmplCache == nil {
-		tmplCache = make(map[string]*template.Template)
-	}
-	t, ok := tmplCache[name]
+	t := tmplCache
 	tmplMu.Unlock()
 
-	if !ok {
+	if t == nil {
 		// Prova prima ./templates (dev locale), poi /templates (Docker distroless).
 		dir := "templates"
 		if m, _ := filepath.Glob(filepath.Join(dir, "*.html")); len(m) == 0 {
 			dir = "/templates"
 		}
 
-		basePath := filepath.Join(dir, "base.html")
-		filePath := filepath.Join(dir, name)
-
 		var err error
-		t = template.New(name).Funcs(funcMap)
-
-		if name != "base.html" && fileExists(basePath) && fileExists(filePath) {
-			_, err = t.ParseFiles(basePath, filePath)
-		} else {
-			_, err = t.ParseFiles(filePath)
-		}
-
+		t, err = template.New("").Funcs(funcMap).ParseGlob(filepath.Join(dir, "*.html"))
 		if err != nil {
 			http.Error(w, "Errore caricamento template: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		tmplMu.Lock()
-		tmplCache[name] = t
+		tmplCache = t
 		tmplMu.Unlock()
 	}
 
@@ -138,7 +134,7 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 	}
 }
 
-// ReloadTemplates forza ricarico in sviluppo.
+// ReloadTemplates forza ricarico in sviluppo (DEV=true).
 func ReloadTemplates() {
 	tmplMu.Lock()
 	tmplCache = nil
