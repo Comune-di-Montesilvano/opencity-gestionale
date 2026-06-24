@@ -253,6 +253,7 @@ func (h *GraduatoriaHandler) GetRunTabella(w http.ResponseWriter, r *http.Reques
 		righe = grad.Escluse
 	}
 
+	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
 	renderTemplate(w, "run_tabella.html", map[string]any{
 		"Op":               op,
 		"Bando":            bando,
@@ -265,6 +266,7 @@ func (h *GraduatoriaHandler) GetRunTabella(w http.ResponseWriter, r *http.Reques
 		"BaseURL":          h.BaseURL,
 		"MappingKeys":      mappingKeysFromBando(bando.EngineConfig),
 		"IstruttoriaStato": istruttoriaStatoMap(h.DB, bandoID),
+		"DatiLocali":       datiLocali,
 	})
 }
 
@@ -423,6 +425,7 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
 	renderTemplate(w, "run_tabella_gruppo.html", map[string]any{
 		"Op":               op,
 		"Bando":            bando,
@@ -435,6 +438,7 @@ func (h *GraduatoriaHandler) GetRunGruppo(w http.ResponseWriter, r *http.Request
 		"BaseURL":          h.BaseURL,
 		"MappingKeys":      mappingKeysFromBando(bando.EngineConfig),
 		"IstruttoriaStato": istruttoriaStatoMap(h.DB, bandoID),
+		"DatiLocali":       datiLocali,
 	})
 }
 

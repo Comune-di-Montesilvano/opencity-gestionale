@@ -180,6 +180,38 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, app.Status); err == nil {
 			nuove++
 		}
+		// Salva metadati utili all'operatore durante l'istruttoria (cross-bando in istruttorie_dati).
+		if len(passingRecords) > 0 {
+			rec := passingRecords[0]
+			// CF richiedente e figlio — per evitare di dover aprire la domanda
+			for _, k := range []string{"richiedente_cf", "richiedente"} {
+				if v := rec.StringMap[k]; v != "" {
+					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, "__richiedente_cf", v) //nolint
+					break
+				}
+			}
+			for _, k := range []string{"figlio_cf", "figlio"} {
+				if v := rec.StringMap[k]; v != "" {
+					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, "__figlio_cf", v) //nolint
+					break
+				}
+			}
+			// Valori dichiarati per i campi cert non verificati
+			for nome, fm := range ecfg.Mapping {
+				if fm.VerificaPath == "" {
+					continue
+				}
+				if certVal := rec.StringMap["__cert_"+nome]; certVal != "" {
+					continue // già verificato dalla fonte
+				}
+				declKey := "__decl_" + nome
+				if sv := rec.StringMap[nome]; sv != "" {
+					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, declKey, sv) //nolint
+				} else if fv, ok := rec.FloatMap[nome]; ok {
+					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, declKey, strconv.FormatFloat(fv, 'f', 2, 64)) //nolint
+				}
+			}
+		}
 	}
 
 	db.InsertAudit(dbConn, &db.AuditAction{

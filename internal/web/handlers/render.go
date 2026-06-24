@@ -78,7 +78,7 @@ var funcMap = template.FuncMap{
 		return code
 	},
 	"isCertFallito": func(motivi []string, campo string) bool {
-		needle := `Campo "` + campo + `" non certificato`
+		needle := `Campo "` + campo + `" non verificato`
 		for _, m := range motivi {
 			if m == needle {
 				return true

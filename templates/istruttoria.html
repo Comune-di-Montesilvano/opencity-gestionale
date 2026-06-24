@@ -109,6 +109,8 @@
       <a href="{{$.BaseURL}}/lang/it/operatori/{{.PraticaID}}/detail" target="_blank"
          style="font-family:monospace;color:#1d4ed8" title="{{.PraticaID}}">{{.PraticaID | printf "%.8s"}}…</a>
       {{if .AppStatus}}<br><span style="font-size:.75rem;color:#9ca3af">stato: {{.AppStatus}}</span>{{end}}
+      {{if index .Dati "__richiedente_cf"}}<br><span style="font-family:monospace;font-size:.75rem;color:#374151" title="CF richiedente">{{cfOscurato (index .Dati "__richiedente_cf")}}</span>{{end}}
+      {{if index .Dati "__figlio_cf"}}<br><span style="font-family:monospace;font-size:.75rem;color:#6b7280" title="CF figlio">{{cfOscurato (index .Dati "__figlio_cf")}}</span>{{end}}
     </td>
     <td>
       <div id="motivi-{{.ID}}">
@@ -188,7 +190,10 @@
                    hx-on:htmx:before-request="this.style.opacity='.5'"
                    hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){var b=document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}');if(!b){b=document.createElement('span');b.id='badge-{{$riga.ID}}-verifica-{{$campo}}';b.style.cssText='font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';this.parentNode.insertBefore(b,this);}b.textContent=this.value+' ✓';b.style.display='';this.style.display='none';this.style.outline='2px solid #16a34a';this.style.background='#f0fdf4';setTimeout(()=>{this.style.outline='';this.style.background=''},2500)}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2500)}"
                    name="valore">
-            {{if not $hasDato}}<span style="font-size:.72rem;color:#9ca3af">verifica operatore</span>{{end}}
+            {{$declKey := printf "__decl_%s" $campo}}
+            {{$declVal := index $riga.Dati $declKey}}
+            {{if $declVal}}<span style="font-size:.72rem;color:#9ca3af">dichiarato: <strong>{{$declVal}}</strong></span>
+            {{else if not $hasDato}}<span style="font-size:.72rem;color:#9ca3af">verifica operatore</span>{{end}}
           </div>
         </div>
         {{end}}{{/* fine if isCertFallito */}}
@@ -255,11 +260,19 @@
 
 {{end}}
 
+<div id="rescan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:1rem">
+  <div style="background:#fff;border-radius:12px;padding:2rem 2.5rem;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:2rem;margin-bottom:.75rem">⏳</div>
+    <strong style="font-size:1rem;display:block;margin-bottom:.25rem">Aggiornamento istruttoria in corso…</strong>
+    <span style="font-size:.85rem;color:#6b7280">Scansione domande in corso, attendere.</span>
+  </div>
+</div>
 <script>
 function toggleAll(cb) {
   document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
 }
 function azioneRapida(id, stato) {
+  document.getElementById('rescan-overlay').style.display = 'flex';
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = `/bandi/{{.Bando.ID}}/istruttoria/batch`;
@@ -272,6 +285,10 @@ function azioneRapida(id, stato) {
   document.body.appendChild(form);
   form.submit();
 }
+// Batch form submit (bottoni "Approva/Escludi selezionate")
+document.getElementById('batch-form')?.addEventListener('submit', function() {
+  document.getElementById('rescan-overlay').style.display = 'flex';
+});
 </script>
 
 {{if .FuoriFondi}}

@@ -49,7 +49,7 @@
          style="font-family:monospace;font-size:.8rem" title="{{.Istanza.ID}}">{{.Istanza.ID | printf "%.8s"}}…</a>
       {{end}}
     </td>
-    {{range $.MappingKeys}}<td>{{if $riga.Istanza}}{{index $riga.Istanza.CampiMappati .}}{{end}}</td>{{end}}
+    {{range $.MappingKeys}}<td>{{if $riga.Istanza}}{{$v := index $riga.Istanza.CampiMappati .}}{{if $v}}{{$v}}{{else}}{{index (index $.DatiLocali $riga.Istanza.ID) .}}{{end}}{{end}}</td>{{end}}
     <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
     <td>
       {{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}

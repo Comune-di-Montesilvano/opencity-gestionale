@@ -242,6 +242,13 @@ func Str(data json.RawMessage, path string) (string, error) {
 	if s, ok := node.(string); ok {
 		return s, nil
 	}
+	if f, ok := node.(float64); ok {
+		// Evita notazione scientifica (es. 20232024 → "2.0232024e+07" con %v).
+		if f == float64(int64(f)) {
+			return strconv.FormatInt(int64(f), 10), nil
+		}
+		return strconv.FormatFloat(f, 'f', -1, 64), nil
+	}
 	return fmt.Sprintf("%v", node), nil
 }
 
