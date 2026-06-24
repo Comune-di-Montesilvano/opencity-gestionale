@@ -811,13 +811,59 @@ func (h *BandiHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "bando_dettaglio.html", map[string]any{
 		"Op":               op,
-		"Bando":           bando,
+		"Bando":            bando,
 		"Runs":             runs,
 		"Config":           ecfg,
 		"IstruttoriaStats": istrStats,
 		"Flash":            flash,
 		"FlashType":        flashType,
+		"SupersetKeys":     supersetKeys(bando.ValoriSuperset),
+		"ExportColonne":    parseStringSlice(bando.ExportColonne),
 	})
+}
+
+// supersetKeys restituisce le chiavi di primo livello del superset JSON, escluse le chiavi speciali ($...).
+func supersetKeys(jsonBlob string) []string {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(jsonBlob), &m); err != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		if !strings.HasPrefix(k, "$") {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// parseStringSlice deserializza un JSON array di stringhe.
+func parseStringSlice(jsonStr string) []string {
+	var s []string
+	json.Unmarshal([]byte(jsonStr), &s) //nolint:errcheck
+	return s
+}
+
+// PostExportColonne salva la selezione delle colonne dinamiche per export CSV e stampa.
+func (h *BandiHandler) PostExportColonne(w http.ResponseWriter, r *http.Request) {
+	bandoID := bandoIDFromPath(r)
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	r.ParseForm()
+	cols := r.Form["col"]
+	if cols == nil {
+		cols = []string{}
+	}
+	jsonArr, _ := json.Marshal(cols)
+	if err := db.SaveExportColonne(h.DB, bandoID, string(jsonArr)); err != nil {
+		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d", bandoID), http.StatusSeeOther)
 }
 
 // BandoExport è il formato JSON per export/import di un bando.

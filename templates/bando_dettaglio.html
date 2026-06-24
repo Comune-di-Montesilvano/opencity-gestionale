@@ -96,4 +96,28 @@ function avviaCalcolo(form) {
   </tbody>
 </table>
 {{end}}
+
+{{if $.Op.IsAdmin}}
+<div class="card" style="margin-top:1.5rem">
+  <div class="card-header"><strong>Colonne export CSV / Stampa</strong></div>
+  <div class="card-body">
+    <p style="font-size:13px;color:#64748b;margin-bottom:.75rem">
+      Seleziona le colonne dinamiche da includere nell'export CSV e nel documento stampa.
+      Le colonne sistema (Posizione, Categoria, Stato, Importo, Note, Link) sono sempre presenti.
+    </p>
+    {{if $.SupersetKeys}}
+    <form method="POST" action="/bandi/{{$.Bando.ID}}/export-colonne" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end">
+      {{range $.SupersetKeys}}
+      <label style="display:flex;align-items:center;gap:.3rem;font-size:13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:.3rem .6rem">
+        <input type="checkbox" name="col" value="{{.}}" {{if hasCol $.ExportColonne .}}checked{{end}}> {{.}}
+      </label>
+      {{end}}
+      <button type="submit" class="btn btn-primary btn-sm" style="margin-left:.5rem">Salva selezione</button>
+    </form>
+    {{else}}
+    <p style="color:#94a3b8;font-size:13px">Nessun superset disponibile. Calcola prima una run per costruire il superset.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}
 {{end}}

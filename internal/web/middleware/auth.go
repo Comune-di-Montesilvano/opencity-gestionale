@@ -43,6 +43,11 @@ func FromContext(ctx context.Context) *OperatorCtx {
 	return op
 }
 
+// WithOperator injects an OperatorCtx into a context. Used in tests.
+func WithOperator(ctx context.Context, op *OperatorCtx) context.Context {
+	return context.WithValue(ctx, ctxOperatore, op)
+}
+
 func Auth(dbConn *sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
