@@ -236,6 +236,20 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras
 	}
 	applicaExtras(base, extras, cfg.Mapping)
 
+	// Campi sistema sempre disponibili se non già configurati nel mapping.
+	// Nota: run calcolate prima di questo fix non hanno questi campi in CampiMappati
+	// senza ricalcolo.
+	if _, mapped := cfg.Mapping["protocollo"]; !mapped {
+		if base.StringMap["protocollo"] == "" {
+			base.StringMap["protocollo"] = app.ProtocolNumber
+		}
+	}
+	if _, mapped := cfg.Mapping["data_invio"]; !mapped {
+		if base.StringMap["data_invio"] == "" {
+			base.StringMap["data_invio"] = app.SubmittedAt
+		}
+	}
+
 	if cfg.Espansione == "" || len(expandMapping) == 0 {
 		return []*graduatoria.Record{base}, nil
 	}
