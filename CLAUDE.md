@@ -129,14 +129,28 @@ Operatori senza valore (`vuoto`, `non_vuoto`, `vero`, `falso`, `cf_valido`) igno
 
 ### Istruttoria — comportamento scan
 
-`PostScansiona` (`POST /motori/{id}/istruttoria/scansiona`):
-1. **Prima cancella tutti i `da_verificare`** (`db.ResetDaVerificare`) — ogni scan ricomincia da zero; record `approvata`/`esclusa` preservati
-2. Applica `ApplicaFiltri` (filtri ammissibilità) — non flagga app escluse da ISEE/residenza/ecc.
-3. Salva app_status in `istruttorie.app_status`
+`PostScansiona` (`POST /bandi/{id}/istruttoria/scansiona`):
+1. **Reset `da_verificare`** (`db.ResetDaVerificare`) — ogni scan ricomincia; `approvata`/`esclusa` preservati; app con note/dati locali mantengono la riga ma con `motivi_json=[]`
+2. Per ogni app che passa `filtri_istanza` (data+stato): estrae campi con nil extras → salva in `istruttorie_api_cache` (valori dichiarati puri)
+3. Poi estrae con override locali applicati → valuta motivi e filtri ammissibilità
+4. Auto-flag built-in (anche senza `Verifica.Attiva` se modalità fondi): corrispettivo=0 e CF richiedente mancante
+5. Salva `UpsertIstruttoria` solo per app con motivi
 
 **Gotcha**: calcolo bloccato da `da_verificare` rimasti con config filtri sbagliata → rescansiona per resettare.
 
-**Dato in locale**: `POST /motori/{id}/istruttoria/{praticaID}/dato` salva override campo in `istruttorie.dati_json`. `db.GetIstruttorieDati` → passato a `EstraiRecordsConExtras` in istruttoria e in `PostCalcolaGraduatoria` come `cfg.CampiExtra`.
+### Modello dati istruttoria — due layer separati
+
+| Tabella | Chiave | Contenuto |
+|---------|--------|-----------|
+| `istruttorie_dati` | `pratica_id` (cross-bando) | **Override operatore**: `{campo: valore}` — applicati al calcolo graduatoria via `EstraiRecordsConExtras` |
+| `istruttorie_api_cache` | `(pratica_id, bando_id)` | **Valori dichiarati API**: aggiornati a ogni scan, mai mescolati con override |
+
+`PostSaveDato` (`POST /bandi/{id}/istruttoria/{praticaID}/dato`):
+- Salva override in `istruttorie_dati`
+- Aggiorna campo in `istruttorie_api_cache` con valore API raw (ri-fetch OpenCity)
+- `?ctx=dati` (passato via `hx-vals`): risponde con `<span>` minimale invece del partial motivi — usato da `/bandi/{id}/dati`
+
+`GetIstruttoria` usa `GetAPICache` come fonte primaria per `campiDichiarati` (freschi da scan); snapshot ultima run come fallback.
 
 ### Package CF helper (`internal/graduatoria/cf/`)
 
@@ -165,21 +179,21 @@ CF di test (checksum corretto): `RSSMRA80A01H501U` (M, 01/01/1980, Roma H501), `
 
 I template usano `{{if .Grad.Gruppi}}` per iterare i risultati.
 
-### Wizard motore (`internal/web/handlers/motori.go`)
+### Wizard bando (`internal/web/handlers/bandi.go`)
 
-Creare un motore richiede 7 step via wizard. Ogni step salva subito in DB — riprendibile da bozza. Alcuni step sono saltati automaticamente in base a `Modalita`.
+Creare un bando richiede 7 step via wizard. Ogni step salva subito in DB — riprendibile da bozza. Alcuni step sono saltati automaticamente in base a `Modalita`.
 
 | Step | Route | Cosa fa | Skip quando |
 |------|-------|---------|-------------|
-| 1 | `GET /motori/nuovo` | Connette servizio OpenCity (HTMX) | — |
-| 2 | `GET/POST /motori/{id}/wizard/2` | **Tipo bando** (fondi/posti/ammissione/lista_attesa) | — |
-| 3 | `GET/POST /motori/{id}/wizard/3` | Mapping campi (flat JSON viewer → datalist) | — |
-| 4 | `GET/POST /motori/{id}/wizard/4` | Filtri (26+ operatori, dropdown per dominio) | — |
-| 5 | `GET/POST /motori/{id}/wizard/5` | Tipologie + ordinamento + deduplicazione | `ammissione`, `lista_attesa` → redirect a fine |
-| 6 | `GET/POST /motori/{id}/wizard/6` | Rimborso netto/lordo | tutto tranne `fondi` → redirect a fine |
-| fine | `GET /motori/{id}/wizard/fine` | Test engine (HTMX) + attiva → `stato_motore='attivo'` | — |
+| 1 | `GET /bandi/nuovo` | Connette servizio OpenCity (HTMX) | — |
+| 2 | `GET/POST /bandi/{id}/wizard/2` | **Tipo bando** (fondi/posti/ammissione/lista_attesa) | — |
+| 3 | `GET/POST /bandi/{id}/wizard/3` | Mapping campi (flat JSON viewer → datalist) | — |
+| 4 | `GET/POST /bandi/{id}/wizard/4` | Filtri (26+ operatori, dropdown per dominio) | — |
+| 5 | `GET/POST /bandi/{id}/wizard/5` | Tipologie + ordinamento + deduplicazione | `ammissione`, `lista_attesa` → redirect a fine |
+| 6 | `GET/POST /bandi/{id}/wizard/6` | Rimborso netto/lordo | tutto tranne `fondi` → redirect a fine |
+| fine | `GET /bandi/{id}/wizard/fine` | Test engine (HTMX) + attiva → `stato_bando='attivo'` | — |
 
-`saveEngineConfig` in `motori.go` serializza la `EngineConfig` corrente e la salva in `bandi.engine_config`. I motori attivi appaiono in `/motori` per tutti gli operatori con accesso al servizio.
+`saveEngineConfig` in `bandi.go` serializza la `EngineConfig` corrente e la salva in `bandi.engine_config`. I bandi attivi appaiono in `/bandi` per tutti gli operatori con accesso al servizio.
 
 ### Dashboard — split per ruolo (`internal/web/handlers/dashboard.go`)
 
@@ -203,6 +217,10 @@ FuncMap aggiuntive in `handlers/render.go`:
 - `hasCol(cols []string, col string) bool`
 - `join(s []string, sep string) string`
 - `statusLabel(code string) string` → label italiana per codice stato OpenCity (es. `"4000"` → `"In attesa istruttoria (4000)"`)
+- `safeJSON(s string) template.JS` — stampa JSON grezzo senza escaping HTML
+- `statoVerificaKey(campo string) string` → `"__stato_verifica_" + campo`
+- `hasMotivoPrefix(motivi []string, prefix string) bool` — match prefisso in lista motivi
+- `primoNonVuoto(vals ...string) string` — primo valore non vuoto
 
 CSS `.filtro-row .form-control { flex: 1; min-width: 100px }` override per input a larghezza fissa: usare `style="width:52px;flex:0 0 52px;min-width:0"` direttamente sull'elemento.
 
@@ -240,37 +258,45 @@ Pattern usato in tutti i template:
 
 Route principali (da `internal/web/server.go`):
 ```
-GET  /motori                              lista motori
-GET  /motori/nuovo                        wizard step 1
-POST /motori/wizard/connetti              HTMX: lista servizi OpenCity
-POST /motori/wizard/crea                  crea motore bozza → redirect a /wizard/2
-GET  /motori/{id}/wizard/{step}           wizard step N (2-6, fine)
-POST /motori/{id}/wizard/{step}           salva step N
-POST /motori/{id}/wizard/test             HTMX: test engine
-POST /motori/{id}/wizard/attiva           attiva motore
-GET  /motori/{id}                         dettaglio motore
-POST /motori/{id}/duplica                 duplica
-POST /motori/{id}/archivia                archivia
-POST /motori/{id}/run                     calcola graduatoria
-GET  /motori/{id}/run/{runID}             dettaglio run
-GET  /motori/{id}/run/{runID}/{anno}/{tipo}  tabella (solo tipo="escluse" attivo)
-GET  /motori/{id}/run/{runID}/gruppo/{nome}  tabella per gruppo
-GET  /motori/{id}/run/{runID}/export/{anno}/{tipo}  CSV (solo tipo="escluse" attivo)
-GET  /motori/{id}/run/{runID}/export/gruppo/{nome}  CSV gruppo
-POST /motori/{id}/run/{runID}/pubblica    pubblica run (admin only)
-GET  /motori/{id}/run/{runID}/stampa      documento stampabile
-POST /motori/{id}/run/{runID}/approva-batch
-POST /motori/{id}/run/{runID}/rifiuta-batch
-GET  /motori/{id}/run/{runID}/export/iban   CSV IBAN ammessi
-GET  /motori/{id}/istruttoria               istruttoria pre-calcolo
-POST /motori/{id}/istruttoria/scansiona     HTMX: scansiona istanze
-POST /motori/{id}/istruttoria/batch         azione batch istruttoria
-POST /motori/{id}/istruttoria/{praticaID}/dato  HTMX: salva dato locale + ri-valuta motivi
+GET  /bandi                               lista bandi
+GET  /bandi/nuovo                         wizard step 1
+POST /bandi/wizard/connetti               HTMX: lista servizi OpenCity
+POST /bandi/wizard/crea                   crea bando bozza → redirect a /wizard/2
+GET  /bandi/{id}/wizard/{step}            wizard step N (2-6, fine)
+POST /bandi/{id}/wizard/{step}            salva step N
+POST /bandi/{id}/wizard/test              HTMX: test engine
+POST /bandi/{id}/wizard/attiva            attiva bando
+GET  /bandi/{id}                          dettaglio bando
+POST /bandi/{id}/duplica                  duplica
+POST /bandi/{id}/archivia                 archivia
+POST /bandi/{id}/run                      calcola graduatoria
+GET  /bandi/{id}/run/{runID}              dettaglio run
+GET  /bandi/{id}/run/{runID}/{anno}/{tipo}   tabella (solo tipo="escluse" attivo)
+GET  /bandi/{id}/run/{runID}/gruppo/{nome}   tabella per gruppo
+GET  /bandi/{id}/run/{runID}/export/{anno}/{tipo}  CSV (solo tipo="escluse" attivo)
+GET  /bandi/{id}/run/{runID}/export/gruppo/{nome}  CSV gruppo
+GET  /bandi/{id}/run/{runID}/export/mapping/{mapID}  CSV da export mapping configurato
+POST /bandi/{id}/run/{runID}/pubblica     pubblica run (admin only)
+GET  /bandi/{id}/run/{runID}/stampa       documento stampabile
+POST /bandi/{id}/run/{runID}/approva-batch
+POST /bandi/{id}/run/{runID}/rifiuta-batch
+GET  /bandi/{id}/istruttoria              istruttoria pre-calcolo (flagged apps)
+GET  /bandi/{id}/dati                     dati locali tutte le domande scansionate
+POST /bandi/{id}/istruttoria/scansiona    scansiona istanze → popola istruttorie + api_cache
+POST /bandi/{id}/istruttoria/batch        azione batch istruttoria
+POST /bandi/{id}/istruttoria/{praticaID}/dato  salva override locale + ri-valuta motivi
+POST /bandi/{id}/istruttoria/{praticaID}/nota  salva nota lavoro (HTMX)
+POST /bandi/{id}/istruttoria/{praticaID}/riapri  → da_verificare
+GET  /bandi/{id}/export-mappings          lista template CSV (admin)
+POST /bandi/{id}/export-mappings          crea template
+GET  /bandi/{id}/export-mappings/{mapID}  edit template
+POST /bandi/{id}/export-mappings/{mapID}  salva template
+POST /bandi/{id}/export-mappings/{mapID}/delete
 GET  /audit                               audit trail
 GET  /dev/reload-templates                solo se DEV=true
 ```
 
-`bandoIDFromPath(r)` e `parseFloat(s)` in `handlers/helpers.go` — usati da graduatoria e motori handler.
+`bandoIDFromPath(r)` e `parseFloat(s)` in `handlers/helpers.go`.
 
 `db.ListRuns(db, bandoID, soloPublicate ...bool)` — terzo parametro variadic: se `true`, filtra solo run `'pubblicata'` (usato in `renderOperatore`; admin passa `false`).
 
@@ -359,11 +385,37 @@ docker cp opencity-backend-gestionale-1:/data/gestionale.db /tmp/gestionale.db
 python3 -c "import sqlite3; db=sqlite3.connect('/tmp/gestionale.db'); [print(r) for r in db.execute('SELECT ...')]"
 ```
 
-## Schema SQLite (`internal/db/schema.sql`)
+### Export mapping (`internal/db/export_mappings.go`, `handlers/export_mappings.go`)
 
-- `bandi`: configurazione bando per servizio (budget, ISEE max, engine_type, engine_config, scadenza)
-- `graduatorie_run`: snapshot `Graduatoria` come JSON blob in `dati_json`; colonna `stato` (`'bozza'`|`'pubblicata'`)
-- `audit_actions`: ogni approve/reject/calcola/pubblica con esito e messaggio
-- `sessioni`: JWT OpenCity + metadati operatore; scade dopo 10 giorni
+Template CSV configurabili per-bando. `ExportColonna` ha tre sorgenti:
+- `"sistema"` — campo dal run snapshot (`posizione`, `protocollo`, `cognome`, `nome`, `cf_richiedente`, `tipologia`, `importo`, `annualita`, `stato_app`)
+- `"mappato"` — campo da `Istanza.CampiMappati` (estratto dal calcolo)
+- `"raw"` — path dot-notation su `app.Data` (ri-fetch OpenCity al momento dell'export)
 
-La colonna `stato` in `graduatorie_run` è aggiunta via `ALTER TABLE` idempotente in `db.Open()` per compatibilità con DB pre-esistenti.
+`GetExportCSVMapped` streama CSV filtrato per `FiltroStati` (vuoto = tutti). Sorgente `"raw"` richiede `FetchAllApplications`.
+
+L'editor colonne usa il superset browser (stesso JS del wizard step 3).
+
+### Pagina dati locali (`/bandi/{id}/dati`)
+
+Mostra tutte le domande scansionate (`istruttorie_api_cache`). Badge per pratica:
+- `ammessa` / `fuori_fondi` — da snapshot ultima run
+- `da_verificare` / `approvata` / `esclusa` — da `istruttorie`
+- `non_rientrante` — passa `filtri_istanza` ma non i filtri di merito (ISEE ecc.); potrebbe rientrare dopo override ISEE
+
+Form dinamico: ogni campo da `EngineConfig.Mapping` ha input con `type` inferito da `Tipo` (`float`/`int`→number, `time`→date, `string`→text). HTMX con `ctx=dati` → `PostSaveDato` risponde con `<span>` minimale.
+
+## Schema SQLite (`internal/db/schema.sql` + migrazioni in `db.Open()`)
+
+| Tabella | Descrizione |
+|---------|-------------|
+| `bandi` | Configurazione bando: service_id, budget, ISEE max, engine_config, stato_bando |
+| `graduatorie_run` | Snapshot `Graduatoria` JSON in `dati_json`; `stato` (`bozza`\|`pubblicata`) |
+| `istruttorie` | Flag per-bando per-pratica: stato (`da_verificare`\|`approvata`\|`esclusa`), motivi, app_status, nota_lavoro |
+| `istruttorie_dati` | Override operatore cross-bando: `pratica_id PK`, JSON `{campo: valore}` — solo campi sovrascritti dall'operatore |
+| `istruttorie_api_cache` | Valori dichiarati API: `(pratica_id, bando_id) PK`, JSON campi estratti durante scan — mai mescolati con override |
+| `export_mappings` | Template CSV per-bando: colonne_json, filtro_stati |
+| `audit_actions` | Ogni approve/reject/calcola/pubblica con esito e messaggio |
+| `sessioni` | JWT OpenCity + metadati operatore; scade dopo 10 giorni |
+
+Tutte le nuove tabelle/colonne aggiunte via `ALTER TABLE` idempotente in `db.Open()` — nessuna migrazione manuale necessaria.
