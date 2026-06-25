@@ -282,6 +282,9 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras
 		for nome, fm := range expandMapping {
 			_ = popolaCampoRaw(rec, nome, fm, elem)
 		}
+		// Riapplica extras dopo l'expansion: popolaCampoRaw sovrascrive i campi expand
+		// con i valori API, cancellando gli override. Riapplicarli qui li ripristina.
+		applicaExtras(rec, extras, cfg.Mapping)
 		out = append(out, rec)
 	}
 	return out, nil

@@ -220,33 +220,31 @@
       {{if $.CampiBuiltin}}
       {{range $.CampiBuiltin}}
       {{$cb := .}}
-      {{if hasMotivoPrefix $riga.Motivi $cb.Motivo}}
       {{$cbDato := index $riga.Dati $cb.Campo}}
+      {{if or (hasMotivoPrefix $riga.Motivi $cb.Motivo) $cbDato}}
       <div style="margin-top:.4rem;display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
         <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$cb.Label}} ✎:</span>
         {{if $cbDato}}
         <span id="badge-{{$riga.ID}}-bi-{{$cb.Campo}}"
-              style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$cbDato}} ✓</span>
-        <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
-                onclick="document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='inline-block'">modifica</button>
+              style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$cbDato}} €</span>
         {{end}}
-        <input type="text"
-               id="input-{{$riga.ID}}-bi-{{$cb.Campo}}"
+        <input type="number" step="0.01"
+               id="input-cb-{{$riga.ID}}-{{$cb.Campo}}"
                value="{{$cbDato}}"
-               placeholder="importo speso (€)"
-               class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $cbDato}}display:none{{end}}"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
-               hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
-               hx-vals='{"campo": "{{$cb.Campo}}"}'
-               hx-include="this"
-               hx-trigger="change"
-               hx-target="#motivi-{{$riga.ID}}"
-               hx-swap="innerHTML"
-               hx-on:htmx:before-request="this.style.opacity='.5'"
-               hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){var b=document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}');if(!b){b=document.createElement('span');b.id='badge-{{$riga.ID}}-bi-{{$cb.Campo}}';b.style.cssText='font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';this.parentNode.insertBefore(b,this);}b.textContent=this.value+' ✓';b.style.display='';this.style.display='none'}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2500)}"
+               placeholder="0.00"
+               class="form-control form-control-sm" style="width:110px;font-size:.8rem"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();this.nextElementSibling.click()}"
                name="valore">
+        <button type="button" class="btn btn-sm btn-secondary"
+                hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
+                hx-vals='{"campo": "{{$cb.Campo}}"}'
+                hx-include="#input-cb-{{$riga.ID}}-{{$cb.Campo}}"
+                hx-target="#motivi-{{$riga.ID}}"
+                hx-swap="innerHTML"
+                hx-on:htmx:before-request="this.disabled=true;this.textContent='...'"
+                hx-on:htmx:after-request="this.disabled=false;this.textContent='Salva';if(event.detail.successful){var inp=document.getElementById('input-cb-{{$riga.ID}}-{{$cb.Campo}}');var b=document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}');if(!b){b=document.createElement('span');b.id='badge-{{$riga.ID}}-bi-{{$cb.Campo}}';b.style.cssText='font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';inp.parentNode.insertBefore(b,inp);}b.textContent=inp.value+' €';b.style.display='';}else{this.textContent='✗ Errore';this.style.color='#dc2626';setTimeout(()=>{this.style.color='';this.textContent='Salva';},2000)}">Salva</button>
       </div>
-      {{end}}{{/* fine hasMotivoPrefix */}}
+      {{end}}{{/* fine hasMotivoPrefix OR cbDato */}}
       {{end}}{{/* fine range CampiBuiltin */}}
       {{end}}
     </td>

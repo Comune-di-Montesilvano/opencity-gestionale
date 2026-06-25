@@ -78,11 +78,13 @@ func SaveDatoIstruttoria(db *sql.DB, bandoID int, praticaID, campo, valore strin
 
 // GetIstruttorieDati restituisce map[praticaID]map[string]string con i dati locali salvati (cross-bando).
 // Usato dal calcolo graduatoria per applicare override ai record estratti.
+// JOIN con istruttorie_api_cache (non istruttorie) per includere anche pratiche non flaggate
+// ma presenti nella scan del bando (es. override ISEE da pagina dati_locali).
 func GetIstruttorieDati(db *sql.DB, bandoID int) (map[string]map[string]string, error) {
 	rows, err := db.Query(`
 		SELECT id.pratica_id, id.dati_json
 		FROM istruttorie_dati id
-		JOIN istruttorie i ON i.pratica_id = id.pratica_id AND i.bando_id = ?
+		JOIN istruttorie_api_cache c ON c.pratica_id = id.pratica_id AND c.bando_id = ?
 		WHERE id.dati_json NOT IN ('{}', '')`,
 		bandoID,
 	)
