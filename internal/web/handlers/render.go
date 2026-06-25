@@ -19,12 +19,19 @@ var (
 	tmplDir   string             // directory template scoperta al primo caricamento
 
 	BrandingData *opencity.Branding
+	Version      string = "dev"
 )
 
 func SetBranding(b *opencity.Branding) {
 	tmplMu.Lock()
 	defer tmplMu.Unlock()
 	BrandingData = b
+}
+
+func SetVersion(v string) {
+	tmplMu.Lock()
+	defer tmplMu.Unlock()
+	Version = v
 }
 
 var funcMap = template.FuncMap{
@@ -154,10 +161,12 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 	if m, ok := data.(map[string]any); ok {
 		tmplMu.Lock()
 		b := BrandingData
+		v := Version
 		tmplMu.Unlock()
 		if b != nil {
 			m["Branding"] = b
 		}
+		m["Version"] = v
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

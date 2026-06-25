@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"database/sql"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -362,4 +363,83 @@ func TestIstruttorieDatiPerBando(t *testing.T) {
 		t.Errorf("expected bando 2 override to be 'valore2', got %q (ok=%t)", val, ok)
 	}
 }
+
+func TestMigrateIstruttorieDati(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// 1. Create a database manually and write old schema
+	conn, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	_, err = conn.Exec(`CREATE TABLE istruttorie_dati (
+		pratica_id TEXT PRIMARY KEY,
+		dati_json TEXT NOT NULL DEFAULT '{}',
+		nota TEXT NOT NULL DEFAULT '',
+		aggiornato_il TEXT
+	)`)
+	if err != nil {
+		conn.Close()
+		t.Fatalf("create old table: %v", err)
+	}
+
+	_, err = conn.Exec(`INSERT INTO istruttorie_dati (pratica_id, dati_json, nota, aggiornato_il)
+		VALUES ('PRAT-OLD', '{"campo1":"valore1"}', 'old-nota', '2026-06-25T12:00:00Z')`)
+	if err != nil {
+		conn.Close()
+		t.Fatalf("insert old row: %v", err)
+	}
+	conn.Close()
+
+	// 2. Open via db.Open (which runs migrateIstruttorieDati)
+	conn2, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open failed: %v", err)
+	}
+	defer conn2.Close()
+
+	// 3. Verify it migrated correctly
+	var bandoIdIsPK bool
+	rows, err := conn2.Query(`PRAGMA table_info(istruttorie_dati)`)
+	if err != nil {
+		t.Fatalf("PRAGMA table_info: %v", err)
+	}
+	for rows.Next() {
+		var cid int
+		var name, dtype string
+		var notnull, pk int
+		var dfltVal sql.NullString
+		if rows.Scan(&cid, &name, &dtype, &notnull, &dfltVal, &pk) == nil {
+			if name == "bando_id" && pk > 0 {
+				bandoIdIsPK = true
+			}
+		}
+	}
+	rows.Close()
+
+	if !bandoIdIsPK {
+		t.Error("expected bando_id to be part of the primary key after migration")
+	}
+
+	// 4. Verify old row migrated to bando_id = 0
+	var bandoID int
+	var dj, nota, agg string
+	err = conn2.QueryRow(`SELECT bando_id, dati_json, nota, aggiornato_il FROM istruttorie_dati WHERE pratica_id = 'PRAT-OLD'`).
+		Scan(&bandoID, &dj, &nota, &agg)
+	if err != nil {
+		t.Fatalf("query old row: %v", err)
+	}
+	if bandoID != 0 {
+		t.Errorf("expected bando_id = 0, got %d", bandoID)
+	}
+	if dj != `{"campo1":"valore1"}` {
+		t.Errorf("expected dati_json, got %q", dj)
+	}
+	if nota != "old-nota" {
+		t.Errorf("expected nota, got %q", nota)
+	}
+}
+
 

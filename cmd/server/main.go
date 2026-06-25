@@ -102,7 +102,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Branding caricato con successo per: %s\n", branding.Nome)
 	}
 
-	handler := web.NewServer(cfg, dbConn, branding)
+	handler := web.NewServer(cfg, dbConn, branding, AppVersion)
 
 	fmt.Fprintf(os.Stderr, "Gestionale OpenCity %s avviato su :%s\n", AppVersion, cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {

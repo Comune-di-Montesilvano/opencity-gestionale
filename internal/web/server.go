@@ -10,8 +10,9 @@ import (
 	"opencity-gestionale/internal/web/middleware"
 )
 
-func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) http.Handler {
+func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding, appVersion string) http.Handler {
 	handlers.SetBranding(branding)
+	handlers.SetVersion(appVersion)
 
 	auth := &handlers.AuthHandler{
 		DB:             dbConn,

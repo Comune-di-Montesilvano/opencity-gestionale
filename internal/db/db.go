@@ -29,9 +29,7 @@ func Open(path string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN export_colonne TEXT NOT NULL DEFAULT '[]'`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN app_status TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN dati_json TEXT NOT NULL DEFAULT '{}'`)
-	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT NOT NULL, bando_id INTEGER NOT NULL DEFAULT 0, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT, PRIMARY KEY (pratica_id, bando_id))`)
-	_, _ = db.Exec(`ALTER TABLE istruttorie_dati ADD COLUMN bando_id INTEGER NOT NULL DEFAULT 0`)
-	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_istruttorie_dati_pratica_bando ON istruttorie_dati (pratica_id, bando_id)`)
+	migrateIstruttorieDati(db)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN nota_lavoro TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN iban_config TEXT NOT NULL DEFAULT '{}'`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS export_mappings (
@@ -65,4 +63,79 @@ func Open(path string) (*sql.DB, error) {
 			'"pdnd_val"', '"verifica_val"')
 		WHERE engine_config LIKE '%"pdnd_path"%'`)
 	return db, nil
+}
+
+func migrateIstruttorieDati(db *sql.DB) {
+	// 1. Assicuriamoci che la tabella esista (se è una nuova installazione, viene creata con la PK corretta)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (
+		pratica_id TEXT NOT NULL,
+		bando_id INTEGER NOT NULL DEFAULT 0,
+		dati_json TEXT NOT NULL DEFAULT '{}',
+		nota TEXT NOT NULL DEFAULT '',
+		aggiornato_il TEXT,
+		PRIMARY KEY (pratica_id, bando_id)
+	)`)
+
+	// 2. Controlliamo se bando_id fa parte della primary key
+	var bandoIdIsPK bool
+	rows, err := db.Query(`PRAGMA table_info(istruttorie_dati)`)
+	if err == nil {
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltVal sql.NullString
+			if rows.Scan(&cid, &name, &dtype, &notnull, &dfltVal, &pk) == nil {
+				if name == "bando_id" && pk > 0 {
+					bandoIdIsPK = true
+				}
+			}
+		}
+		rows.Close()
+	}
+
+	// 3. Se bando_id non è parte della PK, dobbiamo ricostruire la tabella
+	if !bandoIdIsPK {
+		// Rinominiamo la tabella vecchia
+		_, _ = db.Exec(`ALTER TABLE istruttorie_dati RENAME TO old_istruttorie_dati`)
+
+		// Creiamo la nuova tabella con la PK composita
+		_, _ = db.Exec(`CREATE TABLE istruttorie_dati (
+			pratica_id TEXT NOT NULL,
+			bando_id INTEGER NOT NULL DEFAULT 0,
+			dati_json TEXT NOT NULL DEFAULT '{}',
+			nota TEXT NOT NULL DEFAULT '',
+			aggiornato_il TEXT,
+			PRIMARY KEY (pratica_id, bando_id)
+		)`)
+
+		// Copiamo i dati. Se la tabella vecchia aveva già bando_id, usiamolo; altrimenti usiamo 0
+		var oldHasBandoId bool
+		oldRows, oldErr := db.Query(`PRAGMA table_info(old_istruttorie_dati)`)
+		if oldErr == nil {
+			for oldRows.Next() {
+				var cid int
+				var name, dtype string
+				var notnull, pk int
+				var dfltVal sql.NullString
+				if oldRows.Scan(&cid, &name, &dtype, &notnull, &dfltVal, &pk) == nil {
+					if name == "bando_id" {
+						oldHasBandoId = true
+					}
+				}
+			}
+			oldRows.Close()
+		}
+
+		if oldHasBandoId {
+			_, _ = db.Exec(`INSERT INTO istruttorie_dati (pratica_id, bando_id, dati_json, nota, aggiornato_il)
+				SELECT index_cols.pratica_id, index_cols.bando_id, index_cols.dati_json, index_cols.nota, index_cols.aggiornato_il FROM old_istruttorie_dati index_cols`)
+		} else {
+			_, _ = db.Exec(`INSERT INTO istruttorie_dati (pratica_id, bando_id, dati_json, nota, aggiornato_il)
+				SELECT index_cols.pratica_id, 0, index_cols.dati_json, index_cols.nota, index_cols.aggiornato_il FROM old_istruttorie_dati index_cols`)
+		}
+
+		// Rimuoviamo la tabella temporanea
+		_, _ = db.Exec(`DROP TABLE old_istruttorie_dati`)
+	}
 }

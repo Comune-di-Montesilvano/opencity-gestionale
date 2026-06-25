@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', function () {
       <div class="sidebar-brand-name">
         {{if .Branding.Nome}}{{.Branding.Nome}}{{else}}Gestionale OpenCity{{end}}
       </div>
+      {{if .Version}}
+        <span class="badge" style="background: rgba(255, 255, 255, 0.15); color: #fff; font-weight: normal; font-size: 10px;">{{.Version}}</span>
+      {{end}}
     </div>
     <nav class="sidebar-nav">
       <a href="/dashboard">Dashboard</a>
