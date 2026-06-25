@@ -1243,9 +1243,18 @@ func (h *BandiHandler) PostBuildSuperset(w http.ResponseWriter, r *http.Request)
 		if json.Unmarshal(app.Data, &dataMap) != nil {
 			continue
 		}
+		// Campi non-array (scalari e oggetti annidati) → raccolti sotto chiave "" come path dot-notation.
+		if _, ok := sets[""]; !ok {
+			sets[""] = map[string]map[string]struct{}{}
+		}
 		for topKey, topVal := range dataMap {
 			arr, ok := topVal.([]any)
-			if !ok || len(arr) == 0 {
+			if !ok {
+				// Non-array: traversa ricorsivamente per raccogliere tutte le foglie scalari.
+				supersetCollectScalars(topKey, topVal, sets[""])
+				continue
+			}
+			if len(arr) == 0 {
 				continue
 			}
 			// Salta array di file (Form.IO upload): primo elemento ha chiave "url"
@@ -1671,4 +1680,44 @@ func splitTrim(s, sep string) []string {
 		}
 	}
 	return out
+}
+
+// supersetCollectScalars attraversa ricorsivamente un valore JSON e aggiunge
+// tutte le foglie scalari in dest[path]. Salta array annidati e nil.
+func supersetCollectScalars(path string, v any, dest map[string]map[string]struct{}) {
+	switch n := v.(type) {
+	case map[string]any:
+		for k, child := range n {
+			supersetCollectScalars(path+"."+k, child, dest)
+		}
+	case []any:
+		return // array annidati ignorati (gestiti separatamente a livello top-level)
+	case nil:
+		return
+	default:
+		var s string
+		switch x := v.(type) {
+		case float64:
+			s = strconv.FormatFloat(x, 'f', -1, 64)
+		case bool:
+			if x {
+				s = "true"
+			} else {
+				s = "false"
+			}
+		case string:
+			s = x
+		default:
+			s = fmt.Sprintf("%v", v)
+		}
+		if s == "" {
+			return
+		}
+		if _, ok := dest[path]; !ok {
+			dest[path] = map[string]struct{}{}
+		}
+		if len(dest[path]) < 50 {
+			dest[path][s] = struct{}{}
+		}
+	}
 }
