@@ -48,13 +48,13 @@ func UpdateMotiviIstruttoria(db *sql.DB, bandoID int, praticaID string, motivi [
 	return err
 }
 
-// SaveDatoIstruttoria aggiunge/aggiorna un campo in istruttorie_dati (cross-bando).
+// SaveDatoIstruttoria aggiunge/aggiorna un campo in istruttorie_dati (per-bando).
 // Valore vuoto rimuove il campo dal dizionario.
 func SaveDatoIstruttoria(db *sql.DB, bandoID int, praticaID, campo, valore string) error {
 	var datiJSON string
 	err := db.QueryRow(
-		`SELECT COALESCE(dati_json, '{}') FROM istruttorie_dati WHERE pratica_id=?`,
-		praticaID,
+		`SELECT COALESCE(dati_json, '{}') FROM istruttorie_dati WHERE bando_id=? AND pratica_id=?`,
+		bandoID, praticaID,
 	).Scan(&datiJSON)
 	if err != nil {
 		datiJSON = "{}"
@@ -68,15 +68,15 @@ func SaveDatoIstruttoria(db *sql.DB, bandoID int, praticaID, campo, valore strin
 	}
 	b, _ := json.Marshal(dati)
 	_, err = db.Exec(`
-		INSERT INTO istruttorie_dati (pratica_id, dati_json, aggiornato_il)
-		VALUES (?, ?, ?)
-		ON CONFLICT(pratica_id) DO UPDATE SET dati_json=excluded.dati_json, aggiornato_il=excluded.aggiornato_il`,
-		praticaID, string(b), time.Now().Format(time.RFC3339),
+		INSERT INTO istruttorie_dati (bando_id, pratica_id, dati_json, aggiornato_il)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET dati_json=excluded.dati_json, aggiornato_il=excluded.aggiornato_il`,
+		bandoID, praticaID, string(b), time.Now().Format(time.RFC3339),
 	)
 	return err
 }
 
-// GetIstruttorieDati restituisce map[praticaID]map[string]string con i dati locali salvati (cross-bando).
+// GetIstruttorieDati restituisce map[praticaID]map[string]string con i dati locali salvati (per-bando).
 // Usato dal calcolo graduatoria per applicare override ai record estratti.
 // JOIN con istruttorie_api_cache (non istruttorie) per includere anche pratiche non flaggate
 // ma presenti nella scan del bando (es. override ISEE da pagina dati_locali).
@@ -84,8 +84,8 @@ func GetIstruttorieDati(db *sql.DB, bandoID int) (map[string]map[string]string, 
 	rows, err := db.Query(`
 		SELECT id.pratica_id, id.dati_json
 		FROM istruttorie_dati id
-		JOIN istruttorie_api_cache c ON c.pratica_id = id.pratica_id AND c.bando_id = ?
-		WHERE id.dati_json NOT IN ('{}', '')`,
+		JOIN istruttorie_api_cache c ON c.pratica_id = id.pratica_id AND c.bando_id = id.bando_id
+		WHERE id.bando_id = ? AND id.dati_json NOT IN ('{}', '')`,
 		bandoID,
 	)
 	if err != nil {
@@ -113,7 +113,7 @@ func GetIstruttoriaByPratica(db *sql.DB, bandoID int, praticaID string) (*Istrut
 		       COALESCE(i.nota,''), COALESCE(i.operatore,''), COALESCE(i.aggiornato_il,''),
 		       COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(i.nota_lavoro,'')
 		FROM istruttorie i
-		LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id
+		LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id AND id.bando_id = i.bando_id
 		WHERE i.bando_id=? AND i.pratica_id=?`,
 		bandoID, praticaID,
 	).Scan(&ist.ID, &ist.BandoID, &ist.PraticaID, &mj, &ist.Stato,
@@ -136,7 +136,7 @@ func ListIstruttorie(db *sql.DB, bandoID int, statoFilter, appStatusFilter strin
 	             COALESCE(i.nota,''), COALESCE(i.operatore,''), COALESCE(i.aggiornato_il,''),
 	             COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(i.nota_lavoro,'')
 	      FROM istruttorie i
-	      LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id
+	      LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id AND id.bando_id = i.bando_id
 	      WHERE i.bando_id = ?`
 	args := []any{bandoID}
 	if statoFilter != "" {
@@ -203,7 +203,7 @@ func ResetDaVerificare(db *sql.DB, bandoID int) error {
 		WHERE bando_id = ? AND stato = 'da_verificare' AND (
 			COALESCE(nota_lavoro, '') != '' OR EXISTS (
 				SELECT 1 FROM istruttorie_dati id 
-				WHERE id.pratica_id = istruttorie.pratica_id AND id.dati_json NOT IN ('{}', '')
+				WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
 			)
 		)`, bandoID)
 	if err != nil {
@@ -215,7 +215,7 @@ func ResetDaVerificare(db *sql.DB, bandoID int) error {
 		DELETE FROM istruttorie 
 		WHERE bando_id = ? AND stato = 'da_verificare' AND COALESCE(nota_lavoro, '') = '' AND NOT EXISTS (
 			SELECT 1 FROM istruttorie_dati id 
-			WHERE id.pratica_id = istruttorie.pratica_id AND id.dati_json NOT IN ('{}', '')
+			WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
 		)`, bandoID)
 	return err
 }
@@ -271,6 +271,22 @@ func SetStato(db *sql.DB, id int, stato, nota, operatore string) error {
 	return err
 }
 
+// UpsertStatoIstruttoria imposta lo stato per una pratica (per pratica_id).
+// Crea la riga se non esiste ancora (es. pratiche "non_rientranti" senza row istruttoria).
+func UpsertStatoIstruttoria(db *sql.DB, bandoID int, praticaID, stato, nota, operatore string) error {
+	now := time.Now().Format(time.RFC3339)
+	_, err := db.Exec(`
+		INSERT INTO istruttorie (bando_id, pratica_id, motivi_json, stato, nota, operatore, aggiornato_il)
+		VALUES (?, ?, '[]', ?, ?, ?, ?)
+		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET
+			stato=excluded.stato,
+			nota=excluded.nota,
+			operatore=excluded.operatore,
+			aggiornato_il=excluded.aggiornato_il`,
+		bandoID, praticaID, stato, nota, operatore, now)
+	return err
+}
+
 func BatchSetStato(db *sql.DB, ids []int, stato, nota, operatore string) error {
 	if len(ids) == 0 {
 		return nil
@@ -301,7 +317,7 @@ func HasDatiOverride(db *sql.DB, ids []int) bool {
 	var n int
 	db.QueryRow(`
 		SELECT COUNT(*) FROM istruttorie_dati id2
-		JOIN istruttorie i ON i.pratica_id = id2.pratica_id
+		JOIN istruttorie i ON i.pratica_id = id2.pratica_id AND i.bando_id = id2.bando_id
 		WHERE i.id IN (`+ph+`) AND id2.dati_json NOT IN ('{}', '')`,
 		args...).Scan(&n)
 	return n > 0

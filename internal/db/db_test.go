@@ -305,3 +305,61 @@ func TestAuditCRUD(t *testing.T) {
 	}
 	_ = byBando
 }
+
+func TestIstruttorieDatiPerBando(t *testing.T) {
+	conn := openTestDB(t)
+
+	// Create two bandi
+	b1ID, err := db.InsertBando(conn, &db.Bando{ServiceID: "svc-1", Nome: "Bando 1", EngineType: "generic", EngineConfig: "{}", Attivo: true, CreatedAt: time.Now()})
+	if err != nil {
+		t.Fatalf("InsertBando 1: %v", err)
+	}
+	b2ID, err := db.InsertBando(conn, &db.Bando{ServiceID: "svc-2", Nome: "Bando 2", EngineType: "generic", EngineConfig: "{}", Attivo: true, CreatedAt: time.Now()})
+	if err != nil {
+		t.Fatalf("InsertBando 2: %v", err)
+	}
+
+	praticaID := "PRAT-100"
+
+	// Insert into API Cache to allow joining
+	err = db.UpsertAPICache(conn, int(b1ID), praticaID, `{"campo1":"orig1"}`)
+	if err != nil {
+		t.Fatalf("UpsertAPICache bando 1: %v", err)
+	}
+	err = db.UpsertAPICache(conn, int(b2ID), praticaID, `{"campo1":"orig2"}`)
+	if err != nil {
+		t.Fatalf("UpsertAPICache bando 2: %v", err)
+	}
+
+	// Save override for bando 1
+	err = db.SaveDatoIstruttoria(conn, int(b1ID), praticaID, "campo1", "valore1")
+	if err != nil {
+		t.Fatalf("SaveDatoIstruttoria bando 1: %v", err)
+	}
+
+	// Save override for bando 2 with different value
+	err = db.SaveDatoIstruttoria(conn, int(b2ID), praticaID, "campo1", "valore2")
+	if err != nil {
+		t.Fatalf("SaveDatoIstruttoria bando 2: %v", err)
+	}
+
+	// Verify they are separate
+	// For bando 1
+	dati1, err := db.GetIstruttorieDati(conn, int(b1ID))
+	if err != nil {
+		t.Fatalf("GetIstruttorieDati bando 1: %v", err)
+	}
+	if val, ok := dati1[praticaID]["campo1"]; !ok || val != "valore1" {
+		t.Errorf("expected bando 1 override to be 'valore1', got %q (ok=%t)", val, ok)
+	}
+
+	// For bando 2
+	dati2, err := db.GetIstruttorieDati(conn, int(b2ID))
+	if err != nil {
+		t.Fatalf("GetIstruttorieDati bando 2: %v", err)
+	}
+	if val, ok := dati2[praticaID]["campo1"]; !ok || val != "valore2" {
+		t.Errorf("expected bando 2 override to be 'valore2', got %q (ok=%t)", val, ok)
+	}
+}
+

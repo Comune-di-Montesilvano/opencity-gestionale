@@ -125,11 +125,25 @@
         placeholder="Nota di lavoro…">{{$p.NotaLavoro}}</textarea>
     </div>
 
-    {{/* Tasto salva unico */}}
-    <div style="margin-top:.6rem;display:flex;align-items:center;gap:.6rem">
+    {{/* Azioni */}}
+    <div style="margin-top:.6rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
       <button type="button" class="btn btn-primary btn-sm"
               onclick="salvaTutto({{$.Bando.ID}},'{{$p.PraticaID}}',this)">Salva</button>
       <span id="salva-ok-{{$p.PraticaID}}" style="font-size:.8rem;display:none"></span>
+      {{if eq $p.Badge "esclusa"}}
+      <form method="POST" action="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/stato" style="display:inline">
+        <input type="hidden" name="stato" value="da_verificare">
+        <input type="hidden" name="redirect_to" value="/bandi/{{$.Bando.ID}}/dati{{if $.BadgeFilter}}?badge={{$.BadgeFilter}}{{end}}">
+        <button type="submit" class="btn btn-sm btn-secondary">Riapri</button>
+      </form>
+      {{else}}
+      <form method="POST" action="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/stato" style="display:inline"
+            onsubmit="return confirm('Escludere questa domanda dall\'istruttoria?')">
+        <input type="hidden" name="stato" value="esclusa">
+        <input type="hidden" name="redirect_to" value="/bandi/{{$.Bando.ID}}/dati{{if $.BadgeFilter}}?badge={{$.BadgeFilter}}{{end}}">
+        <button type="submit" class="btn btn-sm btn-danger">Escludi</button>
+      </form>
+      {{end}}
     </div>
   </div>
 </details>

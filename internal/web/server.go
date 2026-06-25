@@ -101,6 +101,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 	mux.Handle("POST /bandi/{id}/istruttoria/{praticaID}/dato", authMW(http.HandlerFunc(istr.PostSaveDato)))
 	mux.Handle("POST /bandi/{id}/istruttoria/{praticaID}/nota", authMW(http.HandlerFunc(istr.PostSaveNota)))
 	mux.Handle("POST /bandi/{id}/istruttoria/{praticaID}/riapri", authMW(http.HandlerFunc(istr.PostRiapri)))
+	mux.Handle("POST /bandi/{id}/istruttoria/{praticaID}/stato", authMW(http.HandlerFunc(istr.PostEscludiDati)))
 
 	// Bulk actions
 	mux.Handle("POST /bandi/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))

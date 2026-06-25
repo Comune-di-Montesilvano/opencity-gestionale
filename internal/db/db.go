@@ -29,7 +29,9 @@ func Open(path string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN export_colonne TEXT NOT NULL DEFAULT '[]'`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN app_status TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN dati_json TEXT NOT NULL DEFAULT '{}'`)
-	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT PRIMARY KEY, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT NOT NULL, bando_id INTEGER NOT NULL DEFAULT 0, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT, PRIMARY KEY (pratica_id, bando_id))`)
+	_, _ = db.Exec(`ALTER TABLE istruttorie_dati ADD COLUMN bando_id INTEGER NOT NULL DEFAULT 0`)
+	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_istruttorie_dati_pratica_bando ON istruttorie_dati (pratica_id, bando_id)`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN nota_lavoro TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN iban_config TEXT NOT NULL DEFAULT '{}'`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS export_mappings (

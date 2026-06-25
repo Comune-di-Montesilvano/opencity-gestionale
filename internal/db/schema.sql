@@ -56,10 +56,12 @@ CREATE TABLE IF NOT EXISTS istruttorie (
 
 -- Dati locali condivisi per pratica (cross-bando): override campi mancanti + nota di lavoro.
 CREATE TABLE IF NOT EXISTS istruttorie_dati (
-  pratica_id    TEXT PRIMARY KEY,
+  pratica_id    TEXT NOT NULL,
+  bando_id      INTEGER NOT NULL DEFAULT 0,
   dati_json     TEXT NOT NULL DEFAULT '{}',
   nota          TEXT NOT NULL DEFAULT '',
-  aggiornato_il TEXT
+  aggiornato_il TEXT,
+  PRIMARY KEY (pratica_id, bando_id)
 );
 
 CREATE TABLE IF NOT EXISTS sessioni (

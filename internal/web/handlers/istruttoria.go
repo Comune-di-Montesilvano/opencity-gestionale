@@ -678,6 +678,42 @@ func (h *IstruttoriaHandler) PostRiapri(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria", bandoID), http.StatusSeeOther)
 }
 
+// PostEscludiDati — imposta stato=esclusa (o da_verificare se già esclusa) per pratica.
+// Chiamato dalla pagina dati locali; redirige a /dati preservando il filtro badge.
+func (h *IstruttoriaHandler) PostEscludiDati(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Form non valido", http.StatusBadRequest)
+		return
+	}
+	nuovoStato := r.FormValue("stato")
+	if nuovoStato != "esclusa" && nuovoStato != "da_verificare" {
+		http.Error(w, "Stato non valido", http.StatusBadRequest)
+		return
+	}
+	redirect := r.FormValue("redirect_to")
+	if redirect == "" {
+		redirect = fmt.Sprintf("/bandi/%d/dati", bandoID)
+	}
+	if err := db.UpsertStatoIstruttoria(h.DB, int(bandoID), praticaID, nuovoStato, "", op.Username); err != nil {
+		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, redirect, http.StatusSeeOther)
+}
+
 // PraticaConDati aggrega i dati di una singola pratica per la vista "dati locali".
 type PraticaConDati struct {
 	PraticaID  string
