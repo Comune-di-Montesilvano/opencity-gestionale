@@ -170,29 +170,83 @@ code { background: #f1f5f9; padding: .1rem .35rem; border-radius: 3px; font-size
 
 /* ===== STAMPA / PRINT ===== */
 .stampa-doc { padding: .5rem 0; }
-.stampa-header { margin-bottom: 1.5rem; }
-.stampa-header h1 { font-size: 1.1rem; margin: 0 0 .2rem; }
-.stampa-header h2 { font-size: 1rem; font-weight: 500; margin: 0 0 .4rem; color: #475569; }
-.stampa-header p { font-size: 13px; margin: .15rem 0; color: #64748b; }
+
+/* Header intestazione */
+.stampa-header { margin-bottom: 1.25rem; }
+.stampa-header-inner { display: flex; align-items: flex-start; gap: 1.25rem; margin-bottom: .75rem; }
+.stampa-header-logo { flex-shrink: 0; width: 72px; display: flex; align-items: center; justify-content: center; }
+.stampa-logo-img { max-width: 72px; max-height: 72px; object-fit: contain; }
+.stampa-header-text { flex: 1; }
+.stampa-ente { font-size: 1rem; font-weight: 700; color: #1e3a5f; line-height: 1.2; }
+.stampa-settore { font-size: .8rem; color: #475569; margin-top: .1rem; }
+.stampa-titolo { font-size: .95rem; font-weight: 600; color: #1e3a5f; margin-top: .5rem; text-transform: uppercase; letter-spacing: .03em; }
+.stampa-bando { font-size: .85rem; color: #334155; margin-top: .15rem; }
+.stampa-header-meta { flex-shrink: 0; text-align: right; font-size: 12px; }
+.stampa-meta-row { display: flex; justify-content: flex-end; gap: .5rem; margin-bottom: .2rem; color: #475569; }
+.stampa-meta-row strong { color: #1e293b; min-width: 80px; text-align: right; }
+.stampa-header-bar { height: 3px; background: linear-gradient(90deg, #1e3a5f 0%, #3b82f6 60%, #93c5fd 100%); border-radius: 2px; }
+
+/* Riepilogo statistiche */
+.stampa-riepilogo { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+.stampa-riepilogo-item { flex: 1; border: 1px solid #e2e8f0; border-radius: 6px; padding: .6rem .9rem; background: #f8fafc; }
+.stampa-riepilogo-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: .2rem; }
+.stampa-riepilogo-val { font-size: 1.1rem; font-weight: 700; color: #1e3a5f; }
+
+/* Sezioni tabella */
 .stampa-sezione { margin-bottom: 2rem; }
-.stampa-sezione h3 { font-size: .95rem; margin: 0 0 .4rem; color: #1e3a5f; }
-.stampa-sezione h4 { font-size: .85rem; margin: .8rem 0 .3rem; color: #475569; }
-.stampa-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.stampa-table th { background: #f1f5f9; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 5px 8px; text-align: left; border: 1px solid #cbd5e1; }
-.stampa-table td { padding: 4px 8px; border: 1px solid #e2e8f0; }
+.stampa-sezione-header { display: flex; align-items: baseline; justify-content: space-between; background: #1e3a5f; color: #fff; padding: .4rem .75rem; border-radius: 4px 4px 0 0; margin-bottom: 0; }
+.stampa-sezione-title { font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.stampa-sezione-stats { font-size: .75rem; color: #93c5fd; }
+
+/* Tabella */
+.stampa-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.stampa-table thead { display: table-header-group; }
+.stampa-table th { background: #f1f5f9; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 5px 8px; text-align: left; border: 1px solid #cbd5e1; color: #475569; white-space: nowrap; }
+.stampa-table td { padding: 4px 8px; border: 1px solid #e2e8f0; vertical-align: middle; }
 .stampa-table tr:nth-child(even) td { background: #f8fafc; }
 .stampa-esclusa td { color: #94a3b8; }
+.stampa-table .col-num { text-align: right; width: 60px; }
+.stampa-table .col-cf { font-family: monospace; font-size: 11.5px; white-space: nowrap; }
+.stampa-table .col-proto { font-size: 11px; color: #475569; }
+.stampa-table .col-stato { text-align: center; width: 80px; }
+.stampa-table .col-note { font-size: 11px; color: #64748b; }
+
+/* Badge stato */
+.stampa-badge-ok { display: inline-block; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: 600; }
+.stampa-badge-no { display: inline-block; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: 600; }
+
+/* Footer firma */
+.stampa-footer { margin-top: 3rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }
+.stampa-footer-note { font-size: 10px; color: #94a3b8; margin-bottom: 2rem; font-style: italic; }
+.stampa-firma-area { display: flex; gap: 3rem; }
+.stampa-firma-box { flex: 1; }
+.stampa-firma-line { height: 1px; background: #334155; margin-bottom: .4rem; }
+.stampa-firma-label { font-size: 10px; color: #475569; text-align: center; text-transform: uppercase; letter-spacing: .04em; }
 
 @media print {
+  @page { size: A4; margin: 16mm 18mm 20mm; }
+  @page :right { @bottom-right { content: "Pag. " counter(page) " / " counter(pages); font-size: 9pt; color: #64748b; } }
+
   .no-print { display: none !important; }
   .sidebar { display: none !important; }
   .main-content { margin-left: 0 !important; padding: 0 !important; }
-  body { background: white !important; font-size: 11px; margin: 0; }
-  .stampa-table { font-size: 10px; }
-  .stampa-table th, .stampa-table td { border: 1px solid #999; padding: 3px 6px; }
+  body { background: white !important; font-size: 10pt; margin: 0; }
+
+  .stampa-header-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stampa-sezione-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stampa-riepilogo-item { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stampa-badge-ok, .stampa-badge-no { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stampa-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stampa-table tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .stampa-table { font-size: 9pt; }
+  .stampa-table th, .stampa-table td { border: 1px solid #aaa; padding: 3px 5px; }
   .stampa-esclusa td { color: #999; }
   .stampa-sezione { page-break-inside: avoid; }
-  h3, h4 { page-break-after: avoid; }
+  .stampa-sezione-header { page-break-after: avoid; }
+  .stampa-footer { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
 }
 
 /* ===== HELP BADGE ===== */

@@ -86,6 +86,14 @@ var funcMap = template.FuncMap{
 		}
 		return false
 	},
+	"hasMotivoPrefix": func(motivi []string, prefix string) bool {
+		for _, m := range motivi {
+			if strings.HasPrefix(m, prefix) {
+				return true
+			}
+		}
+		return false
+	},
 	"primoNonVuoto": func(vals ...string) string {
 		for _, v := range vals {
 			if v != "" {

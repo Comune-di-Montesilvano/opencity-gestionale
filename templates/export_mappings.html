@@ -1,0 +1,75 @@
+{{define "export_mappings.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Template export — {{.Bando.Nome}}{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Template export CSV</h1>
+  <span class="text-muted">{{.Bando.Nome}}</span>
+</div>
+
+{{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
+
+<div style="margin-bottom:1.5rem">
+  <a href="/bandi/{{.Bando.ID}}" class="btn btn-secondary btn-sm">← Torna al bando</a>
+</div>
+
+<div class="card" style="margin-bottom:2rem">
+  <div class="card-header"><strong>Nuovo template</strong></div>
+  <div class="card-body">
+    <form method="POST" action="/bandi/{{.Bando.ID}}/export-mappings" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <label class="form-label">Nome template</label>
+        <input type="text" name="nome" class="form-control" style="width:220px" placeholder="es. Ragioneria" required>
+      </div>
+      <div>
+        <label class="form-label">Preset colonne</label>
+        <select name="preset" class="form-control" style="width:180px">
+          <option value="">Vuoto</option>
+          <option value="ragioneria">Ragioneria / Bonifici</option>
+          <option value="generico">Generico</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Crea</button>
+    </form>
+  </div>
+</div>
+
+{{if .Mappings}}
+<table class="table">
+  <thead>
+    <tr>
+      <th>Nome</th>
+      <th>Filtro stati</th>
+      <th>Colonne</th>
+      <th>Creato il</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Mappings}}
+  <tr>
+    <td>{{.Nome}}</td>
+    <td>
+      {{if .FiltroStati}}{{range .FiltroStati}}<span class="badge badge-gray">{{.}}</span> {{end}}
+      {{else}}<span class="text-muted">Tutti gli stati</span>{{end}}
+    </td>
+    <td>{{len .Colonne}} colonne</td>
+    <td>{{.CreatedAt.Format "02/01/2006"}}</td>
+    <td style="white-space:nowrap">
+      <a href="/bandi/{{$.Bando.ID}}/export-mappings/{{.ID}}" class="btn btn-secondary btn-sm">Modifica</a>
+      <form method="POST" action="/bandi/{{$.Bando.ID}}/export-mappings/{{.ID}}/delete" style="display:inline"
+            onsubmit="return confirm('Eliminare il template «{{.Nome}}»?')">
+        <button type="submit" class="btn btn-sm" style="color:#dc2626">Elimina</button>
+      </form>
+    </td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="text-muted">Nessun template configurato. Crea il primo sopra.</p>
+{{end}}
+{{end}}

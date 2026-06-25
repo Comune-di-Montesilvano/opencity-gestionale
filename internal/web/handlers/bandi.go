@@ -1594,6 +1594,53 @@ func (h *BandiHandler) GetValoriCampo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// PostSaveIBANConfig salva la configurazione delle chiavi IBAN per un bando.
+// POST /bandi/{id}/iban/config — redirige alla pagina IBAN della run specificata nel form.
+func (h *BandiHandler) PostSaveIBANConfig(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	r.ParseForm()
+	campoIBAN := strings.TrimSpace(r.FormValue("campo_iban"))
+	campoIntestatario := strings.TrimSpace(r.FormValue("campo_intestatario"))
+	runID := strings.TrimSpace(r.FormValue("run_id"))
+
+	// Valida che le chiavi siano presenti nel mapping engine del bando.
+	var engCfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &engCfg)
+	if campoIBAN != "" {
+		if _, ok := engCfg.Mapping[campoIBAN]; !ok {
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%s/iban?flash=Campo+IBAN+non+trovato+nel+mapping&flashType=error", bandoID, runID), http.StatusSeeOther)
+			return
+		}
+	}
+	if campoIntestatario != "" {
+		if _, ok := engCfg.Mapping[campoIntestatario]; !ok {
+			http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%s/iban?flash=Campo+intestatario+non+trovato+nel+mapping&flashType=error", bandoID, runID), http.StatusSeeOther)
+			return
+		}
+	}
+
+	cfg := db.IBanConfig{CampoIBAN: campoIBAN, CampoIntestatario: campoIntestatario}
+	cfgJSON, _ := json.Marshal(cfg)
+	if err := db.SaveIBANConfig(h.DB, bandoID, string(cfgJSON)); err != nil {
+		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%s/iban?flash=Configurazione+salvata&flashType=success", bandoID, runID), http.StatusSeeOther)
+}
+
 // --- helpers ---
 
 func parseFilterValue(s string) any {

@@ -1,0 +1,129 @@
+{{define "dati_locali.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Dati locali — {{.Bando.Nome}}{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>Dati locali</h1>
+  <span class="text-muted">{{.Bando.Nome}}</span>
+  <a href="/bandi/{{.Bando.ID}}/istruttoria" class="btn btn-secondary btn-sm">← Istruttoria</a>
+</div>
+
+{{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
+
+{{if not .Pratiche}}
+<div class="alert alert-error">
+  Nessuna domanda trovata. Eseguire prima una scansione in istruttoria per caricare i dati dall'API.
+</div>
+{{else}}
+
+<div style="margin-bottom:1rem;font-size:.9rem;color:#6b7280">
+  {{.TotPratiche}} domande scansionate totali.
+</div>
+
+{{/* Filtri badge */}}
+<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">
+  <a href="/bandi/{{.Bando.ID}}/dati"
+     class="btn btn-sm {{if eq .BadgeFilter ""}}btn-primary{{else}}btn-secondary{{end}}">Tutte</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=da_verificare"
+     class="btn btn-sm {{if eq .BadgeFilter "da_verificare"}}btn-primary{{else}}btn-secondary{{end}}">Da verificare</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=non_rientrante"
+     class="btn btn-sm {{if eq .BadgeFilter "non_rientrante"}}btn-primary{{else}}btn-secondary{{end}}">Non rientranti</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=ammessa"
+     class="btn btn-sm {{if eq .BadgeFilter "ammessa"}}btn-primary{{else}}btn-secondary{{end}}">Ammesse</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=fuori_fondi"
+     class="btn btn-sm {{if eq .BadgeFilter "fuori_fondi"}}btn-primary{{else}}btn-secondary{{end}}">Fuori fondi</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=approvata"
+     class="btn btn-sm {{if eq .BadgeFilter "approvata"}}btn-primary{{else}}btn-secondary{{end}}">Approvate</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=esclusa"
+     class="btn btn-sm {{if eq .BadgeFilter "esclusa"}}btn-primary{{else}}btn-secondary{{end}}">Escluse</a>
+</div>
+
+{{range .Pratiche}}
+{{$p := .}}
+<details style="border:1px solid #e5e7eb;border-radius:6px;margin-bottom:.5rem;background:#fff">
+  <summary style="padding:.6rem .8rem;cursor:pointer;display:flex;align-items:center;gap:.6rem;list-style:none">
+    <span style="font-family:monospace;font-size:.8rem;color:#1d4ed8" title="{{$p.PraticaID}}">{{$p.Protocollo}}</span>
+    {{if eq $p.Badge "ammessa"}}
+      <span class="badge badge-green">ammessa</span>
+    {{else if eq $p.Badge "fuori_fondi"}}
+      <span class="badge" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">fuori fondi</span>
+    {{else if eq $p.Badge "da_verificare"}}
+      <span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca">da verificare</span>
+    {{else if eq $p.Badge "approvata"}}
+      <span class="badge" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">approvata</span>
+    {{else if eq $p.Badge "esclusa"}}
+      <span class="badge badge-gray">esclusa</span>
+    {{else}}
+      <span class="badge" style="background:#fefce8;color:#854d0e;border:1px solid #fef08a">non rientrante</span>
+    {{end}}
+    {{if $p.StatusApp}}<span style="font-size:.75rem;color:#9ca3af">stato: {{$p.StatusApp}}</span>{{end}}
+    {{/* Indicatore override presenti */}}
+    {{$hasOverride := false}}
+    {{range $.TuttiCampi}}{{if index $p.DatiLocali .}}{{$hasOverride = true}}{{end}}{{end}}
+    {{if $hasOverride}}<span style="font-size:.75rem;color:#7c3aed">● dati locali</span>{{end}}
+  </summary>
+
+  <div style="padding:.8rem;border-top:1px solid #f3f4f6">
+    <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+      <thead>
+        <tr style="background:#f9fafb">
+          <th style="padding:.3rem .5rem;text-align:left;color:#6b7280;font-weight:500;width:130px">Campo</th>
+          <th style="padding:.3rem .5rem;text-align:left;color:#6b7280;font-weight:500;width:200px">Dichiarato (API)</th>
+          <th style="padding:.3rem .5rem;text-align:left;color:#6b7280;font-weight:500">Locale (operatore)</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range $.TuttiCampi}}
+      {{$campo := .}}
+      {{$apiVal := index $p.DatiAPI $campo}}
+      {{$localVal := index $p.DatiLocali $campo}}
+      {{$fm := index $.Config.Mapping $campo}}
+      <tr style="border-top:1px solid #f3f4f6">
+        <td style="padding:.3rem .5rem;color:#374151;font-weight:500">{{$campo}}</td>
+        <td style="padding:.3rem .5rem;font-family:monospace;color:#6b7280">{{if $apiVal}}{{$apiVal}}{{else}}<span style="color:#d1d5db">—</span>{{end}}</td>
+        <td style="padding:.3rem .5rem">
+          <div style="display:flex;align-items:center;gap:.4rem">
+            {{if $localVal}}
+            <span id="dati-status-{{$p.PraticaID}}-{{$campo}}"
+                  style="color:#16a34a;font-size:.8rem;font-family:monospace">{{$localVal}} ✓</span>
+            <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
+                    onclick="this.previousElementSibling.style.display='none';this.nextElementSibling.style.display='inline-block';this.style.display='none'">modifica</button>
+            {{else}}
+            <span id="dati-status-{{$p.PraticaID}}-{{$campo}}" style="color:#9ca3af;font-size:.8rem">—</span>
+            {{end}}
+            {{if eq $fm.Tipo "float"}}
+            <input type="number" step="0.01"
+            {{else if eq $fm.Tipo "time"}}
+            <input type="date"
+            {{else if eq $fm.Tipo "count"}}
+            <input type="number" step="1"
+            {{else}}
+            <input type="text"
+            {{end}}
+                   value="{{$localVal}}"
+                   placeholder="inserisci valore"
+                   class="form-control form-control-sm" style="width:150px;font-size:.8rem;{{if $localVal}}display:none{{end}}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
+                   hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/dato"
+                   hx-vals='{"campo": "{{$campo}}", "ctx": "dati"}'
+                   hx-include="this"
+                   hx-trigger="change"
+                   hx-target="#dati-status-{{$p.PraticaID}}-{{$campo}}"
+                   hx-swap="outerHTML"
+                   hx-on:htmx:after-request="if(event.detail.successful){this.style.display='none';var prev=this.previousElementSibling;if(prev&&prev.tagName==='BUTTON')prev.style.display='none'}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2500)}"
+                   name="valore">
+          </div>
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</details>
+{{end}}
+
+{{end}}{{/* end if Pratiche */}}
+{{end}}

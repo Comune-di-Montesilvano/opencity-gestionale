@@ -213,15 +213,17 @@ func (h *GraduatoriaHandler) GetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	exportMappings, _ := db.ListExportMappings(h.DB, bandoID)
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "run_dettaglio.html", map[string]any{
-		"Op":          op,
-		"Bando":       bando,
-		"Run":         run,
-		"Grad":        &grad,
-		"NumRiserva":  grad.TotaleConRiserva(),
-		"Flash":       flash,
-		"FlashType":   flashType,
+		"Op":             op,
+		"Bando":          bando,
+		"Run":            run,
+		"Grad":           &grad,
+		"NumRiserva":     grad.TotaleConRiserva(),
+		"ExportMappings": exportMappings,
+		"Flash":          flash,
+		"FlashType":      flashType,
 	})
 }
 
@@ -523,8 +525,14 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
 }
 
+// GetIBANPage — redirect a export-mappings (vista dedicata IBAN rimossa).
+func (h *GraduatoriaHandler) GetIBANPage(w http.ResponseWriter, r *http.Request) {
+	bandoID := bandoIDFromPath(r)
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/export-mappings", bandoID), http.StatusSeeOther)
+}
+
 // GetExportIBAN — CSV ammesse con IBAN per ufficio ragioneria (ordini bonifici).
-// Richiede che il bando abbia "iban" nel mapping; se assente la colonna sarà vuota.
+// Le chiavi IBAN e intestatario vengono lette dalla configurazione per-bando (iban_config).
 func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
 	bandoID := bandoIDFromPath(r)
@@ -545,6 +553,8 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	ibanCfg, _ := db.GetIBANConfig(h.DB, bandoID)
+
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
@@ -555,22 +565,9 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
 	cw.Write([]string{
-		"Posizione", "Protocollo", "CF Richiedente", "Cognome", "Nome",
-		"CF Figlio", "Annualità", "Tipologia", "Importo (€)", "IBAN", "Intestatario IBAN",
+		"Posizione", "Protocollo", "Cognome", "Nome",
+		"Annualità", "Tipologia", "Importo (€)", "IBAN", "Intestatario",
 	})
-
-	// fallbackCampo prova lo struct Istanza poi CampiMappati con chiavi alternative.
-	fallbackCampo := func(structVal string, ist *graduatoria.Istanza, chiavi ...string) string {
-		if structVal != "" {
-			return structVal
-		}
-		for _, k := range chiavi {
-			if v := ist.CampiMappati[k]; v != "" {
-				return v
-			}
-		}
-		return ""
-	}
 
 	pos := 0
 	for _, g := range grad.Gruppi {
@@ -580,24 +577,24 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 			}
 			pos++
 			ist := riga.Istanza
-			annualita := fallbackCampo(func() string {
-				if ist.Annualita != 0 {
-					return fmt.Sprintf("%d", ist.Annualita)
-				}
-				return ""
-			}(), ist, "annualita", "annualita1", "anno")
+			annualita := ""
+			if ist.Annualita != 0 {
+				annualita = fmt.Sprintf("%d", ist.Annualita)
+			} else if v := ist.CampiMappati["annualita"]; v != "" {
+				annualita = v
+			} else if v := ist.CampiMappati["annualita1"]; v != "" {
+				annualita = v
+			}
 			cw.Write([]string{
 				fmt.Sprintf("%d", pos),
 				ist.ProtocolNumber,
-				fallbackCampo(ist.RichiedenteCF, ist, "richiedente_cf", "richiedente"),
-				fallbackCampo(ist.RichiedenteCognome, ist, "richiedente_cognome", "cognome"),
-				fallbackCampo(ist.RichiedenteNome, ist, "richiedente_nome", "nome"),
-				fallbackCampo(ist.FiglioSelezionatoCF, ist, "figlio_cf", "figlio"),
+				ist.RichiedenteCognome,
+				ist.RichiedenteNome,
 				annualita,
 				g.Nome,
 				fmt.Sprintf("%.2f", riga.ImportoRimborso),
-				fallbackCampo(ist.IBAN, ist, "iban"),
-				fallbackCampo(ist.IBANIntestatario, ist, "iban_intestatario", "intestatario"),
+				ist.CampiMappati[ibanCfg.CampoIBAN],
+				ist.CampiMappati[ibanCfg.CampoIntestatario],
 			})
 		}
 	}

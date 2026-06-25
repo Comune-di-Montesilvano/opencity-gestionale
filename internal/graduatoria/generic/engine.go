@@ -255,6 +255,13 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras
 		}
 	}
 
+	// Built-in: CF richiedente da path standard OpenCity se non già estratto dal mapping.
+	if base.StringMap["richiedente_cf"] == "" {
+		if cf, _ := extractor.Str(app.Data, "applicant.fiscal_code.fiscal_code"); cf != "" {
+			base.StringMap["richiedente_cf"] = cf
+		}
+	}
+
 	if cfg.Espansione == "" || len(expandMapping) == 0 {
 		return []*graduatoria.Record{base}, nil
 	}

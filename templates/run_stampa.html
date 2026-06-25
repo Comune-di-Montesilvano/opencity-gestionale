@@ -37,7 +37,6 @@
         <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
           <input type="checkbox" name="col" value="note" {{if hasCol .Colonne "note"}}checked{{end}}> Note
         </label>
-        <!-- Colonne dinamiche (dal superset bando) -->
         {{range $.ExportColonne}}
         <label style="display:flex;align-items:center;gap:.35rem;font-size:13px">
           <input type="checkbox" name="col" value="{{.}}" {{if hasCol $.Colonne .}}checked{{end}}> {{.}}
@@ -54,26 +53,63 @@
 
 <!-- Documento stampabile -->
 <div class="stampa-doc">
+
+  <!-- INTESTAZIONE ISTITUZIONALE -->
   <div class="stampa-header">
-    <h1>Comune di Montesilvano</h1>
-    <h2>{{.Bando.Nome}}</h2>
-    <p>Graduatoria run #{{.Run.ID}} — calcolata il {{.Run.CalcolataAt.Format "02/01/2006 15:04"}} da {{.Run.CalcolataDa}}</p>
-    <p>Ammesse: {{.Run.NumAmmesse}} | Budget assegnato: €{{printf "%.2f" .Run.BudgetUsato}}</p>
+    <div class="stampa-header-inner">
+      <div class="stampa-header-logo">
+        {{if .Branding.Logo}}
+        <img src="{{.Branding.Logo}}" alt="Logo ente" class="stampa-logo-img">
+        {{end}}
+      </div>
+      <div class="stampa-header-text">
+        <div class="stampa-ente">{{if .Branding.Nome}}{{.Branding.Nome}}{{else}}Comune di Montesilvano{{end}}</div>
+        <div class="stampa-settore">Settore Servizi Sociali</div>
+        <div class="stampa-titolo">Graduatoria Provvisoria</div>
+        <div class="stampa-bando">{{.Bando.Nome}}</div>
+      </div>
+      <div class="stampa-header-meta">
+        <div class="stampa-meta-row"><span>Run</span><strong>#{{.Run.ID}}</strong></div>
+        <div class="stampa-meta-row"><span>Data calcolo</span><strong>{{.Run.CalcolataAt.Format "02/01/2006"}}</strong></div>
+        <div class="stampa-meta-row"><span>Ora</span><strong>{{.Run.CalcolataAt.Format "15:04"}}</strong></div>
+        <div class="stampa-meta-row"><span>Operatore</span><strong>{{.Run.CalcolataDa}}</strong></div>
+      </div>
+    </div>
+    <div class="stampa-header-bar"></div>
+  </div>
+
+  <!-- RIEPILOGO -->
+  <div class="stampa-riepilogo">
+    <div class="stampa-riepilogo-item">
+      <div class="stampa-riepilogo-label">Totale ammesse</div>
+      <div class="stampa-riepilogo-val">{{.Run.NumAmmesse}}</div>
+    </div>
+    <div class="stampa-riepilogo-item">
+      <div class="stampa-riepilogo-label">Budget assegnato</div>
+      <div class="stampa-riepilogo-val">€ {{printf "%.2f" .Run.BudgetUsato}}</div>
+    </div>
+    <div class="stampa-riepilogo-item">
+      <div class="stampa-riepilogo-label">Data stampa</div>
+      <div class="stampa-riepilogo-val stampa-print-date">—</div>
+    </div>
   </div>
 
   {{if .Grad.Gruppi}}
   {{range .Grad.Gruppi}}
   <div class="stampa-sezione">
-    <h3>{{.Nome}} — {{len .Righe}} istanze (budget: €{{printf "%.2f" .BudgetUsato}})</h3>
+    <div class="stampa-sezione-header">
+      <div class="stampa-sezione-title">{{.Nome}}</div>
+      <div class="stampa-sezione-stats">{{len .Righe}} istanze &nbsp;·&nbsp; budget usato: € {{printf "%.2f" .BudgetUsato}}</div>
+    </div>
     <table class="stampa-table">
       <thead>
         <tr>
-          {{if hasCol $.Colonne "posizione"}}<th>#</th>{{end}}
+          {{if hasCol $.Colonne "posizione"}}<th class="col-num">#</th>{{end}}
           {{if hasCol $.Colonne "protocollo"}}<th>Protocollo</th>{{end}}
           {{if hasCol $.Colonne "cf"}}<th>CF richiedente</th>{{end}}
           {{if hasCol $.Colonne "cf_figlio"}}<th>CF figlio</th>{{end}}
-          {{if hasCol $.Colonne "importo"}}<th>Importo (€)</th>{{end}}
-          {{if hasCol $.Colonne "ammessa"}}<th>Stato</th>{{end}}
+          {{if hasCol $.Colonne "importo"}}<th class="col-num">Importo (€)</th>{{end}}
+          {{if hasCol $.Colonne "ammessa"}}<th class="col-stato">Stato</th>{{end}}
           {{if hasCol $.Colonne "note"}}<th>Note</th>{{end}}
           {{range $.ExportColonne}}<th>{{.}}</th>{{end}}
         </tr>
@@ -81,13 +117,13 @@
       <tbody>
       {{range .Righe}}
       <tr{{if not .Ammessa}} class="stampa-esclusa"{{end}}>
-        {{if hasCol $.Colonne "posizione"}}<td>{{.Posizione}}</td>{{end}}
-        {{if hasCol $.Colonne "protocollo"}}<td>{{if .Istanza}}{{.Istanza.ProtocolNumber}}{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "cf"}}<td>{{if .Istanza}}{{cfOscurato (primoNonVuoto .Istanza.RichiedenteCF (index .Istanza.CampiMappati "richiedente_cf") (index .Istanza.CampiMappati "richiedente"))}}{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "cf_figlio"}}<td>{{if .Istanza}}{{cfOscurato (primoNonVuoto .Istanza.FiglioSelezionatoCF (index .Istanza.CampiMappati "figlio_cf") (index .Istanza.CampiMappati "figlio"))}}{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "importo"}}<td>{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "ammessa"}}<td>{{if .Ammessa}}✓{{else}}✗{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "note"}}<td>{{.NoteEsclusione}}</td>{{end}}
+        {{if hasCol $.Colonne "posizione"}}<td class="col-num">{{.Posizione}}</td>{{end}}
+        {{if hasCol $.Colonne "protocollo"}}<td class="col-proto">{{if .Istanza}}{{protocolloBreve .Istanza.ProtocolNumber}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "cf"}}<td class="col-cf">{{if .Istanza}}{{cfOscurato (primoNonVuoto .Istanza.RichiedenteCF (index .Istanza.CampiMappati "richiedente_cf") (index .Istanza.CampiMappati "richiedente"))}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "cf_figlio"}}<td class="col-cf">{{if .Istanza}}{{cfOscurato (primoNonVuoto .Istanza.FiglioSelezionatoCF (index .Istanza.CampiMappati "figlio_cf") (index .Istanza.CampiMappati "figlio"))}}{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "importo"}}<td class="col-num">{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "ammessa"}}<td class="col-stato">{{if .Ammessa}}<span class="stampa-badge-ok">Ammessa</span>{{else}}<span class="stampa-badge-no">Esclusa</span>{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "note"}}<td class="col-note">{{.NoteEsclusione}}</td>{{end}}
         {{$ist := .Istanza}}
         {{range $.ExportColonne}}<td>{{if $ist}}{{index $ist.CampiMappati .}}{{end}}</td>{{end}}
       </tr>
@@ -98,5 +134,33 @@
   {{end}}
   {{end}}
 
+  <!-- FOOTER FIRMA -->
+  <div class="stampa-footer">
+    <div class="stampa-footer-note">
+      Documento generato dal sistema gestionale. Graduatoria provvisoria soggetta ad approvazione formale.
+    </div>
+    <div class="stampa-firma-area">
+      <div class="stampa-firma-box">
+        <div class="stampa-firma-line"></div>
+        <div class="stampa-firma-label">Il Responsabile del Procedimento</div>
+      </div>
+      <div class="stampa-firma-box">
+        <div class="stampa-firma-line"></div>
+        <div class="stampa-firma-label">Timbro e Firma</div>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<script>
+// Aggiorna data stampa al momento dell'apertura
+(function() {
+  var el = document.querySelector('.stampa-print-date');
+  if (el) {
+    var d = new Date();
+    el.textContent = d.toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' ' + d.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  }
+})();
+</script>
 {{end}}

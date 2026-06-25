@@ -19,9 +19,18 @@
 </form>
 {{end}}
 
-<div style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap">
+<div style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
   <a href="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/stampa" class="btn btn-secondary" target="_blank">Stampa documento graduatoria</a>
-  <a href="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/export/iban" class="btn btn-secondary">CSV bonifici (IBAN)</a>
+  {{if .ExportMappings}}
+  <select id="globalMapping" class="form-control form-control-sm" style="width:auto">
+    <option value="">Scegli formato CSV…</option>
+    {{range .ExportMappings}}<option value="{{.ID}}">{{.Nome}}</option>{{end}}
+  </select>
+  <button type="button" class="btn btn-sm" onclick="scaricaMappingGlobal()">Scarica CSV</button>
+  {{end}}
+  {{if .Op.IsAdmin}}
+  <a href="/bandi/{{.Bando.ID}}/export-mappings" class="btn btn-secondary btn-sm">Configura template CSV</a>
+  {{end}}
 </div>
 
 <div class="stats-row">
@@ -50,4 +59,12 @@
 <h2>Escluse ({{len .Grad.Escluse}})</h2>
 <a href="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/0/escluse" class="btn btn-secondary btn-sm">Visualizza tabella</a>
 <a href="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/export/0/escluse" class="btn btn-sm">CSV</a>
+
+<script>
+function scaricaMappingGlobal() {
+  var mapID = document.getElementById('globalMapping').value;
+  if (!mapID) { alert('Seleziona un formato CSV'); return; }
+  window.location.href = '/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/export/mapping/' + mapID;
+}
+</script>
 {{end}}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"sort"
@@ -64,12 +65,48 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 	}
 	sort.Strings(campiVerifica)
 
+	// Campi built-in editabili: non hanno VerificaPath ma l'operatore può inserire il valore corretto.
+	type CampoBuiltin struct {
+		Campo  string
+		Label  string
+		Motivo string // prefisso del motivo che attiva l'input
+	}
+	var campiBuiltin []CampoBuiltin
+	if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
+		campiBuiltin = append(campiBuiltin, CampoBuiltin{
+			Campo:  ecfg.Rimborso.CampoLordo,
+			Label:  "Importo speso (€)",
+			Motivo: "Corrispettivo dichiarato €0,00",
+		})
+	}
+
 	// Campi dichiarati e CF da mostrare in istruttoria senza aprire la domanda.
-	// Fonte: CampiMappati dell'ultima run calcolata (snapshot affidabile, nessun fetch API).
-	campiDichiarati := map[string]map[string]string{} // praticaID → CampiMappati
-	richiedenteCF := map[string]string{}              // praticaID → CF richiedente oscurato
-	figlioCF := map[string]string{}                   // praticaID → CF figlio oscurato
+	// Sorgente primaria: cache API aggiornata durante la scan. Fallback: snapshot ultima run.
+	campiDichiarati := map[string]map[string]string{} // praticaID → campi API dichiarati
+	richiedenteCF := map[string]string{}              // praticaID → CF richiedente
+	figlioCF := map[string]string{}                   // praticaID → CF figlio
 	var fuoriFondi []RigaFuoriFondi
+
+	// Sorgente primaria: cache API (aggiornata durante scan)
+	if apiCache, err := db.GetAPICache(h.DB, int(bandoID)); err == nil {
+		for pid, apiFields := range apiCache {
+			campiDichiarati[pid] = apiFields
+			for _, k := range []string{"richiedente_cf", "richiedente"} {
+				if v := apiFields[k]; v != "" {
+					richiedenteCF[pid] = v
+					break
+				}
+			}
+			for _, k := range []string{"figlio_cf", "figlio"} {
+				if v := apiFields[k]; v != "" {
+					figlioCF[pid] = v
+					break
+				}
+			}
+		}
+	}
+
+	// Fallback: snapshot ultima run (per app non ancora scansionate, fuori fondi, ecc.)
 	if run, err := db.GetLatestRun(h.DB, bando.ID); err == nil && run != nil {
 		var grad graduatoria.Graduatoria
 		if json.Unmarshal([]byte(run.DatiJSON), &grad) == nil {
@@ -78,26 +115,31 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 					return
 				}
 				pid := r.Istanza.ID
-				campiDichiarati[pid] = r.Istanza.CampiMappati
-				// CF richiedente: prova chiavi comuni
-				for _, k := range []string{"richiedente_cf", "richiedente"} {
-					if v := r.Istanza.CampiMappati[k]; v != "" {
-						richiedenteCF[pid] = v
-						break
+				// Fallback: usa snapshot run solo se cache API non ha già i dati
+				if campiDichiarati[pid] == nil {
+					campiDichiarati[pid] = r.Istanza.CampiMappati
+				}
+				if richiedenteCF[pid] == "" {
+					for _, k := range []string{"richiedente_cf", "richiedente"} {
+						if v := r.Istanza.CampiMappati[k]; v != "" {
+							richiedenteCF[pid] = v
+							break
+						}
+					}
+					if richiedenteCF[pid] == "" {
+						richiedenteCF[pid] = r.Istanza.RichiedenteCF
 					}
 				}
-				if v := r.Istanza.RichiedenteCF; v != "" {
-					richiedenteCF[pid] = v
-				}
-				// CF figlio
-				for _, k := range []string{"figlio_cf", "figlio"} {
-					if v := r.Istanza.CampiMappati[k]; v != "" {
-						figlioCF[pid] = v
-						break
+				if figlioCF[pid] == "" {
+					for _, k := range []string{"figlio_cf", "figlio"} {
+						if v := r.Istanza.CampiMappati[k]; v != "" {
+							figlioCF[pid] = v
+							break
+						}
 					}
-				}
-				if v := r.Istanza.FiglioSelezionatoCF; v != "" {
-					figlioCF[pid] = v
+					if figlioCF[pid] == "" {
+						figlioCF[pid] = r.Istanza.FiglioSelezionatoCF
+					}
 				}
 			}
 			for _, g := range grad.Gruppi {
@@ -135,6 +177,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"Flash":           flash,
 		"FlashType":       flashType,
 		"CampiVerifica":    campiVerifica,
+		"CampiBuiltin":     campiBuiltin,
 		"FuoriFondi":       fuoriFondi,
 		"CampiDichiarati":  campiDichiarati,
 		"RichiedenteCF":    richiedenteCF,
@@ -150,7 +193,8 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 	var ecfg graduatoria.EngineConfig
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
-	if !ecfg.Verifica.Attiva {
+	hasFondiCheck := ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != ""
+	if !ecfg.Verifica.Attiva && !hasFondiCheck {
 		return 0, nil
 	}
 
@@ -185,6 +229,32 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) {
 			continue
 		}
+
+		// Salva i dati dichiarati dall'API per questa pratica (prima di applicare override locali).
+		// Usato per la vista "dati locali" e per mostrare dichiarato vs sovrascitto in istruttoria.
+		apiRecs, _ := generic.EstraiRecordsConExtras(app, ecfg, nil)
+		if len(apiRecs) > 0 {
+			rec := apiRecs[0]
+			apiFields := map[string]string{
+				"protocollo": app.ProtocolNumber,
+				"status":     app.Status,
+			}
+			for k, v := range rec.FloatMap {
+				apiFields[k] = strconv.FormatFloat(v, 'f', -1, 64)
+			}
+			for k, v := range rec.StringMap {
+				if v != "" {
+					apiFields[k] = v
+				}
+			}
+			for k, v := range rec.IntMap {
+				apiFields[k] = strconv.Itoa(v)
+			}
+			if b, err2 := json.Marshal(apiFields); err2 == nil {
+				db.UpsertAPICache(dbConn, int(bando.ID), app.ID, string(b)) //nolint
+			}
+		}
+
 		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
 		if err != nil || len(records) == 0 {
 			continue
@@ -215,6 +285,38 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		for _, rec := range passingRecords {
 			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
 				motiviSet[m] = struct{}{}
+			}
+		}
+		// Built-in: corrispettivo=0 in modalità fondi (sempre, indipendentemente da Verifica.Attiva)
+		if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
+			lordo := ecfg.Rimborso.CampoLordo
+			for _, rec := range passingRecords {
+				val := float64(0)
+				found := false
+				if v, ok := rec.FloatMap[lordo]; ok {
+					val = v
+					found = true
+				} else if sv, ok := rec.StringMap[lordo]; ok {
+					// campo mappato come "string": parsa il valore
+					sv = strings.TrimSpace(sv)
+					if sv == "" || sv == "0" {
+						val = 0
+						found = true
+					} else if parsed, err := strconv.ParseFloat(sv, 64); err == nil {
+						val = parsed
+						found = true
+					}
+				}
+				if found && val == 0 {
+					motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+				}
+			}
+		}
+		// Built-in: CF richiedente mancante — controlla sia richiedente_cf (built-in) che richiedente (chiave mappata comune)
+		for _, rec := range passingRecords {
+			hasCF := rec.StringMap["richiedente_cf"] != "" || rec.StringMap["richiedente"] != ""
+			if !hasCF {
+				motiviSet["CF richiedente mancante — verificare identità del richiedente"] = struct{}{}
 			}
 		}
 		if len(motiviSet) == 0 {
@@ -274,7 +376,8 @@ func (h *IstruttoriaHandler) PostScansiona(w http.ResponseWriter, r *http.Reques
 	var ecfg graduatoria.EngineConfig
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
-	if !ecfg.Verifica.Attiva {
+	hasFondiCheck := ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != ""
+	if !ecfg.Verifica.Attiva && !hasFondiCheck {
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria?flash=Verifica+non+attiva+per+questo+bando&flashType=error", bandoID), http.StatusSeeOther)
 		return
 	}
@@ -388,6 +491,7 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 	}
 	campo := strings.TrimSpace(r.FormValue("campo"))
 	valore := strings.TrimSpace(r.FormValue("valore"))
+	ctx := r.FormValue("ctx") // "dati" → risponde con span minimale invece del partial motivi
 	if campo == "" {
 		http.Error(w, "Campo obbligatorio", http.StatusBadRequest)
 		return
@@ -407,6 +511,23 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	if app, err := client.FetchApplication(praticaID); err == nil {
+		// Salva/aggiorna il valore API dichiarato nella cache (separato dagli override).
+		apiRecs, _ := generic.EstraiRecordsConExtras(*app, ecfg, nil)
+		if len(apiRecs) > 0 {
+			rec := apiRecs[0]
+			var apiVal string
+			if v, ok := rec.FloatMap[campo]; ok {
+				apiVal = strconv.FormatFloat(v, 'f', -1, 64)
+			} else if v, ok := rec.IntMap[campo]; ok {
+				apiVal = strconv.Itoa(v)
+			} else if v, ok := rec.StringMap[campo]; ok {
+				apiVal = v
+			}
+			if apiVal != "" {
+				_ = db.UpsertAPICacheField(h.DB, int(bandoID), praticaID, campo, apiVal)
+			}
+		}
+
 		// Legge tutti i dati locali aggiornati per questa pratica.
 		allDati, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
 		extras := allDati[praticaID]
@@ -430,11 +551,9 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 				}
 			}
 			_ = db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, "__stato_verifica_"+campo, stato)
-			// Rilegge extras aggiornati con lo stato verifica.
 			allDati, _ = db.GetIstruttorieDati(h.DB, int(bandoID))
 			extras = allDati[praticaID]
 		} else if valore == "" {
-			// Valore cancellato: rimuove anche il metadato stato.
 			_ = db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, "__stato_verifica_"+campo, "")
 			allDati, _ = db.GetIstruttorieDati(h.DB, int(bandoID))
 			extras = allDati[praticaID]
@@ -445,6 +564,34 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 		for _, rec := range records {
 			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
 				motiviSet[m] = struct{}{}
+			}
+		}
+		// Re-valuta check built-in dopo l'override.
+		if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
+			lordo := ecfg.Rimborso.CampoLordo
+			for _, rec := range records {
+				val := float64(0)
+				found := false
+				if v, ok := rec.FloatMap[lordo]; ok {
+					val = v
+					found = true
+				} else if sv, ok := rec.StringMap[lordo]; ok {
+					sv = strings.TrimSpace(sv)
+					if sv == "" || sv == "0" {
+						val = 0; found = true
+					} else if parsed, err2 := strconv.ParseFloat(sv, 64); err2 == nil {
+						val = parsed; found = true
+					}
+				}
+				if found && val == 0 {
+					motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+				}
+			}
+		}
+		for _, rec := range records {
+			hasCF := rec.StringMap["richiedente_cf"] != "" || rec.StringMap["richiedente"] != ""
+			if !hasCF {
+				motiviSet["CF richiedente mancante — verificare identità del richiedente"] = struct{}{}
 			}
 		}
 		for m := range motiviSet {
@@ -470,6 +617,19 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 		}
 	}
 	sort.Strings(campiVerifica)
+
+	// ctx="dati" → risposta minimale per la pagina dati_locali (span status per campo)
+	if ctx == "dati" {
+		spanID := "dati-status-" + praticaID + "-" + campo
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if valore == "" {
+			fmt.Fprintf(w, `<span id="%s" style="color:#9ca3af;font-size:.8rem">—</span>`, html.EscapeString(spanID))
+		} else {
+			fmt.Fprintf(w, `<span id="%s" style="color:#16a34a;font-size:.8rem;font-family:monospace">%s ✓</span>`,
+				html.EscapeString(spanID), html.EscapeString(valore))
+		}
+		return
+	}
 
 	stato := "da_verificare"
 	if ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID); err == nil {
@@ -511,6 +671,123 @@ func (h *IstruttoriaHandler) PostRiapri(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria", bandoID), http.StatusSeeOther)
+}
+
+// PraticaConDati aggrega i dati di una singola pratica per la vista "dati locali".
+type PraticaConDati struct {
+	PraticaID  string
+	Protocollo string
+	StatusApp  string
+	Badge      string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"non_rientrante"
+	DatiAPI    map[string]string // valori dichiarati dall'API (dalla cache scan)
+	DatiLocali map[string]string // override operatore (da istruttorie_dati)
+}
+
+// GetDatiLocali — vista "tutte le domande" con campi API + override operatore per ciascuna.
+func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
+	// Campi del mapping ordinati — usati per intestazioni colonne e form dinamico.
+	var tuttiCampi []string
+	for nome := range ecfg.Mapping {
+		tuttiCampi = append(tuttiCampi, nome)
+	}
+	sort.Strings(tuttiCampi)
+
+	// Dati API cache (aggiornati durante scan).
+	apiCache, _ := db.GetAPICache(h.DB, int(bandoID))
+	// Override operatore per bando.
+	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
+	// Stato istruttoria per pratica.
+	istruttorieMap := map[string]string{} // praticaID → stato
+	if istruttorie, err := db.ListIstruttorie(h.DB, int(bandoID), "", ""); err == nil {
+		for _, ist := range istruttorie {
+			istruttorieMap[ist.PraticaID] = ist.Stato
+		}
+	}
+	// Ammesse/fuori fondi dall'ultima run.
+	ammesseMap := map[string]string{} // praticaID → "ammessa"|"fuori_fondi"
+	if run, err := db.GetLatestRun(h.DB, bando.ID); err == nil && run != nil {
+		var grad graduatoria.Graduatoria
+		if json.Unmarshal([]byte(run.DatiJSON), &grad) == nil {
+			for _, g := range grad.Gruppi {
+				for _, riga := range g.Righe {
+					if riga.Istanza == nil {
+						continue
+					}
+					if riga.Ammessa {
+						ammesseMap[riga.Istanza.ID] = "ammessa"
+					} else if riga.NoteEsclusione == "fondi esauriti" || riga.NoteEsclusione == "posti esauriti" {
+						ammesseMap[riga.Istanza.ID] = "fuori_fondi"
+					}
+				}
+			}
+		}
+	}
+
+	// Costruisce lista pratiche ordinate.
+	var pratiche []PraticaConDati
+	for praticaID, apiFields := range apiCache {
+		badge := "non_rientrante"
+		if stato, ok := istruttorieMap[praticaID]; ok {
+			badge = stato
+		} else if b, ok := ammesseMap[praticaID]; ok {
+			badge = b
+		}
+		pratiche = append(pratiche, PraticaConDati{
+			PraticaID:  praticaID,
+			Protocollo: apiFields["protocollo"],
+			StatusApp:  apiFields["status"],
+			Badge:      badge,
+			DatiAPI:    apiFields,
+			DatiLocali: datiLocali[praticaID],
+		})
+	}
+	sort.Slice(pratiche, func(i, j int) bool {
+		if pratiche[i].Badge != pratiche[j].Badge {
+			order := map[string]int{"da_verificare": 0, "non_rientrante": 1, "ammessa": 2, "fuori_fondi": 3, "approvata": 4, "esclusa": 5}
+			return order[pratiche[i].Badge] < order[pratiche[j].Badge]
+		}
+		return pratiche[i].Protocollo < pratiche[j].Protocollo
+	})
+
+	badgeFilter := r.URL.Query().Get("badge")
+	filtered := pratiche
+	if badgeFilter != "" {
+		filtered = filtered[:0]
+		for _, p := range pratiche {
+			if p.Badge == badgeFilter {
+				filtered = append(filtered, p)
+			}
+		}
+	}
+
+	flash, flashType := flashFromRequest(r)
+	renderTemplate(w, "dati_locali.html", map[string]any{
+		"Op":          op,
+		"Bando":       bando,
+		"Config":      ecfg,
+		"TuttiCampi":  tuttiCampi,
+		"Pratiche":    filtered,
+		"TotPratiche": len(pratiche),
+		"BadgeFilter": badgeFilter,
+		"Flash":       flash,
+		"FlashType":   flashType,
+	})
 }
 
 // PostSaveNota — salva nota inline su una pratica. HTMX: risponde 200 vuoto.

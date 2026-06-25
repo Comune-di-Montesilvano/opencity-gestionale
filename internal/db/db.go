@@ -31,6 +31,22 @@ func Open(path string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN dati_json TEXT NOT NULL DEFAULT '{}'`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_dati (pratica_id TEXT PRIMARY KEY, dati_json TEXT NOT NULL DEFAULT '{}', nota TEXT NOT NULL DEFAULT '', aggiornato_il TEXT)`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN nota_lavoro TEXT NOT NULL DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN iban_config TEXT NOT NULL DEFAULT '{}'`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS export_mappings (
+		id           INTEGER PRIMARY KEY,
+		bando_id     INTEGER NOT NULL,
+		nome         TEXT NOT NULL,
+		filtro_stati TEXT NOT NULL DEFAULT '[]',
+		colonne_json TEXT NOT NULL DEFAULT '[]',
+		created_at   TEXT NOT NULL
+	)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS istruttorie_api_cache (
+		pratica_id   TEXT NOT NULL,
+		bando_id     INTEGER NOT NULL,
+		dati_json    TEXT NOT NULL DEFAULT '{}',
+		aggiornato_il TEXT,
+		PRIMARY KEY (pratica_id, bando_id)
+	)`)
 	// Migra note esistenti cross-bando → per-bando (una-tantum, non sovrascrive note già migrate).
 	_, _ = db.Exec(`UPDATE istruttorie SET nota_lavoro = (
 		SELECT nota FROM istruttorie_dati

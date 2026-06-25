@@ -1,0 +1,311 @@
+{{define "export_mapping_edit.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}{{.Mapping.Nome}} — template export{{end}}
+
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.Mapping.Nome}}</h1>
+  <span class="text-muted">{{.Bando.Nome}} — template export CSV</span>
+</div>
+
+{{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
+
+<div style="margin-bottom:1rem">
+  <a href="/bandi/{{.Bando.ID}}/export-mappings" class="btn btn-secondary btn-sm">← Template</a>
+</div>
+
+<form method="POST" action="/bandi/{{.Bando.ID}}/export-mappings/{{.Mapping.ID}}" id="mappingForm">
+  <input type="hidden" name="colonne_json" id="colonneJsonInput" value='{{.ColonneJSON}}'>
+
+  <!-- Impostazioni: nome + filtro stati -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-header"><strong>Impostazioni</strong></div>
+    <div class="card-body" style="display:flex;gap:1.5rem;flex-wrap:wrap">
+      <div>
+        <label class="form-label">Nome template</label>
+        <input type="text" name="nome" class="form-control" value="{{.Mapping.Nome}}" style="width:240px" required>
+      </div>
+      <div>
+        <label class="form-label">Filtro stati (nessuna selezione = tutti)</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem">
+          {{range $code, $name := .StatusNames}}
+          <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer">
+            <input type="checkbox" name="filtro_stati" value="{{$code}}"
+              {{range $.Mapping.FiltroStati}}{{if eq . $code}}checked{{end}}{{end}}>
+            {{$name}} ({{$code}})
+          </label>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start">
+
+    <!-- Colonne correnti + aggiungi -->
+    <div>
+      <div class="card" style="margin-bottom:1.5rem">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Colonne CSV</strong>
+          <span class="text-muted" style="font-size:.82rem">Trascina per riordinare</span>
+        </div>
+        <div style="padding:0">
+          <table class="table" style="margin:0">
+            <thead>
+              <tr>
+                <th style="width:24px"></th>
+                <th>Intestazione</th>
+                <th>Sorgente</th>
+                <th>Campo / Path</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody id="colonneBody"></tbody>
+          </table>
+          <div id="colonneEmpty" style="padding:.75rem 1rem;color:#9ca3af;font-size:.85rem;display:none">Nessuna colonna. Aggiungi dal pannello a destra.</div>
+        </div>
+      </div>
+
+      <!-- Aggiungi colonna manuale -->
+      <div class="card" style="margin-bottom:1.5rem">
+        <div class="card-header"><strong>Aggiungi colonna</strong></div>
+        <div class="card-body">
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label class="form-label" style="font-size:.82rem">Intestazione CSV</label>
+              <input type="text" id="newLabel" class="form-control form-control-sm" style="width:150px" placeholder="es. IBAN">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:.82rem">Sorgente</label>
+              <select id="newSorgente" class="form-control form-control-sm" style="width:130px" onchange="aggiornaChiaveUI()">
+                <option value="sistema">Sistema (snapshot)</option>
+                <option value="mappato">Mappato (wizard)</option>
+                <option value="raw">Superset / path raw</option>
+              </select>
+            </div>
+            <div id="sistemaDiv">
+              <label class="form-label" style="font-size:.82rem">Campo</label>
+              <select id="newChiaveSistema" class="form-control form-control-sm" style="width:140px">
+                {{range .SistemaKeys}}<option value="{{.}}">{{.}}</option>{{end}}
+              </select>
+            </div>
+            <div id="mappatoDiv" style="display:none">
+              <label class="form-label" style="font-size:.82rem">Campo</label>
+              <select id="newChiaveMappato" class="form-control form-control-sm" style="width:140px">
+                {{range .MappingKeys}}<option value="{{.}}">{{.}}</option>{{end}}
+              </select>
+            </div>
+            <div id="rawDiv" style="display:none">
+              <label class="form-label" style="font-size:.82rem">Path in app.Data</label>
+              <input type="text" id="newPath" class="form-control form-control-sm" style="width:200px" placeholder="es. iban.iban">
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="aggiungiColonna()">+ Aggiungi</button>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Salva template</button>
+      <a href="/bandi/{{.Bando.ID}}/export-mappings" class="btn btn-secondary" style="margin-left:.5rem">Annulla</a>
+    </div>
+
+    <!-- Superset browser -->
+    <div class="card" style="position:sticky;top:1rem">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:.6rem .9rem">
+        <strong style="font-size:.88rem">Sfoglia superset</strong>
+        <span class="text-muted" style="font-size:.75rem">click → aggiunge colonna</span>
+      </div>
+      <div style="padding:.6rem .9rem .4rem">
+        <input type="text" id="supersetSearch" class="form-control form-control-sm"
+               placeholder="Filtra percorsi…" oninput="renderSuperset(this.value)">
+      </div>
+      <div style="max-height:520px;overflow-y:auto">
+        <table class="table table-sm" style="margin:0;font-size:.8rem" id="supersetTable">
+          <thead style="position:sticky;top:0;background:#fff;z-index:1">
+            <tr>
+              <th style="font-size:.75rem">Percorso</th>
+              <th style="font-size:.75rem">Valori campione</th>
+            </tr>
+          </thead>
+          <tbody id="supersetBody"></tbody>
+        </table>
+        <div id="supersetEmpty" style="padding:.75rem;color:#9ca3af;font-size:.82rem;display:none">
+          Nessun superset disponibile. Aggiorna dal wizard step 3.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- grid -->
+</form>
+
+<!-- Dati superset per JS -->
+<pre id="superset-data" style="display:none">{{if .SupersetData}}{{safeJSON .SupersetData}}{{else}}{}{{end}}</pre>
+
+<style>
+#supersetBody tr { cursor:pointer; }
+#supersetBody tr:hover { background:#eff6ff; }
+#colonneBody tr { cursor:grab; }
+#colonneBody tr:hover { background:#f9fafb; }
+</style>
+
+<script>
+var supersetRaw = {};
+try { supersetRaw = JSON.parse(document.getElementById('superset-data').textContent || '{}'); } catch(e){}
+
+var colonne = [];
+try { colonne = JSON.parse(document.getElementById('colonneJsonInput').value || '[]'); } catch(e){}
+
+// ---- Superset browser ----
+
+var supersetPaths = []; // [{path, samples}]
+
+function buildSupersetPaths() {
+  var specialKeys = new Set(['$app', '$status_names', '$status_counts']);
+  supersetPaths = [];
+  for (var arrKey in supersetRaw) {
+    if (specialKeys.has(arrKey)) continue;
+    var fields = supersetRaw[arrKey];
+    for (var field in fields) {
+      var path = arrKey === '' ? field : arrKey + '.' + field;
+      var vals = (fields[field] || []).slice(0, 3).join(', ');
+      supersetPaths.push({path: path, samples: vals});
+    }
+  }
+  supersetPaths.sort(function(a,b){return a.path.localeCompare(b.path);});
+}
+
+function renderSuperset(filter) {
+  var tbody = document.getElementById('supersetBody');
+  var empty = document.getElementById('supersetEmpty');
+  tbody.innerHTML = '';
+  if (supersetPaths.length === 0) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  var q = (filter || '').toLowerCase();
+  var shown = 0;
+  supersetPaths.forEach(function(item) {
+    if (q && item.path.toLowerCase().indexOf(q) === -1) return;
+    var tr = document.createElement('tr');
+    tr.title = 'Clicca per aggiungere colonna con path: ' + item.path;
+    tr.innerHTML =
+      '<td><code style="font-size:.75em;color:#2563eb;word-break:break-all">' + esc(item.path) + '</code></td>' +
+      '<td style="color:#6b7280;font-size:.75em;max-width:120px;word-break:break-word">' + esc(item.samples) + '</td>';
+    tr.onclick = function() { usaSupersetPath(item.path); };
+    tbody.appendChild(tr);
+    shown++;
+  });
+  if (shown === 0) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="2" style="color:#9ca3af;padding:.5rem">Nessun risultato</td>';
+    tbody.appendChild(tr);
+  }
+}
+
+function usaSupersetPath(path) {
+  // Sorgente → raw, path → quello cliccato, label → ultima parte del path
+  document.getElementById('newSorgente').value = 'raw';
+  aggiornaChiaveUI();
+  document.getElementById('newPath').value = path;
+  var parts = path.split('.');
+  var suggestedLabel = parts[parts.length - 1];
+  // Capitalizza prima lettera
+  suggestedLabel = suggestedLabel.charAt(0).toUpperCase() + suggestedLabel.slice(1);
+  if (!document.getElementById('newLabel').value) {
+    document.getElementById('newLabel').value = suggestedLabel;
+  }
+  // Evidenzia il campo path
+  document.getElementById('newPath').focus();
+  document.getElementById('newPath').select();
+}
+
+// ---- Colonne builder ----
+
+function renderColonne() {
+  var tbody = document.getElementById('colonneBody');
+  var empty = document.getElementById('colonneEmpty');
+  tbody.innerHTML = '';
+  if (colonne.length === 0) { empty.style.display = ''; syncJson(); return; }
+  empty.style.display = 'none';
+  colonne.forEach(function(col, i) {
+    var tr = document.createElement('tr');
+    tr.draggable = true;
+    tr.dataset.index = i;
+    tr.innerHTML =
+      '<td style="cursor:grab;text-align:center;color:#9ca3af;user-select:none">⠿</td>' +
+      '<td><input class="form-control form-control-sm" value="' + esc(col.label) + '" style="width:100%" oninput="colonne[' + i + '].label=this.value;syncJson()"></td>' +
+      '<td style="white-space:nowrap"><span class="badge badge-gray" style="font-size:.72rem">' + sorgenteBadge(col) + '</span></td>' +
+      '<td style="font-size:.78rem;color:#6b7280;word-break:break-all;max-width:140px">' + esc(col.chiave || col.path || '') + '</td>' +
+      '<td><button type="button" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px" onclick="rimuoviColonna(' + i + ')">×</button></td>';
+    tbody.appendChild(tr);
+  });
+  abilitaDrag();
+  syncJson();
+}
+
+function sorgenteBadge(col) {
+  if (col.sorgente === 'sistema') return '📋 sistema';
+  if (col.sorgente === 'mappato') return '🔗 mappato';
+  return '📡 raw';
+}
+
+function rimuoviColonna(i) { colonne.splice(i, 1); renderColonne(); }
+
+function aggiungiColonna() {
+  var label = document.getElementById('newLabel').value.trim();
+  if (!label) { document.getElementById('newLabel').focus(); return; }
+  var sorgente = document.getElementById('newSorgente').value;
+  var col = {label: label, sorgente: sorgente};
+  if (sorgente === 'sistema') {
+    col.chiave = document.getElementById('newChiaveSistema').value;
+  } else if (sorgente === 'mappato') {
+    col.chiave = document.getElementById('newChiaveMappato').value;
+  } else {
+    col.path = document.getElementById('newPath').value.trim();
+  }
+  colonne.push(col);
+  document.getElementById('newLabel').value = '';
+  document.getElementById('newPath').value = '';
+  renderColonne();
+}
+
+function aggiornaChiaveUI() {
+  var s = document.getElementById('newSorgente').value;
+  document.getElementById('sistemaDiv').style.display = s === 'sistema' ? '' : 'none';
+  document.getElementById('mappatoDiv').style.display = s === 'mappato' ? '' : 'none';
+  document.getElementById('rawDiv').style.display = s === 'raw' ? '' : 'none';
+}
+
+function syncJson() {
+  document.getElementById('colonneJsonInput').value = JSON.stringify(colonne);
+}
+
+// Drag-to-reorder
+function abilitaDrag() {
+  var tbody = document.getElementById('colonneBody');
+  var dragSrc = null;
+  Array.from(tbody.rows).forEach(function(row) {
+    row.addEventListener('dragstart', function(e) {
+      dragSrc = this;
+      this.style.opacity = '.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', function() { this.style.opacity = ''; });
+    row.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    row.addEventListener('drop', function(e) {
+      e.preventDefault();
+      if (dragSrc === this) return;
+      var a = parseInt(dragSrc.dataset.index), b = parseInt(this.dataset.index);
+      var tmp = colonne[a]; colonne[a] = colonne[b]; colonne[b] = tmp;
+      renderColonne();
+    });
+  });
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// Init
+buildSupersetPaths();
+renderSuperset('');
+renderColonne();
+</script>
+{{end}}

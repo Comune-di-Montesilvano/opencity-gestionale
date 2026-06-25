@@ -403,6 +403,70 @@ func ListEscluse(db *sql.DB, bandoID int) ([]string, error) {
 	return out, rows.Err()
 }
 
+// UpsertAPICache salva il JSON blob dei campi estratti dall'API per una pratica/bando.
+// Chiamato durante la scan per tutte le app che passano filtri_istanza.
+func UpsertAPICache(db *sql.DB, bandoID int, praticaID, datiJSON string) error {
+	_, err := db.Exec(`
+		INSERT INTO istruttorie_api_cache (pratica_id, bando_id, dati_json, aggiornato_il)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(pratica_id, bando_id) DO UPDATE SET
+			dati_json=excluded.dati_json, aggiornato_il=excluded.aggiornato_il`,
+		praticaID, bandoID, datiJSON, time.Now().Format(time.RFC3339),
+	)
+	return err
+}
+
+// UpsertAPICacheField aggiorna un singolo campo nella cache API (usato in PostSaveDato).
+func UpsertAPICacheField(db *sql.DB, bandoID int, praticaID, campo, valore string) error {
+	var datiJSON string
+	err := db.QueryRow(
+		`SELECT COALESCE(dati_json, '{}') FROM istruttorie_api_cache WHERE pratica_id=? AND bando_id=?`,
+		praticaID, bandoID,
+	).Scan(&datiJSON)
+	if err != nil {
+		datiJSON = "{}"
+	}
+	dati := map[string]string{}
+	json.Unmarshal([]byte(datiJSON), &dati)
+	if valore == "" {
+		delete(dati, campo)
+	} else {
+		dati[campo] = valore
+	}
+	b, _ := json.Marshal(dati)
+	_, err = db.Exec(`
+		INSERT INTO istruttorie_api_cache (pratica_id, bando_id, dati_json, aggiornato_il)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(pratica_id, bando_id) DO UPDATE SET
+			dati_json=excluded.dati_json, aggiornato_il=excluded.aggiornato_il`,
+		praticaID, bandoID, string(b), time.Now().Format(time.RFC3339),
+	)
+	return err
+}
+
+// GetAPICache restituisce map[praticaID]map[campo]valore con i dati dichiarati dall'API per un bando.
+func GetAPICache(db *sql.DB, bandoID int) (map[string]map[string]string, error) {
+	rows, err := db.Query(`
+		SELECT pratica_id, dati_json FROM istruttorie_api_cache
+		WHERE bando_id=? AND dati_json NOT IN ('{}', '')`,
+		bandoID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[string]string{}
+	for rows.Next() {
+		var pid, dj string
+		rows.Scan(&pid, &dj)
+		var dati map[string]string
+		if json.Unmarshal([]byte(dj), &dati) == nil && len(dati) > 0 {
+			out[pid] = dati
+		}
+	}
+	return out, rows.Err()
+}
+
 func ListApprovate(db *sql.DB, bandoID int) ([]string, error) {
 	rows, err := db.Query(`SELECT pratica_id FROM istruttorie WHERE bando_id=? AND stato='approvata'`, bandoID)
 	if err != nil {

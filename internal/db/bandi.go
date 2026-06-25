@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -19,7 +20,14 @@ type Bando struct {
 	StatoBando           string // "bozza" | "attivo" | "archiviato"
 	ValoriSuperset        string // JSON blob: map[arrayPath]map[fieldName][]string
 	ExportColonne         string // JSON array: ["isee","figlio_cf",...] — colonne dinamiche per CSV/stampa
+	IBanConfig            string // JSON: IBanConfig — mapping chiavi IBAN per export bonifici
 	CreatedAt             time.Time
+}
+
+// IBanConfig contiene le chiavi di CampiMappati usate nell'export bonifici IBAN.
+type IBanConfig struct {
+	CampoIBAN         string `json:"campo_iban"`
+	CampoIntestatario string `json:"campo_intestatario"`
 }
 
 func InsertBando(db *sql.DB, b *Bando) (int64, error) {
@@ -44,15 +52,15 @@ func InsertBando(db *sql.DB, b *Bando) (int64, error) {
 func ListBandi(db *sql.DB, stato string) ([]*Bando, error) {
 	if stato == "archiviato" {
 		return listBandiQuery(db,
-			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), created_at FROM bandi WHERE attivo=0 ORDER BY id DESC`)
+			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), COALESCE(iban_config,'{}'), created_at FROM bandi WHERE attivo=0 ORDER BY id DESC`)
 	}
 	if stato != "" {
 		return listBandiQuery(db,
-			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), created_at FROM bandi WHERE stato_bando=? AND attivo=1 ORDER BY id DESC`,
+			`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), COALESCE(iban_config,'{}'), created_at FROM bandi WHERE stato_bando=? AND attivo=1 ORDER BY id DESC`,
 			stato)
 	}
 	return listBandiQuery(db,
-		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), created_at FROM bandi ORDER BY id DESC`)
+		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), COALESCE(iban_config,'{}'), created_at FROM bandi ORDER BY id DESC`)
 }
 
 func listBandiQuery(db *sql.DB, q string, args ...any) ([]*Bando, error) {
@@ -74,7 +82,7 @@ func listBandiQuery(db *sql.DB, q string, args ...any) ([]*Bando, error) {
 
 func GetBando(db *sql.DB, id int64) (*Bando, error) {
 	row := db.QueryRow(
-		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), created_at FROM bandi WHERE id = ?`, id)
+		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), COALESCE(iban_config,'{}'), created_at FROM bandi WHERE id = ?`, id)
 	b, err := scanBando(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("bando %d non trovato", id)
@@ -84,7 +92,7 @@ func GetBando(db *sql.DB, id int64) (*Bando, error) {
 
 func GetBandoByServiceID(db *sql.DB, serviceID string) (*Bando, error) {
 	row := db.QueryRow(
-		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), created_at FROM bandi WHERE service_id = ? AND attivo = 1`, serviceID)
+		`SELECT id, service_id, nome, budget_totale, isee_massimo, scadenza_presentazione, engine_type, engine_config, attivo, COALESCE(stato_bando,'bozza'), COALESCE(valori_superset,'{}'), COALESCE(export_colonne,'[]'), COALESCE(iban_config,'{}'), created_at FROM bandi WHERE service_id = ? AND attivo = 1`, serviceID)
 	b, err := scanBando(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("bando per service_id %s non trovato", serviceID)
@@ -172,7 +180,7 @@ func scanBando(s scanner) (*Bando, error) {
 	var attivoInt int
 	var createdAtStr string
 	err := s.Scan(&b.ID, &b.ServiceID, &b.Nome, &b.BudgetTotale, &b.ISEEMassimo,
-		&b.ScadenzaPresentazione, &b.EngineType, &b.EngineConfig, &attivoInt, &b.StatoBando, &b.ValoriSuperset, &b.ExportColonne, &createdAtStr)
+		&b.ScadenzaPresentazione, &b.EngineType, &b.EngineConfig, &attivoInt, &b.StatoBando, &b.ValoriSuperset, &b.ExportColonne, &b.IBanConfig, &createdAtStr)
 	if err != nil {
 		return nil, err
 	}
@@ -189,6 +197,23 @@ func SaveValoriSuperset(db *sql.DB, bandoID int64, jsonBlob string) error {
 func SaveExportColonne(db *sql.DB, bandoID int64, jsonArr string) error {
 	_, err := db.Exec(`UPDATE bandi SET export_colonne=? WHERE id=?`, jsonArr, bandoID)
 	return err
+}
+
+func SaveIBANConfig(db *sql.DB, bandoID int64, jsonStr string) error {
+	_, err := db.Exec(`UPDATE bandi SET iban_config=? WHERE id=?`, jsonStr, bandoID)
+	return err
+}
+
+func GetIBANConfig(db *sql.DB, bandoID int64) (*IBanConfig, error) {
+	b, err := GetBando(db, bandoID)
+	if err != nil {
+		return nil, err
+	}
+	cfg := &IBanConfig{CampoIBAN: "iban", CampoIntestatario: "iban_intestatario"}
+	if b.IBanConfig != "" && b.IBanConfig != "{}" {
+		json.Unmarshal([]byte(b.IBanConfig), cfg)
+	}
+	return cfg, nil
 }
 
 func boolToInt(b bool) int {

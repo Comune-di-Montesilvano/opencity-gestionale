@@ -25,6 +25,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 	acts := &handlers.ActionsHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 	auditH := &handlers.AuditHandler{DB: dbConn}
 	istr := &handlers.IstruttoriaHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
+	expMap := &handlers.ExportMappingsHandler{DB: dbConn, BaseURL: cfg.OpenCityBaseURL}
 
 	authMW := middleware.Auth(dbConn)
 
@@ -83,6 +84,8 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 	mux.Handle("GET /bandi/{id}/run/{runID}", authMW(http.HandlerFunc(grad.GetRun)))
 	mux.Handle("GET /bandi/{id}/run/{runID}/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetRunTabella)))
 	mux.Handle("GET /bandi/{id}/run/{runID}/export/{anno}/{tipo}", authMW(http.HandlerFunc(grad.GetExportCSV)))
+	mux.Handle("GET /bandi/{id}/run/{runID}/iban", authMW(http.HandlerFunc(grad.GetIBANPage)))
+	mux.Handle("POST /bandi/{id}/iban/config", authMW(http.HandlerFunc(bandi.PostSaveIBANConfig)))
 	mux.Handle("GET /bandi/{id}/run/{runID}/export/iban", authMW(http.HandlerFunc(grad.GetExportIBAN)))
 	mux.Handle("POST /bandi/{id}/run/{runID}/pubblica", authMW(middleware.RequireAdmin(http.HandlerFunc(grad.PostPubblica))))
 	mux.Handle("GET /bandi/{id}/run/{runID}/stampa", authMW(http.HandlerFunc(grad.GetStampa)))
@@ -91,6 +94,7 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 
 	// Istruttoria pre-calcolo
 	mux.Handle("GET /bandi/{id}/istruttoria", authMW(http.HandlerFunc(istr.GetIstruttoria)))
+	mux.Handle("GET /bandi/{id}/dati", authMW(http.HandlerFunc(istr.GetDatiLocali)))
 	mux.Handle("POST /bandi/{id}/istruttoria/scansiona", authMW(http.HandlerFunc(istr.PostScansiona)))
 	mux.Handle("POST /bandi/{id}/istruttoria/batch", authMW(http.HandlerFunc(istr.PostIstruttoriaBatch)))
 	mux.Handle("POST /bandi/{id}/istruttoria/{praticaID}/dato", authMW(http.HandlerFunc(istr.PostSaveDato)))
@@ -100,6 +104,14 @@ func NewServer(cfg *config.Config, dbConn *sql.DB, branding *opencity.Branding) 
 	// Bulk actions
 	mux.Handle("POST /bandi/{id}/run/{runID}/approva-batch", authMW(http.HandlerFunc(acts.PostApprovaBatch)))
 	mux.Handle("POST /bandi/{id}/run/{runID}/rifiuta-batch", authMW(http.HandlerFunc(acts.PostRifiutaBatch)))
+
+	// Export mappings (template CSV configurabili per bando)
+	mux.Handle("GET /bandi/{id}/export-mappings", authMW(middleware.RequireAdmin(http.HandlerFunc(expMap.GetExportMappings))))
+	mux.Handle("POST /bandi/{id}/export-mappings", authMW(middleware.RequireAdmin(http.HandlerFunc(expMap.PostCreateMapping))))
+	mux.Handle("GET /bandi/{id}/export-mappings/{mapID}", authMW(middleware.RequireAdmin(http.HandlerFunc(expMap.GetEditMapping))))
+	mux.Handle("POST /bandi/{id}/export-mappings/{mapID}", authMW(middleware.RequireAdmin(http.HandlerFunc(expMap.PostSaveMapping))))
+	mux.Handle("POST /bandi/{id}/export-mappings/{mapID}/delete", authMW(middleware.RequireAdmin(http.HandlerFunc(expMap.PostDeleteMapping))))
+	mux.Handle("GET /bandi/{id}/run/{runID}/export/mapping/{mapID}", authMW(http.HandlerFunc(expMap.GetExportCSVMapped)))
 
 	// Audit
 	mux.Handle("GET /audit", authMW(http.HandlerFunc(auditH.GetAudit)))
