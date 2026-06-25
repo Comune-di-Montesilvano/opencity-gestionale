@@ -148,7 +148,7 @@ Operatori senza valore (`vuoto`, `non_vuoto`, `vero`, `falso`, `cf_valido`) igno
 `PostSaveDato` (`POST /bandi/{id}/istruttoria/{praticaID}/dato`):
 - Salva override in `istruttorie_dati`
 - Aggiorna campo in `istruttorie_api_cache` con valore API raw (ri-fetch OpenCity)
-- `?ctx=dati` (passato via `hx-vals`): risponde con `<span>` minimale invece del partial motivi — usato da `/bandi/{id}/dati`
+- `?ctx=dati`: risponde con `<span>` minimale invece del partial motivi — usato dalla pagina `/bandi/{id}/dati`
 
 `GetIstruttoria` usa `GetAPICache` come fonte primaria per `campiDichiarati` (freschi da scan); snapshot ultima run come fallback.
 
@@ -176,6 +176,10 @@ CF di test (checksum corretto): `RSSMRA80A01H501U` (M, 01/01/1980, Roma H501), `
 `Graduatoria` ha una sola sezione:
 - `Gruppi []*GraduatoriaGruppo` — una voce per tipologia (engine generic)
 - `Escluse []RigaGraduatoria` — escluse per filtri o duplicati
+
+Metodi helper su `Graduatoria`: `TotaleAmmesse`, `TotaleConRiserva`, `TotaleBudgetUsato`, `TotaleFuoriFondi`.
+
+**Gotcha `TotaleFuoriFondi()`**: conta righe in `Gruppi` (non in `Escluse`) con `NoteEsclusione == "fondi esauriti" || "posti esauriti"`. Le escluse per filtri/deduplicazione stanno in `Escluse` — sono categorie distinte.
 
 I template usano `{{if .Grad.Gruppi}}` per iterare i risultati.
 
@@ -206,6 +210,8 @@ Template `dashboard.html` eliminato — rinominato in `dashboard_operatore.html`
 ### Workflow pubblicazione run
 
 Le run vengono create in stato `'bozza'` (`graduatorie_run.stato`). Solo l'admin può pubblicarle (`POST /motori/{id}/run/{runID}/pubblica`). Gli operatori non-admin vedono solo le run `'pubblicata'` — `db.ListRuns` accetta un parametro opzionale `soloPublicate bool`.
+
+`db.DeleteRunBozza` elimina una run solo se `stato='bozza'` (guard SQL: `DELETE ... WHERE stato='bozza'`, ritorna errore se 0 righe → run già pubblicata). Admin only via `PostEliminaRun` (`POST /bandi/{id}/run/{runID}/elimina`).
 
 ### Documento stampabile (`templates/run_stampa.html`)
 
@@ -277,6 +283,7 @@ GET  /bandi/{id}/run/{runID}/export/{anno}/{tipo}  CSV (solo tipo="escluse" atti
 GET  /bandi/{id}/run/{runID}/export/gruppo/{nome}  CSV gruppo
 GET  /bandi/{id}/run/{runID}/export/mapping/{mapID}  CSV da export mapping configurato
 POST /bandi/{id}/run/{runID}/pubblica     pubblica run (admin only)
+POST /bandi/{id}/run/{runID}/elimina      elimina run bozza (admin only)
 GET  /bandi/{id}/run/{runID}/stampa       documento stampabile
 POST /bandi/{id}/run/{runID}/approva-batch
 POST /bandi/{id}/run/{runID}/rifiuta-batch
@@ -403,7 +410,7 @@ Mostra tutte le domande scansionate (`istruttorie_api_cache`). Badge per pratica
 - `da_verificare` / `approvata` / `esclusa` — da `istruttorie`
 - `non_rientrante` — passa `filtri_istanza` ma non i filtri di merito (ISEE ecc.); potrebbe rientrare dopo override ISEE
 
-Form dinamico: ogni campo da `EngineConfig.Mapping` ha input con `type` inferito da `Tipo` (`float`/`int`→number, `time`→date, `string`→text). HTMX con `ctx=dati` → `PostSaveDato` risponde con `<span>` minimale.
+Form dinamico: ogni campo da `EngineConfig.Mapping` ha input con `type="text" inputmode="decimal|numeric"` per float/int (mai `type="number"` — locale italiana causa `element.value=""` su valori con virgola). Il tasto "Salva" chiama `salvaTutto()` via `fetch()` nativo — non HTMX (`hx-vals` non serializza `campo` correttamente in questa versione HTMX). `PostSaveDato` risponde con `<span>` minimale quando `?ctx=dati`. Valore vuoto → `delete(dati, campo)` in `SaveDatoIstruttoria`.
 
 ## Schema SQLite (`internal/db/schema.sql` + migrazioni in `db.Open()`)
 
