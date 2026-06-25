@@ -141,6 +141,7 @@
             <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
                     onclick="document.getElementById('badge-{{$riga.ID}}-{{.Campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-{{.Campo}}').style.display='inline-block'">modifica</button>
             {{end}}
+            <input type="hidden" id="hid-campo-{{$riga.ID}}-{{.Campo}}" name="campo" value="{{.Campo}}">
             <input type="text"
                    id="input-{{$riga.ID}}-{{.Campo}}"
                    value="{{$hasDato}}"
@@ -148,8 +149,7 @@
                    class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
                    hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
-                   hx-vals='{"campo": "{{.Campo}}"}'
-                   hx-include="this"
+                   hx-include="#hid-campo-{{$riga.ID}}-{{.Campo}}"
                    hx-trigger="change"
                    hx-target="#motivi-{{$riga.ID}}"
                    hx-swap="innerHTML"
@@ -188,23 +188,23 @@
                     style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
               {{end}}
               <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
-                      onclick="document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}').style.display='inline-block'">modifica</button>
+                      onclick="document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}').style.display='inline-block';document.getElementById('btn-verifica-{{$riga.ID}}-{{$campo}}').style.display='inline-block'">modifica</button>
             {{end}}
             <input type="text"
                    id="input-{{$riga.ID}}-verifica-{{$campo}}"
+                   data-istr-id="{{$riga.ID}}"
+                   data-bando-id="{{$.Bando.ID}}"
+                   data-pratica-id="{{$riga.PraticaID}}"
+                   data-campo="{{$campo}}"
                    value="{{$hasDato}}"
                    placeholder="valore verificato"
-                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if or $hasDato $isConfermato}}display:none{{end}}"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
-                   hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
-                   hx-vals='{"campo": "{{$campo}}"}'
-                   hx-include="this"
-                   hx-trigger="change"
-                   hx-target="#motivi-{{$riga.ID}}"
-                   hx-swap="innerHTML"
-                   hx-on:htmx:before-request="this.style.opacity='.5'"
-                   hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){var b=document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}');if(!b){b=document.createElement('span');b.id='badge-{{$riga.ID}}-verifica-{{$campo}}';b.style.cssText='font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';this.parentNode.insertBefore(b,this);}b.textContent=this.value+' ✓';b.style.display='';this.style.display='none';this.style.outline='2px solid #16a34a';this.style.background='#f0fdf4';setTimeout(()=>{this.style.outline='';this.style.background=''},2500)}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2500)}"
+                   class="form-control form-control-sm" style="width:140px;font-size:.8rem;{{if or $hasDato $isConfermato}}display:none{{end}}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',this,'badge-{{$riga.ID}}-verifica-{{$campo}}','motivi-{{$riga.ID}}','btn-verifica-{{$riga.ID}}-{{$campo}}','err-verifica-{{$riga.ID}}-{{$campo}}')}"
                    name="valore">
+            <button type="button" id="btn-verifica-{{$riga.ID}}-{{$campo}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if or $hasDato $isConfermato}}display:none{{end}}"
+                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}'),'badge-{{$riga.ID}}-verifica-{{$campo}}','motivi-{{$riga.ID}}','btn-verifica-{{$riga.ID}}-{{$campo}}','err-verifica-{{$riga.ID}}-{{$campo}}')">Salva</button>
+            <span id="err-verifica-{{$riga.ID}}-{{$campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
             {{if $declVal}}
               <span style="font-size:.72rem;color:#9ca3af">dichiarato: <strong>{{$declVal}}</strong></span>
             {{else if not $hasDato}}
@@ -216,7 +216,7 @@
         {{end}}{{/* fine range CampiVerifica */}}
       </div>
       {{end}}
-      {{/* Campi built-in editabili (corrispettivo=0, ecc.) — stessa logica di CampiVerifica */}}
+      {{/* Campi built-in editabili (corrispettivo=0, ecc.) */}}
       {{if $.CampiBuiltin}}
       <div style="margin-top:.4rem">
         {{range $.CampiBuiltin}}
@@ -230,23 +230,23 @@
             <span id="badge-{{$riga.ID}}-bi-{{$cb.Campo}}"
                   style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$cbDato}} ✓</span>
             <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
-                    onclick="document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='inline-block'">modifica</button>
+                    onclick="document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='inline-block';document.getElementById('btn-bi-{{$riga.ID}}-{{$cb.Campo}}').style.display='inline-block'">modifica</button>
             {{end}}
-            <input type="number" step="0.01"
+            <input type="text" inputmode="decimal"
                    id="input-{{$riga.ID}}-bi-{{$cb.Campo}}"
+                   data-istr-id="{{$riga.ID}}"
+                   data-bando-id="{{$.Bando.ID}}"
+                   data-pratica-id="{{$riga.PraticaID}}"
+                   data-campo="{{$cb.Campo}}"
                    value="{{$cbDato}}"
                    placeholder="{{$cb.Label}}"
-                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $cbDato}}display:none{{end}}"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
-                   hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$riga.PraticaID}}/dato"
-                   hx-vals='{"campo": "{{$cb.Campo}}"}'
-                   hx-include="this"
-                   hx-trigger="change"
-                   hx-target="#motivi-{{$riga.ID}}"
-                   hx-swap="innerHTML"
-                   hx-on:htmx:before-request="this.style.opacity='.5'"
-                   hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){var b=document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}');if(!b){b=document.createElement('span');b.id='badge-{{$riga.ID}}-bi-{{$cb.Campo}}';b.style.cssText='font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';this.parentNode.insertBefore(b,this);}b.textContent=this.value+' ✓';b.style.display='';this.style.display='none';this.style.outline='2px solid #16a34a';this.style.background='#f0fdf4';setTimeout(()=>{this.style.outline='';this.style.background=''},2500)}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2500)}"
+                   class="form-control form-control-sm" style="width:140px;font-size:.8rem;{{if $cbDato}}display:none{{end}}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',this,'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}')}"
                    name="valore">
+            <button type="button" id="btn-bi-{{$riga.ID}}-{{$cb.Campo}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $cbDato}}display:none{{end}}"
+                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}'),'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}')">Salva</button>
+            <span id="err-bi-{{$riga.ID}}-{{$cb.Campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
           </div>
         </div>
         {{end}}{{/* fine hasMotivoPrefix OR cbDato */}}
@@ -360,6 +360,56 @@ function azioneRapida(id, stato) {
 document.getElementById('batch-form')?.addEventListener('submit', function() {
   document.getElementById('rescan-overlay').style.display = 'flex';
 });
+function salvaBuiltin(bandoID, praticaID, campo, input, badgeID, motiviID, btnID, errID) {
+  var valore = input.value.trim().replace(',', '.');
+  var cleared = valore === '';
+  input.disabled = true;
+  var btn = document.getElementById(btnID);
+  if (btn) btn.disabled = true;
+  var errSpan = document.getElementById(errID);
+  if (errSpan) { errSpan.textContent = ''; errSpan.style.display = 'none'; }
+  fetch('/bandi/' + bandoID + '/istruttoria/' + praticaID + '/dato', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'campo=' + encodeURIComponent(campo) + '&valore=' + encodeURIComponent(valore)
+  }).then(function(r) {
+    input.disabled = false;
+    if (btn) btn.disabled = false;
+    if (r.ok) {
+      r.text().then(function(html) {
+        var m = document.getElementById(motiviID);
+        if (m) m.innerHTML = html;
+      });
+      var b = document.getElementById(badgeID);
+      if (cleared) {
+        if (b) b.style.display = 'none';
+        input.style.display = '';
+        if (btn) btn.style.display = '';
+      } else {
+        if (!b) {
+          b = document.createElement('span');
+          b.id = badgeID;
+          b.style.cssText = 'font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0';
+          input.parentNode.insertBefore(b, input);
+        }
+        b.textContent = input.value + ' ✓';
+        b.style.display = '';
+        input.style.display = 'none';
+        if (btn) btn.style.display = 'none';
+      }
+    } else {
+      r.text().then(function(t) {
+        if (errSpan) { errSpan.textContent = 'Errore: ' + t; errSpan.style.display = ''; }
+        else { alert('Errore salvataggio: ' + t); }
+      });
+    }
+  }).catch(function(e) {
+    input.disabled = false;
+    if (btn) btn.disabled = false;
+    if (errSpan) { errSpan.textContent = 'Errore rete'; errSpan.style.display = ''; }
+    else { alert('Errore di rete: ' + e); }
+  });
+}
 </script>
 
 {{if .FuoriFondi}}

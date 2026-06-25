@@ -300,11 +300,17 @@ func applicaExtras(rec *graduatoria.Record, extras map[string]string, mapping ma
 		}
 		switch fm.Tipo {
 		case "float":
-			if f, err := strconv.ParseFloat(strings.TrimSpace(valore), 64); err == nil {
+			normalized := strings.ReplaceAll(strings.TrimSpace(valore), ",", ".")
+			if f, err := strconv.ParseFloat(normalized, 64); err == nil {
 				rec.FloatMap[campo] = f
 			}
 		case "int":
-			if i, err := strconv.Atoi(strings.TrimSpace(valore)); err == nil {
+			normalized := strings.ReplaceAll(strings.TrimSpace(valore), ",", ".")
+			if i, err := strconv.Atoi(normalized); err != nil {
+				if f, err := strconv.ParseFloat(normalized, 64); err == nil {
+					rec.IntMap[campo] = int(f)
+				}
+			} else {
 				rec.IntMap[campo] = i
 			}
 		default:

@@ -86,6 +86,19 @@ func PubblicaRun(db *sql.DB, id int64) error {
 	return err
 }
 
+// DeleteRunBozza elimina una run solo se è in stato 'bozza'. Ritorna errore se non trovata o già pubblicata.
+func DeleteRunBozza(db *sql.DB, id int64) error {
+	res, err := db.Exec(`DELETE FROM graduatorie_run WHERE id = ? AND stato = 'bozza'`, id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("run %d non trovata o già pubblicata", id)
+	}
+	return nil
+}
+
 func scanRun(s scanner) (*GraduatoriaRun, error) {
 	var r GraduatoriaRun
 	var atStr string

@@ -146,6 +146,18 @@ func (g *Graduatoria) TotaleBudgetUsato() float64 {
 	return tot
 }
 
+func (g *Graduatoria) TotaleFuoriFondi() int {
+	count := 0
+	for _, gr := range g.Gruppi {
+		for _, r := range gr.Righe {
+			if !r.Ammessa && (r.NoteEsclusione == "fondi esauriti" || r.NoteEsclusione == "posti esauriti") {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 func CorrispettivoNetto(ist *Istanza) float64 {
 	return math.Max(0, ist.Corrispettivo-ist.BeneficioRicevuto)
 }

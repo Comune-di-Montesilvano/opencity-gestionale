@@ -14,9 +14,14 @@
 {{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
 
 {{if and .Op.IsAdmin (eq .Run.Stato "bozza")}}
-<form method="POST" action="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/pubblica" style="margin-bottom:1rem">
-  <button type="submit" class="btn btn-primary" onclick="return confirm('Pubblicare la graduatoria? Gli operatori potranno vederla.')">Pubblica graduatoria</button>
-</form>
+<div style="display:flex;gap:.5rem;margin-bottom:1rem;align-items:center">
+  <form method="POST" action="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/pubblica">
+    <button type="submit" class="btn btn-primary" onclick="return confirm('Pubblicare la graduatoria? Gli operatori potranno vederla.')">Pubblica graduatoria</button>
+  </form>
+  <form method="POST" action="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/elimina">
+    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Eliminare definitivamente questa run bozza?')">Elimina run</button>
+  </form>
+</div>
 {{end}}
 
 <div style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
@@ -36,7 +41,8 @@
 <div class="stats-row">
   <div class="stat"><span class="stat-value">{{.Run.NumAmmesse}}</span><span class="stat-label">Ammesse</span></div>
   {{if gt .NumRiserva 0}}<div class="stat"><span class="stat-value" style="color:#e67e22">{{.NumRiserva}}</span><span class="stat-label">Con riserva verifica</span></div>{{end}}
-  <div class="stat"><span class="stat-value">{{.Run.NumEscluse}}</span><span class="stat-label">Escluse</span></div>
+  {{if gt (.Grad.TotaleFuoriFondi) 0}}<div class="stat"><span class="stat-value" style="color:#c2410c">{{.Grad.TotaleFuoriFondi}}</span><span class="stat-label">Fuori fondi</span></div>{{end}}
+  <div class="stat"><span class="stat-value">{{.Run.NumEscluse}}</span><span class="stat-label">Escluse (filtri)</span></div>
   <div class="stat"><span class="stat-value">€{{printf "%.2f" .Run.BudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
 </div>
 

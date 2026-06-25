@@ -525,6 +525,32 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
 }
 
+// PostEliminaRun — elimina una run in stato bozza. Solo admin.
+func (h *GraduatoriaHandler) PostEliminaRun(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	if !op.IsAdmin() {
+		http.Error(w, "Solo gli amministratori possono eliminare una run", http.StatusForbidden)
+		return
+	}
+	bandoID := bandoIDFromPath(r)
+	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
+
+	run, err := db.GetRun(h.DB, runID)
+	if err != nil || run.BandoID != bandoID {
+		http.NotFound(w, r)
+		return
+	}
+	if run.Stato != "bozza" {
+		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Impossibile+eliminare+una+run+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
+		return
+	}
+	if err := db.DeleteRunBozza(h.DB, runID); err != nil {
+		http.Error(w, "Errore eliminazione: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/bandi/%d?flash=Run+eliminata&flashType=success", bandoID), http.StatusSeeOther)
+}
+
 // GetIBANPage — redirect a export-mappings (vista dedicata IBAN rimossa).
 func (h *GraduatoriaHandler) GetIBANPage(w http.ResponseWriter, r *http.Request) {
 	bandoID := bandoIDFromPath(r)

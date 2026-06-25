@@ -500,6 +500,11 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 	var ecfg graduatoria.EngineConfig
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
+	// Normalizza separatore decimale per campi numerici (utenti italiani digitano virgola).
+	if fm, ok := ecfg.Mapping[campo]; ok && (fm.Tipo == "float" || fm.Tipo == "int") {
+		valore = strings.ReplaceAll(valore, ",", ".")
+	}
+
 	// Salva il dato locale.
 	if err := db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, campo, valore); err != nil {
 		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
@@ -681,6 +686,7 @@ type PraticaConDati struct {
 	Badge      string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"non_rientrante"
 	DatiAPI    map[string]string // valori dichiarati dall'API (dalla cache scan)
 	DatiLocali map[string]string // override operatore (da istruttorie_dati)
+	NotaLavoro string
 }
 
 // GetDatiLocali — vista "tutte le domande" con campi API + override operatore per ciascuna.
@@ -714,9 +720,11 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
 	// Stato istruttoria per pratica.
 	istruttorieMap := map[string]string{} // praticaID → stato
+	noteMap := map[string]string{}        // praticaID → nota_lavoro
 	if istruttorie, err := db.ListIstruttorie(h.DB, int(bandoID), "", ""); err == nil {
 		for _, ist := range istruttorie {
 			istruttorieMap[ist.PraticaID] = ist.Stato
+			noteMap[ist.PraticaID] = ist.NotaLavoro
 		}
 	}
 	// Ammesse/fuori fondi dall'ultima run.
@@ -755,6 +763,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 			Badge:      badge,
 			DatiAPI:    apiFields,
 			DatiLocali: datiLocali[praticaID],
+			NotaLavoro: noteMap[praticaID],
 		})
 	}
 	sort.Slice(pratiche, func(i, j int) bool {
@@ -787,6 +796,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		"BadgeFilter": badgeFilter,
 		"Flash":       flash,
 		"FlashType":   flashType,
+		"BaseURL":     h.BaseURL,
 	})
 }
 
