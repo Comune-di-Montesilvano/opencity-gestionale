@@ -322,7 +322,7 @@ func SaveNota(db *sql.DB, bandoID int, praticaID, nota string) error {
 	now := time.Now().Format(time.RFC3339)
 	_, err := db.Exec(`
 		INSERT INTO istruttorie (bando_id, pratica_id, motivi_json, stato, nota_lavoro, aggiornato_il)
-		VALUES (?, ?, '[]', 'da_verificare', ?, ?)
+		VALUES (?, ?, '[]', '', ?, ?)
 		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET nota_lavoro=excluded.nota_lavoro, aggiornato_il=excluded.aggiornato_il`,
 		bandoID, praticaID, nota, now,
 	)
