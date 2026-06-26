@@ -215,15 +215,52 @@ func ListStatiApp(db *sql.DB, bandoID int) ([]string, error) {
 }
 
 // ResetDaVerificare resetta o cancella i record "da_verificare" per un bando.
-// Preserva i record che hanno note di lavoro (nota_lavoro) o dati locali (istruttorie_dati) per evitare perdite di dati.
-func ResetDaVerificare(db *sql.DB, bandoID int) error {
-	// 1. Resetta i motivi per le pratiche 'da_verificare' che hanno note o dati locali
-	_, err := db.Exec(`
-		UPDATE istruttorie 
-		SET motivi_json = '[]' 
+// Preserva i record che hanno note di lavoro (nota_lavoro) o dati locali reali (istruttorie_dati).
+// I campi sistema con prefisso __ (es. __richiedente_cf) non contano come dati reali.
+func ResetDaVerificare(dbConn *sql.DB, bandoID int) error {
+	// 0. Pulisce campi sistema (__*) da istruttorie_dati per pratiche da_verificare senza note.
+	//    Rimuove residui salvati dal scan precedente che bloccano il delete.
+	rows, err := dbConn.Query(`
+		SELECT id.pratica_id, id.dati_json FROM istruttorie_dati id
+		JOIN istruttorie i ON i.pratica_id = id.pratica_id AND i.bando_id = id.bando_id
+		WHERE id.bando_id = ? AND i.stato = 'da_verificare' AND COALESCE(i.nota_lavoro,'') = ''
+		AND id.dati_json NOT IN ('{}','')`, bandoID)
+	if err == nil {
+		defer rows.Close()
+		type row struct{ pid, dj string }
+		var toClean []row
+		for rows.Next() {
+			var r row
+			if rows.Scan(&r.pid, &r.dj) == nil {
+				toClean = append(toClean, r)
+			}
+		}
+		rows.Close()
+		for _, r := range toClean {
+			var dati map[string]interface{}
+			if json.Unmarshal([]byte(r.dj), &dati) != nil {
+				continue
+			}
+			onlySystem := true
+			for k := range dati {
+				if len(k) < 2 || k[:2] != "__" {
+					onlySystem = false
+					break
+				}
+			}
+			if onlySystem {
+				dbConn.Exec(`UPDATE istruttorie_dati SET dati_json='{}' WHERE pratica_id=? AND bando_id=?`, r.pid, bandoID) //nolint
+			}
+		}
+	}
+
+	// 1. Resetta i motivi per le pratiche 'da_verificare' che hanno note o dati locali reali
+	_, err = dbConn.Exec(`
+		UPDATE istruttorie
+		SET motivi_json = '[]'
 		WHERE bando_id = ? AND stato = 'da_verificare' AND (
 			COALESCE(nota_lavoro, '') != '' OR EXISTS (
-				SELECT 1 FROM istruttorie_dati id 
+				SELECT 1 FROM istruttorie_dati id
 				WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
 			)
 		)`, bandoID)
@@ -231,8 +268,8 @@ func ResetDaVerificare(db *sql.DB, bandoID int) error {
 		return err
 	}
 
-	// 2. Rimuove le pratiche 'da_verificare' che NON hanno note né dati locali né flag includi_dufficio
-	_, err = db.Exec(`
+	// 2. Rimuove le pratiche 'da_verificare' che NON hanno note né dati locali reali né flag includi_dufficio
+	_, err = dbConn.Exec(`
 		DELETE FROM istruttorie
 		WHERE bando_id = ? AND stato = 'da_verificare' AND COALESCE(nota_lavoro, '') = ''
 		AND includi_dufficio = 0

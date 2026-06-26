@@ -361,22 +361,6 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, app.Status); err == nil {
 			nuove++
 		}
-		// Salva CF richiedente/figlio cross-bando — usato come fallback in istruttoria prima di una run.
-		if len(passingRecords) > 0 {
-			rec := passingRecords[0]
-			for _, k := range []string{"richiedente_cf", "richiedente"} {
-				if v := rec.StringMap[k]; v != "" {
-					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, "__richiedente_cf", v) //nolint
-					break
-				}
-			}
-			for _, k := range []string{"figlio_cf", "figlio"} {
-				if v := rec.StringMap[k]; v != "" {
-					db.SaveDatoIstruttoria(dbConn, int(bando.ID), app.ID, "__figlio_cf", v) //nolint
-					break
-				}
-			}
-		}
 	}
 
 	db.InsertAudit(dbConn, &db.AuditAction{
