@@ -853,7 +853,7 @@ type PraticaConDati struct {
 	PraticaID       string
 	Protocollo      string
 	StatusApp       string
-	Badge           string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"non_rientrante"
+	Badge           string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"duplicato"|"non_rientrante"
 	DatiAPI         map[string]string // valori dichiarati dall'API (dalla cache scan)
 	DatiLocali      map[string]string // override operatore (da istruttorie_dati)
 	NotaLavoro      string
@@ -898,8 +898,8 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 			noteMap[ist.PraticaID] = ist.NotaLavoro
 		}
 	}
-	// Ammesse/fuori fondi dall'ultima run.
-	ammesseMap := map[string]string{} // praticaID → "ammessa"|"fuori_fondi"
+	// Ammesse/fuori fondi/duplicati dall'ultima run.
+	ammesseMap := map[string]string{} // praticaID → "ammessa"|"fuori_fondi"|"duplicato"
 	if run, err := db.GetLatestRun(h.DB, bando.ID); err == nil && run != nil {
 		var grad graduatoria.Graduatoria
 		if json.Unmarshal([]byte(run.DatiJSON), &grad) == nil {
@@ -912,6 +912,16 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 						ammesseMap[riga.Istanza.ID] = "ammessa"
 					} else if riga.NoteEsclusione == "fondi esauriti" || riga.NoteEsclusione == "posti esauriti" {
 						ammesseMap[riga.Istanza.ID] = "fuori_fondi"
+					}
+				}
+			}
+			for _, riga := range grad.Escluse {
+				if riga.Istanza == nil {
+					continue
+				}
+				if strings.Contains(strings.ToLower(riga.NoteEsclusione), "duplicat") {
+					if _, already := ammesseMap[riga.Istanza.ID]; !already {
+						ammesseMap[riga.Istanza.ID] = "duplicato"
 					}
 				}
 			}
@@ -947,7 +957,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 	}
 	sort.Slice(pratiche, func(i, j int) bool {
 		if pratiche[i].Badge != pratiche[j].Badge {
-			order := map[string]int{"da_verificare": 0, "non_rientrante": 1, "ammessa": 2, "fuori_fondi": 3, "approvata": 4, "esclusa": 5}
+			order := map[string]int{"da_verificare": 0, "duplicato": 1, "non_rientrante": 2, "ammessa": 3, "fuori_fondi": 4, "approvata": 5, "esclusa": 6}
 			return order[pratiche[i].Badge] < order[pratiche[j].Badge]
 		}
 		return pratiche[i].Protocollo < pratiche[j].Protocollo

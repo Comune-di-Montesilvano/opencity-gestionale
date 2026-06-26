@@ -31,6 +31,8 @@
      class="btn btn-sm {{if eq .BadgeFilter "da_verificare"}}btn-primary{{else}}btn-secondary{{end}}">Da verificare</a>
   <a href="/bandi/{{.Bando.ID}}/dati?badge=non_rientrante"
      class="btn btn-sm {{if eq .BadgeFilter "non_rientrante"}}btn-primary{{else}}btn-secondary{{end}}">Non rientranti</a>
+  <a href="/bandi/{{.Bando.ID}}/dati?badge=duplicato"
+     class="btn btn-sm {{if eq .BadgeFilter "duplicato"}}btn-primary{{else}}btn-secondary{{end}}">Duplicati</a>
   <a href="/bandi/{{.Bando.ID}}/dati?badge=ammessa"
      class="btn btn-sm {{if eq .BadgeFilter "ammessa"}}btn-primary{{else}}btn-secondary{{end}}">Ammesse</a>
   <a href="/bandi/{{.Bando.ID}}/dati?badge=fuori_fondi"
@@ -60,6 +62,8 @@
       <span class="badge" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">approvata</span>
     {{else if eq $p.Badge "esclusa"}}
       <span class="badge badge-gray">esclusa</span>
+    {{else if eq $p.Badge "duplicato"}}
+      <span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca">duplicato</span>
     {{else}}
       <span class="badge" style="background:#fefce8;color:#854d0e;border:1px solid #fef08a">non rientrante</span>
     {{end}}
