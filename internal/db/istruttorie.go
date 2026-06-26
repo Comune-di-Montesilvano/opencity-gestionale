@@ -317,10 +317,14 @@ func GetIstruttoriaStats(db *sql.DB, bandoID int) (IstruttoriaStats, error) {
 }
 
 // SaveNota salva la nota di lavoro per-bando in istruttorie.nota_lavoro.
+// Crea la riga se non esiste (pratica senza motivi non ha row istruttoria).
 func SaveNota(db *sql.DB, bandoID int, praticaID, nota string) error {
-	_, err := db.Exec(
-		`UPDATE istruttorie SET nota_lavoro=?, aggiornato_il=? WHERE bando_id=? AND pratica_id=?`,
-		nota, time.Now().Format(time.RFC3339), bandoID, praticaID,
+	now := time.Now().Format(time.RFC3339)
+	_, err := db.Exec(`
+		INSERT INTO istruttorie (bando_id, pratica_id, motivi_json, stato, nota_lavoro, aggiornato_il)
+		VALUES (?, ?, '[]', 'da_verificare', ?, ?)
+		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET nota_lavoro=excluded.nota_lavoro, aggiornato_il=excluded.aggiornato_il`,
+		bandoID, praticaID, nota, now,
 	)
 	return err
 }
