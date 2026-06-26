@@ -231,11 +231,13 @@ func ResetDaVerificare(db *sql.DB, bandoID int) error {
 		return err
 	}
 
-	// 2. Rimuove le pratiche 'da_verificare' che NON hanno note né dati locali
+	// 2. Rimuove le pratiche 'da_verificare' che NON hanno note né dati locali né flag includi_dufficio
 	_, err = db.Exec(`
-		DELETE FROM istruttorie 
-		WHERE bando_id = ? AND stato = 'da_verificare' AND COALESCE(nota_lavoro, '') = '' AND NOT EXISTS (
-			SELECT 1 FROM istruttorie_dati id 
+		DELETE FROM istruttorie
+		WHERE bando_id = ? AND stato = 'da_verificare' AND COALESCE(nota_lavoro, '') = ''
+		AND includi_dufficio = 0
+		AND NOT EXISTS (
+			SELECT 1 FROM istruttorie_dati id
 			WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
 		)`, bandoID)
 	return err
@@ -407,11 +409,11 @@ func GetAltriBandiPerPratiche(db *sql.DB, bandoID int, praticaIDs []string) (map
 	}
 
 	rows, err := db.Query(`
-		SELECT i.pratica_id, COALESCE(b.nome, 'Bando '||i.bando_id)
-		FROM istruttorie i
-		LEFT JOIN bandi b ON b.id = i.bando_id
-		WHERE i.bando_id != ? AND i.pratica_id IN (`+ph+`)
-		ORDER BY i.pratica_id, b.nome`, args...)
+		SELECT c.pratica_id, COALESCE(b.nome, 'Bando '||c.bando_id)
+		FROM istruttorie_api_cache c
+		LEFT JOIN bandi b ON b.id = c.bando_id
+		WHERE c.bando_id != ? AND c.pratica_id IN (`+ph+`)
+		ORDER BY c.pratica_id, b.nome`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -440,6 +442,36 @@ func ListEscluse(db *sql.DB, bandoID int) ([]string, error) {
 		out = append(out, id)
 	}
 	return out, rows.Err()
+}
+
+func ListInclusiDufficio(db *sql.DB, bandoID int) ([]string, error) {
+	rows, err := db.Query(`SELECT pratica_id FROM istruttorie WHERE bando_id=? AND includi_dufficio=1`, bandoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			out = append(out, id)
+		}
+	}
+	return out, rows.Err()
+}
+
+func SetIncludiDufficio(db *sql.DB, bandoID int, praticaID string, includi bool) error {
+	val := 0
+	if includi {
+		val = 1
+	}
+	_, err := db.Exec(`
+		INSERT INTO istruttorie (bando_id, pratica_id, motivi_json, stato, includi_dufficio)
+		VALUES (?, ?, '[]', 'da_verificare', ?)
+		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET includi_dufficio=excluded.includi_dufficio`,
+		bandoID, praticaID, val,
+	)
+	return err
 }
 
 // UpsertAPICache salva il JSON blob dei campi estratti dall'API per una pratica/bando.

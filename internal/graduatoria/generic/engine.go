@@ -51,6 +51,10 @@ func (e *Engine) Calcola(apps []opencity.Application, cfg graduatoria.BandoConfi
 			rec.DerivaCampi(ecfg.Rimborso)
 			ok, motivo := applicaFiltri(rec, ecfg.Filtri)
 			if !ok {
+				if cfg.InclusiDufficio[app.ID] {
+					ammissibili = append(ammissibili, rec)
+					continue
+				}
 				escluse = append(escluse, graduatoria.RigaGraduatoria{
 					Istanza:        rec.ToIstanza(),
 					Ammessa:        false,

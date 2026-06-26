@@ -11,12 +11,13 @@ import (
 // BandoConfig contiene i parametri configurabili di un bando.
 // Viene popolato dal DB (tabella bandi) e passato all'engine al momento del calcolo.
 type BandoConfig struct {
-	BudgetTotale  float64
-	ISEEMassimo   float64
-	Scadenza      time.Time
-	ExtraJSON     json.RawMessage            // parametri engine-specific
-	CampiExtra    map[string]map[string]string // praticaID → campo → valore override da istruttoria
-	Approvate     map[string]bool            // praticaID → true se approvata in istruttoria
+	BudgetTotale    float64
+	ISEEMassimo     float64
+	Scadenza        time.Time
+	ExtraJSON       json.RawMessage
+	CampiExtra      map[string]map[string]string // praticaID → campo → valore override da istruttoria
+	Approvate       map[string]bool              // praticaID → true se approvata in istruttoria
+	InclusiDufficio map[string]bool              // praticaID → true se incluso d'ufficio (bypassa filtri merito)
 }
 
 // ServiceEngine è l'interfaccia che ogni motore di servizio deve implementare.

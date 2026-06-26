@@ -776,15 +776,56 @@ func (h *IstruttoriaHandler) PostEscludiDati(w http.ResponseWriter, r *http.Requ
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }
 
+// PostToggleIncludiDufficio — toggle flag includi_dufficio per una pratica.
+// Risponde con fragment HTMX aggiornato (nuovo stato pulsante).
+func (h *IstruttoriaHandler) PostToggleIncludiDufficio(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	var current int
+	h.DB.QueryRow(
+		`SELECT COALESCE(includi_dufficio, 0) FROM istruttorie WHERE bando_id=? AND pratica_id=?`,
+		bandoID, praticaID,
+	).Scan(&current)
+
+	includi := current == 0
+	if err := db.SetIncludiDufficio(h.DB, int(bandoID), praticaID, includi); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	pid := html.EscapeString(praticaID)
+	if includi {
+		fmt.Fprintf(w, `<span id="includi-dufficio-btn-%s"><button hx-post="/bandi/%d/istruttoria/%s/includi-dufficio" hx-target="#includi-dufficio-btn-%s" hx-swap="outerHTML" class="btn btn-sm" style="font-size:.75rem;padding:2px 8px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0" onclick="event.stopPropagation()">✓ incluso d'ufficio</button></span>`,
+			pid, bandoID, pid, pid)
+	} else {
+		fmt.Fprintf(w, `<span id="includi-dufficio-btn-%s"><button hx-post="/bandi/%d/istruttoria/%s/includi-dufficio" hx-target="#includi-dufficio-btn-%s" hx-swap="outerHTML" class="btn btn-sm btn-secondary" style="font-size:.75rem;padding:2px 8px" onclick="event.stopPropagation()">Includi d'ufficio</button></span>`,
+			pid, bandoID, pid, pid)
+	}
+}
+
 // PraticaConDati aggrega i dati di una singola pratica per la vista "dati locali".
 type PraticaConDati struct {
-	PraticaID  string
-	Protocollo string
-	StatusApp  string
-	Badge      string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"non_rientrante"
-	DatiAPI    map[string]string // valori dichiarati dall'API (dalla cache scan)
-	DatiLocali map[string]string // override operatore (da istruttorie_dati)
-	NotaLavoro string
+	PraticaID       string
+	Protocollo      string
+	StatusApp       string
+	Badge           string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"non_rientrante"
+	DatiAPI         map[string]string // valori dichiarati dall'API (dalla cache scan)
+	DatiLocali      map[string]string // override operatore (da istruttorie_dati)
+	NotaLavoro      string
+	IncludiDufficio bool
 }
 
 // GetDatiLocali — vista "tutte le domande" con campi API + override operatore per ciascuna.
@@ -845,6 +886,13 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	inclusiDufficio := map[string]bool{}
+	if inclusi, err := db.ListInclusiDufficio(h.DB, int(bandoID)); err == nil {
+		for _, id := range inclusi {
+			inclusiDufficio[id] = true
+		}
+	}
+
 	// Costruisce lista pratiche ordinate.
 	var pratiche []PraticaConDati
 	for praticaID, apiFields := range apiCache {
@@ -855,13 +903,14 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 			badge = b
 		}
 		pratiche = append(pratiche, PraticaConDati{
-			PraticaID:  praticaID,
-			Protocollo: apiFields["protocollo"],
-			StatusApp:  apiFields["status"],
-			Badge:      badge,
-			DatiAPI:    apiFields,
-			DatiLocali: datiLocali[praticaID],
-			NotaLavoro: noteMap[praticaID],
+			PraticaID:       praticaID,
+			Protocollo:      apiFields["protocollo"],
+			StatusApp:       apiFields["status"],
+			Badge:           badge,
+			DatiAPI:         apiFields,
+			DatiLocali:      datiLocali[praticaID],
+			NotaLavoro:      noteMap[praticaID],
+			IncludiDufficio: inclusiDufficio[praticaID],
 		})
 	}
 	sort.Slice(pratiche, func(i, j int) bool {
@@ -872,11 +921,29 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		return pratiche[i].Protocollo < pratiche[j].Protocollo
 	})
 
-	var allPraticaIDs []string
-	for _, p := range pratiche {
-		allPraticaIDs = append(allPraticaIDs, p.PraticaID)
+	// Badge "Anche in": usa le run degli altri bandi (Gruppi[].Righe) per rilevare
+	// la partecipazione reale (passa filtri merito, anche se fuori_fondi).
+	// Non usa istruttorie_api_cache perché bandi con stesso service_id condividono
+	// tutte le pratiche e mostrerebbe badge su tutto.
+	altriBandi := map[string][]string{} // praticaID → []bandoNome
+	if altreRun, err := db.GetLatestRunsAltriBandi(h.DB, bando.ID); err == nil {
+		for _, altroRun := range altreRun {
+			var grad graduatoria.Graduatoria
+			if json.Unmarshal([]byte(altroRun.DatiJSON), &grad) != nil {
+				continue
+			}
+			seen := map[string]bool{}
+			for _, g := range grad.Gruppi {
+				for _, riga := range g.Righe {
+					if riga.Istanza == nil || seen[riga.Istanza.ID] {
+						continue
+					}
+					seen[riga.Istanza.ID] = true
+					altriBandi[riga.Istanza.ID] = append(altriBandi[riga.Istanza.ID], altroRun.BandoNome)
+				}
+			}
+		}
 	}
-	altriBandi, _ := db.GetAltriBandiPerPratiche(h.DB, int(bandoID), allPraticaIDs)
 
 	badgeFilter := r.URL.Query().Get("badge")
 	filtered := pratiche

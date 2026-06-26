@@ -20,6 +20,36 @@ type GraduatoriaRun struct {
 	Stato       string // "bozza" | "pubblicata"
 }
 
+// RunAltroBandoInfo è usato per calcolare il badge "Anche in" basandosi sulle run degli altri bandi.
+type RunAltroBandoInfo struct {
+	BandoNome string
+	DatiJSON  string
+}
+
+// GetLatestRunsAltriBandi restituisce la run più recente per ogni bando eccetto excludeBandoID.
+// Il JSON di ogni run va parsato dal chiamante per estrarre le pratica IDs.
+func GetLatestRunsAltriBandi(db *sql.DB, excludeBandoID int64) ([]RunAltroBandoInfo, error) {
+	rows, err := db.Query(`
+		SELECT COALESCE(b.nome, 'Bando '||r.bando_id), r.dati_json
+		FROM graduatorie_run r
+		LEFT JOIN bandi b ON b.id = r.bando_id
+		WHERE r.bando_id != ? AND r.id = (
+			SELECT MAX(r2.id) FROM graduatorie_run r2 WHERE r2.bando_id = r.bando_id
+		)`, excludeBandoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []RunAltroBandoInfo
+	for rows.Next() {
+		var nome, datiJSON string
+		if err := rows.Scan(&nome, &datiJSON); err == nil {
+			out = append(out, RunAltroBandoInfo{BandoNome: nome, DatiJSON: datiJSON})
+		}
+	}
+	return out, rows.Err()
+}
+
 func InsertRun(db *sql.DB, r *GraduatoriaRun) (int64, error) {
 	res, err := db.Exec(
 		`INSERT INTO graduatorie_run (bando_id, calcolata_da, calcolata_at, dati_json, num_totale, num_ammesse, num_escluse, budget_usato, note, stato)

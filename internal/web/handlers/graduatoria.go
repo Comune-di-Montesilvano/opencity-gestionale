@@ -148,6 +148,13 @@ func (h *GraduatoriaHandler) PostCalcola(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	cfg.Approvate = approvateSet
+	inclusiSet := make(map[string]bool)
+	if inclusi, err := db.ListInclusiDufficio(h.DB, int(bandoID)); err == nil {
+		for _, id := range inclusi {
+			inclusiSet[id] = true
+		}
+	}
+	cfg.InclusiDufficio = inclusiSet
 
 	grad, err := engine.Calcola(apps, cfg)
 	if err != nil {
