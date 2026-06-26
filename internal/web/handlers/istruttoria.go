@@ -883,13 +883,12 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 	datiLocali, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
 	// Stato istruttoria per pratica.
 	istruttorieMap := map[string]string{} // praticaID → stato
-	noteMap := map[string]string{}        // praticaID → nota_lavoro
 	if istruttorie, err := db.ListIstruttorie(h.DB, int(bandoID), "", ""); err == nil {
 		for _, ist := range istruttorie {
 			istruttorieMap[ist.PraticaID] = ist.Stato
-			noteMap[ist.PraticaID] = ist.NotaLavoro
 		}
 	}
+	noteMap, _ := db.GetNoteForBando(h.DB, int(bandoID))
 	// Ammesse/fuori fondi/duplicati dall'ultima run.
 	ammesseMap := map[string]string{} // praticaID → "ammessa"|"fuori_fondi"|"duplicato"
 	duplicatoOrigID := map[string]string{} // praticaID duplicata → praticaID originale

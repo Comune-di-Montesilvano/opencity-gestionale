@@ -56,6 +56,16 @@ func Open(path string) (*sql.DB, error) {
 		SELECT 1 FROM istruttorie_dati
 		WHERE istruttorie_dati.pratica_id = istruttorie.pratica_id AND nota != ''
 	)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS note_lavoro (
+		bando_id      INTEGER NOT NULL,
+		pratica_id    TEXT    NOT NULL,
+		nota          TEXT    NOT NULL DEFAULT '',
+		aggiornato_il TEXT,
+		PRIMARY KEY (bando_id, pratica_id)
+	)`)
+	// Migra note esistenti da istruttorie.nota_lavoro → note_lavoro (una-tantum).
+	_, _ = db.Exec(`INSERT OR IGNORE INTO note_lavoro (bando_id, pratica_id, nota, aggiornato_il)
+		SELECT bando_id, pratica_id, nota_lavoro, aggiornato_il FROM istruttorie WHERE nota_lavoro != ''`)
 	// Migrazione: rinomina chiavi PDND → Verifica nei blob engine_config
 	_, _ = db.Exec(`UPDATE bandi SET engine_config =
 		replace(replace(replace(engine_config,
