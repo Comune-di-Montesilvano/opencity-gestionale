@@ -80,6 +80,28 @@
     {{range $duplicatiList}}
     <span class="badge" style="font-size:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca" title="Duplicato in: {{.}}">Duplicato in: {{.}}</span>
     {{end}}
+    {{/* Badge collegamenti manuali */}}
+    {{$collegatiList := index $.Collegamenti $p.PraticaID}}
+    {{range $collegatiList}}
+    <span class="badge" style="font-size:10px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">
+      Anche in: {{.BandoNome}} prot. {{.Protocollo}}
+      <form method="POST" action="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/scollega/{{.ID}}"
+            style="display:inline" onclick="event.stopPropagation()">
+        <button type="submit" title="Rimuovi collegamento"
+                style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:10px;padding:0 2px;line-height:1"
+                onclick="return confirm('Rimuovere collegamento?')">✕</button>
+      </form>
+    </span>
+    {{end}}
+    {{/* Pulsante collega — HTMX carica select con pratiche stesso CF */}}
+    <span id="collega-wrap-{{$p.PraticaID}}" onclick="event.stopPropagation()">
+      <button class="btn btn-sm"
+              style="font-size:.7rem;padding:1px 6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe"
+              hx-get="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/collega-form"
+              hx-target="#collega-wrap-{{$p.PraticaID}}"
+              hx-swap="innerHTML"
+              onclick="event.stopPropagation()">+ Collega</button>
+    </span>
     {{if or (eq $p.Badge "non_rientrante") $p.IncludiDufficio}}
     <span id="includi-dufficio-btn-{{$p.PraticaID}}">
       <button hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/includi-dufficio"

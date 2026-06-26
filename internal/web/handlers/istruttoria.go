@@ -839,6 +839,117 @@ func (h *IstruttoriaHandler) PostToggleIncludiDufficio(w http.ResponseWriter, r 
 	}
 }
 
+// GetCollegaForm restituisce un fragment HTMX con <select> delle pratiche dello stesso CF in altri bandi.
+func (h *IstruttoriaHandler) GetCollegaForm(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	pratiche, _ := db.TrovaPraticheStessoCF(h.DB, int(bandoID), praticaID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	pid := html.EscapeString(praticaID)
+
+	if len(pratiche) == 0 {
+		fmt.Fprintf(w, `<span style="font-size:.75rem;color:#9ca3af" onclick="event.stopPropagation()">Nessuna pratica con stesso CF in altri bandi scansionati</span>`)
+		return
+	}
+
+	referer := r.Header.Get("Referer")
+	if referer == "" {
+		referer = fmt.Sprintf("/bandi/%d/dati", bandoID)
+	}
+
+	fmt.Fprintf(w, `<form method="POST" action="/bandi/%d/istruttoria/%s/collega" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">`,
+		bandoID, pid)
+	fmt.Fprintf(w, `<select name="target" class="form-control form-control-sm" style="font-size:.75rem;max-width:300px"><option value="">— scegli pratica —</option>`)
+	for _, p := range pratiche {
+		fmt.Fprintf(w, `<option value="%d:%s">prot. %s — %s</option>`,
+			p.BandoID, html.EscapeString(p.PraticaID),
+			html.EscapeString(p.Protocollo), html.EscapeString(p.BandoNome))
+	}
+	fmt.Fprintf(w, `</select>`)
+	fmt.Fprintf(w, `<input type="hidden" name="redirect_to" value="%s">`, html.EscapeString(referer))
+	fmt.Fprintf(w, `<button type="submit" class="btn btn-sm btn-primary" style="font-size:.75rem;padding:2px 8px">Collega</button>`)
+	fmt.Fprintf(w, `<button type="button" class="btn btn-sm btn-secondary" style="font-size:.75rem;padding:2px 8px" onclick="event.stopPropagation();location.reload()">✕</button>`)
+	fmt.Fprintf(w, `</form>`)
+}
+
+// PostCollega salva un collegamento manuale tra due pratiche di bandi diversi.
+func (h *IstruttoriaHandler) PostCollega(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	r.ParseForm()
+	target := r.FormValue("target")
+	parts := strings.SplitN(target, ":", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		http.Error(w, "Selezione non valida", http.StatusBadRequest)
+		return
+	}
+	bandoIDB, _ := strconv.Atoi(parts[0])
+	praticaIDB := parts[1]
+
+	if bandoIDB == 0 {
+		http.Error(w, "Bando non valido", http.StatusBadRequest)
+		return
+	}
+
+	db.AddCollegamento(h.DB, int(bandoID), praticaID, bandoIDB, praticaIDB) //nolint
+
+	redirectTo := r.FormValue("redirect_to")
+	if redirectTo == "" || !strings.HasPrefix(redirectTo, "/") {
+		redirectTo = fmt.Sprintf("/bandi/%d/dati", bandoID)
+	}
+	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+}
+
+// PostScollega rimuove un collegamento manuale tra pratiche.
+func (h *IstruttoriaHandler) PostScollega(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	cid, _ := strconv.Atoi(r.PathValue("collegamentoID"))
+	db.RemoveCollegamento(h.DB, cid) //nolint
+
+	redirectTo := r.Header.Get("Referer")
+	if redirectTo == "" {
+		redirectTo = fmt.Sprintf("/bandi/%d/dati", bandoID)
+	}
+	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+}
+
 // PraticaConDati aggrega i dati di una singola pratica per la vista "dati locali".
 type PraticaConDati struct {
 	PraticaID           string
@@ -998,6 +1109,12 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	var tuttiPraticaIDs []string
+	for _, p := range pratiche {
+		tuttiPraticaIDs = append(tuttiPraticaIDs, p.PraticaID)
+	}
+	collegamentiMap, _ := db.GetCollegamenti(h.DB, int(bandoID), tuttiPraticaIDs)
+
 	badgeFilter := r.URL.Query().Get("badge")
 	filtered := pratiche
 	if badgeFilter != "" {
@@ -1023,6 +1140,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		"BaseURL":        h.BaseURL,
 		"AltriBandi":     altriBandi,
 		"DuplicatiBandi": duplicatiBandi,
+		"Collegamenti":   collegamentiMap,
 	})
 }
 
