@@ -160,53 +160,61 @@ async function salvaTutto(bandoID, praticaID, btn) {
   if (ok) { ok.style.display = 'none'; }
 
   var inputs = block.querySelectorAll('[data-campo][data-pratica]');
-  var promises = [];
+  var dati = {};
   inputs.forEach(function(input) {
     var campo = input.getAttribute('data-campo');
     var valore = input.value.trim();
-    if (input.inputMode === 'decimal' || input.inputMode === 'numeric') {
+    if (input.inputMode === 'decimal' || input.inputMode === 'numeric' || input.getAttribute('inputmode') === 'decimal' || input.getAttribute('inputmode') === 'numeric') {
       valore = valore.replace(',', '.');
     }
-    promises.push(
-      fetch('/bandi/' + bandoID + '/istruttoria/' + praticaID + '/dato', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'campo=' + encodeURIComponent(campo) + '&valore=' + encodeURIComponent(valore) + '&ctx=dati'
-      }).then(function(r) { return {campo: campo, input: input, ok: r.ok}; })
-    );
+    dati[campo] = valore;
   });
 
+  var notaVal = '';
   var ta = document.getElementById('nota-' + praticaID);
   if (ta) {
-    promises.push(
-      fetch('/bandi/' + bandoID + '/istruttoria/' + praticaID + '/nota', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'nota=' + encodeURIComponent(ta.value)
-      }).then(function(r) { return {campo: '__nota', input: null, ok: r.ok}; })
-    );
+    notaVal = ta.value;
   }
 
-  var results = await Promise.all(promises);
-  if (btn) btn.disabled = false;
+  try {
+    var response = await fetch('/bandi/' + bandoID + '/istruttoria/' + praticaID + '/salva-tutto', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dati: dati, nota: notaVal })
+    });
+    
+    if (btn) btn.disabled = false;
+    var allOk = response.ok;
+    
+    inputs.forEach(function(input) {
+      var campo = input.getAttribute('data-campo');
+      var s = document.getElementById('dati-status-' + praticaID + '-' + campo);
+      if (!s) return;
+      var valore = input.value.trim();
+      if (allOk) {
+        if (valore === '' || valore === '.') {
+          s.textContent = '—';
+          s.style.color = '#9ca3af';
+        } else {
+          s.textContent = valore + ' ✓';
+          s.style.color = '#16a34a';
+        }
+      }
+    });
 
-  var allOk = results.every(function(r) { return r.ok; });
-  results.forEach(function(res) {
-    if (res.campo === '__nota' || !res.input) return;
-    var s = document.getElementById('dati-status-' + praticaID + '-' + res.campo);
-    if (!s) return;
-    var valore = res.input.value.trim();
-    if (res.ok) {
-      if (valore === '' || valore === '.') { s.textContent = '—'; s.style.color = '#9ca3af'; }
-      else { s.textContent = valore + ' ✓'; s.style.color = '#16a34a'; }
+    if (ok) {
+      ok.textContent = allOk ? '✓ salvato' : '⚠ errore durante il salvataggio';
+      ok.style.color = allOk ? '#16a34a' : '#dc2626';
+      ok.style.display = '';
+      if (allOk) setTimeout(function() { ok.style.display = 'none'; }, 2500);
     }
-  });
-
-  if (ok) {
-    ok.textContent = allOk ? '✓ salvato' : '⚠ errore su alcuni campi';
-    ok.style.color = allOk ? '#16a34a' : '#dc2626';
-    ok.style.display = '';
-    if (allOk) setTimeout(function() { ok.style.display = 'none'; }, 2500);
+  } catch (err) {
+    if (btn) btn.disabled = false;
+    if (ok) {
+      ok.textContent = '⚠ errore di rete';
+      ok.style.color = '#dc2626';
+      ok.style.display = '';
+    }
   }
 }
 </script>

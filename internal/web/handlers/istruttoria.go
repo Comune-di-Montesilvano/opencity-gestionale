@@ -497,72 +497,167 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var ecfg graduatoria.EngineConfig
-	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
-
-	// Normalizza separatore decimale per campi numerici (utenti italiani digitano virgola).
-	if fm, ok := ecfg.Mapping[campo]; ok && (fm.Tipo == "float" || fm.Tipo == "int") {
-		valore = strings.ReplaceAll(valore, ",", ".")
-	}
-
-	// Salva il dato locale.
-	if err := db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, campo, valore); err != nil {
+	motivi, datiPratica, err := h.salvaEValutaDati(bando, op, praticaID, map[string]string{campo: valore})
+	if err != nil {
 		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Ri-valuta i motivi recuperando l'app da OpenCity e applicando i dati locali aggiornati.
-	var motivi []string
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
+	var campiVerifica []string
+	for nome, fm := range ecfg.Mapping {
+		if fm.VerificaPath != "" {
+			campiVerifica = append(campiVerifica, nome)
+		}
+	}
+	sort.Strings(campiVerifica)
+
+	// ctx="dati" → risposta minimale per la pagina dati_locali (span status per campo)
+	if ctx == "dati" {
+		spanID := "dati-status-" + praticaID + "-" + campo
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if valore == "" {
+			fmt.Fprintf(w, `<span id="%s" style="color:#9ca3af;font-size:.8rem">—</span>`, html.EscapeString(spanID))
+		} else {
+			fmt.Fprintf(w, `<span id="%s" style="color:#16a34a;font-size:.8rem;font-family:monospace">%s ✓</span>`,
+				html.EscapeString(spanID), html.EscapeString(valore))
+		}
+		return
+	}
+
+	stato := "da_verificare"
+	if ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID); err == nil {
+		stato = ist.Stato
+	}
+
+	renderTemplate(w, "istruttoria_dato_partial.html", map[string]any{
+		"Motivi":        motivi,
+		"CampiVerifica": campiVerifica,
+		"Dati":          datiPratica,
+		"BandoID":       bandoID,
+		"PraticaID":     praticaID,
+		"Stato":         stato,
+	})
+}
+
+// PostSalvaTutto — salva tutti i dati locali e la nota di lavoro di una pratica in una singola richiesta.
+func (h *IstruttoriaHandler) PostSalvaTutto(w http.ResponseWriter, r *http.Request) {
+	op := middleware.FromContext(r.Context())
+	bandoID := bandoIDFromPath(r)
+	praticaID := r.PathValue("praticaID")
+
+	bando, err := db.GetBando(h.DB, bandoID)
+	if err != nil {
+		http.Error(w, "Bando non trovato", http.StatusNotFound)
+		return
+	}
+	if !op.IsAdmin() && !op.CanAccessService(bando.ServiceID) {
+		http.Error(w, "Accesso negato", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Dati map[string]string `json:"dati"`
+		Nota string            `json:"nota"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "JSON non valido", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Salva dati e ricalcola motivi
+	_, _, err = h.salvaEValutaDati(bando, op, praticaID, req.Dati)
+	if err != nil {
+		http.Error(w, "Errore salvataggio dati: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Salva la nota di lavoro
+	if err := db.SaveNota(h.DB, int(bandoID), praticaID, req.Nota); err != nil {
+		http.Error(w, "Errore salvataggio nota: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// salvaEValutaDati salva multipli dati locali ed esegue il ricalcolo dei motivi istruttori.
+func (h *IstruttoriaHandler) salvaEValutaDati(bando *db.Bando, op *middleware.OperatorCtx, praticaID string, overrides map[string]string) ([]string, map[string]string, error) {
+	bandoID := int(bando.ID)
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
+	// Normalizza i valori modificati
+	normalized := make(map[string]string)
+	for campo, valore := range overrides {
+		valore = strings.TrimSpace(valore)
+		if fm, ok := ecfg.Mapping[campo]; ok && (fm.Tipo == "float" || fm.Tipo == "int") {
+			valore = strings.ReplaceAll(valore, ",", ".")
+		}
+		normalized[campo] = valore
+	}
+
+	var motivi []string
 	client := opencity.NewClient(h.BaseURL, op.JWT)
-	if app, err := client.FetchApplication(praticaID); err == nil {
-		// Salva/aggiorna il valore API dichiarato nella cache (separato dagli override).
+	app, errFetch := client.FetchApplication(praticaID)
+	if errFetch == nil {
+		// Salva/aggiorna i valori API dichiarati nella cache (separati dagli override).
 		apiRecs, _ := generic.EstraiRecordsConExtras(*app, ecfg, nil)
 		if len(apiRecs) > 0 {
 			rec := apiRecs[0]
-			var apiVal string
-			if v, ok := rec.FloatMap[campo]; ok {
-				apiVal = strconv.FormatFloat(v, 'f', -1, 64)
-			} else if v, ok := rec.IntMap[campo]; ok {
-				apiVal = strconv.Itoa(v)
-			} else if v, ok := rec.StringMap[campo]; ok {
-				apiVal = v
-			}
-			if apiVal != "" {
-				_ = db.UpsertAPICacheField(h.DB, int(bandoID), praticaID, campo, apiVal)
-			}
-		}
-
-		// Legge tutti i dati locali aggiornati per questa pratica.
-		allDati, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
-		extras := allDati[praticaID]
-
-		// Per campi verifica: determina se il valore è sovrascitto o confermato.
-		if fm, ok := ecfg.Mapping[campo]; ok && fm.VerificaPath != "" && valore != "" {
-			recOrig, _ := generic.EstraiRecordsConExtras(*app, ecfg, nil)
-			stato := "sovrascitto"
-			if len(recOrig) > 0 {
-				rec := recOrig[0]
-				origStr := ""
+			for campo := range normalized {
+				var apiVal string
 				if v, ok := rec.FloatMap[campo]; ok {
-					origStr = strconv.FormatFloat(v, 'f', -1, 64)
+					apiVal = strconv.FormatFloat(v, 'f', -1, 64)
 				} else if v, ok := rec.IntMap[campo]; ok {
-					origStr = strconv.Itoa(v)
-				} else {
-					origStr = rec.StringMap[campo]
+					apiVal = strconv.Itoa(v)
+				} else if v, ok := rec.StringMap[campo]; ok {
+					apiVal = v
 				}
-				if strings.TrimSpace(valore) == strings.TrimSpace(origStr) {
-					stato = "confermato"
+				if apiVal != "" {
+					_ = db.UpsertAPICacheField(h.DB, bandoID, praticaID, campo, apiVal)
 				}
 			}
-			_ = db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, "__stato_verifica_"+campo, stato)
-			allDati, _ = db.GetIstruttorieDati(h.DB, int(bandoID))
-			extras = allDati[praticaID]
-		} else if valore == "" {
-			_ = db.SaveDatoIstruttoria(h.DB, int(bandoID), praticaID, "__stato_verifica_"+campo, "")
-			allDati, _ = db.GetIstruttorieDati(h.DB, int(bandoID))
-			extras = allDati[praticaID]
 		}
+
+		// Determina lo stato verifica per ciascun campo modificato.
+		for campo, valore := range normalized {
+			if fm, ok := ecfg.Mapping[campo]; ok && fm.VerificaPath != "" {
+				if valore != "" {
+					stato := "sovrascitto"
+					if len(apiRecs) > 0 {
+						rec := apiRecs[0]
+						origStr := ""
+						if v, ok := rec.FloatMap[campo]; ok {
+							origStr = strconv.FormatFloat(v, 'f', -1, 64)
+						} else if v, ok := rec.IntMap[campo]; ok {
+							origStr = strconv.Itoa(v)
+						} else {
+							origStr = rec.StringMap[campo]
+						}
+						if strings.TrimSpace(valore) == strings.TrimSpace(origStr) {
+							stato = "confermato"
+						}
+					}
+					normalized["__stato_verifica_"+campo] = stato
+				} else {
+					normalized["__stato_verifica_"+campo] = ""
+				}
+			}
+		}
+	}
+
+	// Salva tutti i dati (inclusi gli stati verifica) in un'unica transazione.
+	if err := db.SaveDatiIstruttoria(h.DB, bandoID, praticaID, normalized); err != nil {
+		return nil, nil, err
+	}
+
+	if errFetch == nil {
+		// Legge tutti i dati locali aggiornati per questa pratica per ricalcolare i motivi.
+		allDati, _ := db.GetIstruttorieDati(h.DB, bandoID)
+		extras := allDati[praticaID]
 
 		records, _ := generic.EstraiRecordsConExtras(*app, ecfg, extras)
 		motiviSet := map[string]struct{}{}
@@ -603,52 +698,19 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 			motivi = append(motivi, m)
 		}
 		// Aggiorna motivi_json nel DB.
-		db.UpdateMotiviIstruttoria(h.DB, int(bandoID), praticaID, motivi)
+		db.UpdateMotiviIstruttoria(h.DB, bandoID, praticaID, motivi)
 	} else {
 		// Fallback: legge motivi dal DB senza ri-valutare.
-		if ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID); err == nil {
+		if ist, err := db.GetIstruttoriaByPratica(h.DB, bandoID, praticaID); err == nil {
 			motivi = ist.Motivi
 		}
 	}
 
 	// Carica dati aggiornati per il partial (include stato_verifica).
-	allDatiPost, _ := db.GetIstruttorieDati(h.DB, int(bandoID))
+	allDatiPost, _ := db.GetIstruttorieDati(h.DB, bandoID)
 	datiPratica := allDatiPost[praticaID]
 
-	var campiVerifica []string
-	for nome, fm := range ecfg.Mapping {
-		if fm.VerificaPath != "" {
-			campiVerifica = append(campiVerifica, nome)
-		}
-	}
-	sort.Strings(campiVerifica)
-
-	// ctx="dati" → risposta minimale per la pagina dati_locali (span status per campo)
-	if ctx == "dati" {
-		spanID := "dati-status-" + praticaID + "-" + campo
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if valore == "" {
-			fmt.Fprintf(w, `<span id="%s" style="color:#9ca3af;font-size:.8rem">—</span>`, html.EscapeString(spanID))
-		} else {
-			fmt.Fprintf(w, `<span id="%s" style="color:#16a34a;font-size:.8rem;font-family:monospace">%s ✓</span>`,
-				html.EscapeString(spanID), html.EscapeString(valore))
-		}
-		return
-	}
-
-	stato := "da_verificare"
-	if ist, err := db.GetIstruttoriaByPratica(h.DB, int(bandoID), praticaID); err == nil {
-		stato = ist.Stato
-	}
-
-	renderTemplate(w, "istruttoria_dato_partial.html", map[string]any{
-		"Motivi":        motivi,
-		"CampiVerifica": campiVerifica,
-		"Dati":          datiPratica,
-		"BandoID":       bandoID,
-		"PraticaID":     praticaID,
-		"Stato":         stato,
-	})
+	return motivi, datiPratica, nil
 }
 
 // PostRiapri — riporta una pratica approvata/esclusa a da_verificare.

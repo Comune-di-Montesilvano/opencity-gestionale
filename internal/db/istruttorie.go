@@ -51,29 +51,50 @@ func UpdateMotiviIstruttoria(db *sql.DB, bandoID int, praticaID string, motivi [
 // SaveDatoIstruttoria aggiunge/aggiorna un campo in istruttorie_dati (per-bando).
 // Valore vuoto rimuove il campo dal dizionario.
 func SaveDatoIstruttoria(db *sql.DB, bandoID int, praticaID, campo, valore string) error {
+	return SaveDatiIstruttoria(db, bandoID, praticaID, map[string]string{campo: valore})
+}
+
+// SaveDatiIstruttoria aggiunge/aggiorna multipli campi in istruttorie_dati (per-bando) in una singola transazione.
+// Valori vuoti rimuovono i rispettivi campi dal dizionario.
+func SaveDatiIstruttoria(db *sql.DB, bandoID int, praticaID string, overrides map[string]string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	var datiJSON string
-	err := db.QueryRow(
+	err = tx.QueryRow(
 		`SELECT COALESCE(dati_json, '{}') FROM istruttorie_dati WHERE bando_id=? AND pratica_id=?`,
 		bandoID, praticaID,
 	).Scan(&datiJSON)
 	if err != nil {
 		datiJSON = "{}"
 	}
+
 	dati := map[string]string{}
 	json.Unmarshal([]byte(datiJSON), &dati)
-	if valore == "" {
-		delete(dati, campo)
-	} else {
-		dati[campo] = valore
+
+	for campo, valore := range overrides {
+		if valore == "" {
+			delete(dati, campo)
+		} else {
+			dati[campo] = valore
+		}
 	}
+
 	b, _ := json.Marshal(dati)
-	_, err = db.Exec(`
+	_, err = tx.Exec(`
 		INSERT INTO istruttorie_dati (bando_id, pratica_id, dati_json, aggiornato_il)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET dati_json=excluded.dati_json, aggiornato_il=excluded.aggiornato_il`,
 		bandoID, praticaID, string(b), time.Now().Format(time.RFC3339),
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // GetIstruttorieDati restituisce map[praticaID]map[string]string con i dati locali salvati (per-bando).
