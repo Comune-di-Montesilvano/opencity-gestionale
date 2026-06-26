@@ -62,7 +62,7 @@
           <button type="button" class="help-badge"
             data-bs-toggle="popover" data-bs-placement="right"
             data-bs-title="Tipo limite"
-            data-bs-content="&lt;b&gt;Residuo&lt;/b&gt;: importo rimane fino a budget esaurito.&lt;br&gt;&lt;b&gt;Fisso&lt;/b&gt;: importo fisso per istanza (es. 500€).&lt;br&gt;&lt;b&gt;Percentuale&lt;/b&gt;: percentuale di un campo (es. 50% del corrispettivo).&lt;br&gt;&lt;b&gt;Posti&lt;/b&gt;: max N candidati.">?</button>
+            data-bs-content="&lt;b&gt;Residuo&lt;/b&gt;: importo scalato fino a esaurimento budget.&lt;br&gt;&lt;b&gt;Importo fisso&lt;/b&gt;: importo fisso per istanza (es. 500€).&lt;br&gt;&lt;b&gt;% del totale&lt;/b&gt;: percentuale di un campo (es. 50% del corrispettivo).&lt;br&gt;&lt;b&gt;Numero posti&lt;/b&gt; (in modalità posti): limite al numero massimo di candidati.">?</button>
         </label>
         <select name="tip_budget_tipo" class="form-control form-control-sm">
           {{if eq $.Modalita "posti"}}

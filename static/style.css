@@ -269,3 +269,55 @@ code { background: #f1f5f9; padding: .1rem .35rem; border-radius: 3px; font-size
   line-height: 1;
 }
 .help-badge:hover { background: #495057; }
+
+/* ===== BOOTSTRAP POPOVER CUSTOM STYLE ===== */
+.popover {
+  position: absolute !important;
+  z-index: 1060 !important;
+  display: block !important;
+  max-width: 380px !important;
+  background-color: #ffffff !important;
+  background-clip: padding-box !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.popover-header {
+  padding: 0.6rem 0.8rem !important;
+  margin-bottom: 0 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e3a5f !important;
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  border-top-left-radius: 7px !important;
+  border-top-right-radius: 7px !important;
+}
+
+.popover-body {
+  padding: 0.8rem !important;
+  color: #334155 !important;
+}
+
+.popover-body b {
+  color: #1e3a5f !important;
+}
+
+.popover-body code {
+  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace !important;
+  font-size: 12px !important;
+  color: #2563eb !important;
+  background-color: #f1f5f9 !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+}
+
+.popover .popover-arrow {
+  display: none !important;
+}
