@@ -252,6 +252,11 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		return 0, fmt.Errorf("reset da_verificare: %w", err)
 	}
 
+	// Svuota cache API del bando: le app che non passano più filtri_istanza devono sparire da /dati
+	if _, err := dbConn.Exec(`DELETE FROM istruttorie_api_cache WHERE bando_id=?`, bando.ID); err != nil {
+		return 0, fmt.Errorf("reset api_cache: %w", err)
+	}
+
 	nuove := 0
 	for _, raw := range rawApps {
 		var app opencity.Application
