@@ -294,6 +294,9 @@ POST /bandi/{id}/istruttoria/batch        azione batch istruttoria
 POST /bandi/{id}/istruttoria/{praticaID}/dato  salva override locale + ri-valuta motivi
 POST /bandi/{id}/istruttoria/{praticaID}/nota  salva nota lavoro (HTMX)
 POST /bandi/{id}/istruttoria/{praticaID}/riapri  → da_verificare
+GET  /bandi/{id}/istruttoria/{praticaID}/collega-form  HTMX: select pratiche stesso CF altri bandi
+POST /bandi/{id}/istruttoria/{praticaID}/collega       salva link manuale cross-bando
+POST /bandi/{id}/istruttoria/{praticaID}/scollega/{collegamentoID}  rimuove link
 GET  /bandi/{id}/export-mappings          lista template CSV (admin)
 POST /bandi/{id}/export-mappings          crea template
 GET  /bandi/{id}/export-mappings/{mapID}  edit template
@@ -412,6 +415,8 @@ Mostra tutte le domande scansionate (`istruttorie_api_cache`). Badge per pratica
 
 Form dinamico: ogni campo da `EngineConfig.Mapping` ha input con `type="text" inputmode="decimal|numeric"` per float/int (mai `type="number"` — locale italiana causa `element.value=""` su valori con virgola). Il tasto "Salva" chiama `salvaTutto()` via `fetch()` nativo — non HTMX (`hx-vals` non serializza `campo` correttamente in questa versione HTMX). `PostSaveDato` risponde con `<span>` minimale quando `?ctx=dati`. Valore vuoto → `delete(dati, campo)` in `SaveDatoIstruttoria`.
 
+**Collegamento manuale cross-bando**: Badge "Anche in" verde per link espliciti tra pratiche di soggetti diversi in bandi diversi (vs badge automatico = stesso `pratica_id`). `GetPraticheCollegabili` mostra "+ Collega" solo se esiste altra pratica con stesso `richiedente_cf` in bando diverso E `pratica_id` diverso (esclude caso badge automatico). `TrovaPraticheStessoCF` legge CF da `istruttorie_api_cache.dati_json` (prova chiave `richiedente_cf` poi `richiedente`). `AddCollegamento` normalizza: bando_id minore va in posizione A — evita duplicati con UNIQUE constraint. `GetCollegamenti` usa UNION ALL bidirezionale per leggere da entrambi i lati della riga. `GetCollegaForm` → fragment HTMX inline (`fmt.Fprintf`), non usa template file.
+
 ## Schema SQLite (`internal/db/schema.sql` + migrazioni in `db.Open()`)
 
 | Tabella | Descrizione |
@@ -421,6 +426,8 @@ Form dinamico: ogni campo da `EngineConfig.Mapping` ha input con `type="text" in
 | `istruttorie` | Flag per-bando per-pratica: stato (`da_verificare`\|`approvata`\|`esclusa`), motivi, app_status, nota_lavoro |
 | `istruttorie_dati` | Override operatore cross-bando: `pratica_id PK`, JSON `{campo: valore}` — solo campi sovrascritti dall'operatore |
 | `istruttorie_api_cache` | Valori dichiarati API: `(pratica_id, bando_id) PK`, JSON campi estratti durante scan — mai mescolati con override |
+| `note_lavoro` | Note operatore per-bando per-pratica: `(bando_id, pratica_id) PK`, `nota` — tabella separata da `istruttorie` per evitare row `da_verificare` fantasma |
+| `pratiche_collegate` | Link manuale cross-bando: `(bando_id_a, pratica_id_a, bando_id_b, pratica_id_b)` normalizzato (bando_id minore in posizione A) con UNIQUE constraint |
 | `export_mappings` | Template CSV per-bando: colonne_json, filtro_stati |
 | `audit_actions` | Ogni approve/reject/calcola/pubblica con esito e messaggio |
 | `sessioni` | JWT OpenCity + metadati operatore; scade dopo 10 giorni |

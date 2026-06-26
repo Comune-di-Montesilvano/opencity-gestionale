@@ -15,17 +15,25 @@ type CollegamentoInfo struct {
 	Protocollo string
 }
 
-func AddCollegamento(db *sql.DB, bandoIDA int, praticaIDA string, bandoIDB int, praticaIDB string) error {
+func AddCollegamento(db *sql.DB, bandoIDA int, praticaIDA string, bandoIDB int, praticaIDB string) (int64, error) {
 	if bandoIDA > bandoIDB || (bandoIDA == bandoIDB && praticaIDA > praticaIDB) {
 		bandoIDA, bandoIDB = bandoIDB, bandoIDA
 		praticaIDA, praticaIDB = praticaIDB, praticaIDA
 	}
-	_, err := db.Exec(
+	res, err := db.Exec(
 		`INSERT OR IGNORE INTO pratiche_collegate (bando_id_a, pratica_id_a, bando_id_b, pratica_id_b, created_at)
 		 VALUES (?, ?, ?, ?, ?)`,
 		bandoIDA, praticaIDA, bandoIDB, praticaIDB, time.Now().Format(time.RFC3339),
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	id, _ := res.LastInsertId()
+	if id == 0 {
+		db.QueryRow(`SELECT id FROM pratiche_collegate WHERE bando_id_a=? AND pratica_id_a=? AND bando_id_b=? AND pratica_id_b=?`,
+			bandoIDA, praticaIDA, bandoIDB, praticaIDB).Scan(&id)
+	}
+	return id, nil
 }
 
 func RemoveCollegamento(db *sql.DB, id int) error {
@@ -111,7 +119,10 @@ func GetPraticheCollegabili(db *sql.DB, bandoID int) (map[string]bool, error) {
 	return out, rows.Err()
 }
 
-func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string) ([]CollegamentoInfo, error) {
+// TrovaPraticheStessoCF cerca pratiche in altri bandi con stesso CF richiedente.
+// dedupFilters: mappa campo→valore estratti dalla chiave di deduplicazione del bando corrente;
+// se non vuota, filtra i candidati per corrispondenza su quei campi.
+func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string, dedupFilters map[string]string) ([]CollegamentoInfo, error) {
 	var datiJSON string
 	db.QueryRow(`SELECT COALESCE(dati_json,'{}') FROM istruttorie_api_cache WHERE bando_id=? AND pratica_id=?`,
 		bandoID, praticaID).Scan(&datiJSON)
@@ -133,7 +144,18 @@ func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string) ([]Collega
 		return nil, nil
 	}
 
-	rows, err := db.Query(`
+	// Costruisce filtri dedup dinamici e condizione NOT EXISTS per già collegati
+	dedupWhere := ""
+	args := []any{bandoID, praticaID, cf, cf, bandoID, praticaID, bandoID, praticaID}
+	for campo, valore := range dedupFilters {
+		if valore == "" {
+			continue
+		}
+		dedupWhere += " AND json_extract(c.dati_json, '$." + strings.ReplaceAll(campo, "'", "") + "') = ?"
+		args = append(args, valore)
+	}
+
+	q := `
 		SELECT c.pratica_id, c.bando_id,
 		       COALESCE(b.nome, 'Bando '||c.bando_id),
 		       COALESCE(json_extract(c.dati_json, '$.protocollo'), '')
@@ -142,9 +164,14 @@ func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string) ([]Collega
 		WHERE c.bando_id != ? AND c.pratica_id != ?
 		  AND (json_extract(c.dati_json, '$.richiedente_cf') = ?
 		       OR json_extract(c.dati_json, '$.richiedente') = ?)
-		ORDER BY b.nome, json_extract(c.dati_json, '$.protocollo')`,
-		bandoID, praticaID, cf, cf,
-	)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM pratiche_collegate pc
+		    WHERE (pc.bando_id_a=? AND pc.pratica_id_a=? AND pc.bando_id_b=c.bando_id AND pc.pratica_id_b=c.pratica_id)
+		       OR (pc.bando_id_b=? AND pc.pratica_id_b=? AND pc.bando_id_a=c.bando_id AND pc.pratica_id_a=c.pratica_id)
+		  )` + dedupWhere + `
+		ORDER BY b.nome, json_extract(c.dati_json, '$.protocollo')`
+
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

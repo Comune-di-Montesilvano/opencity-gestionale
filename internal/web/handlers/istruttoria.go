@@ -855,7 +855,28 @@ func (h *IstruttoriaHandler) GetCollegaForm(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	pratiche, _ := db.TrovaPraticheStessoCF(h.DB, int(bandoID), praticaID)
+	// Costruisce filtri dedup dal engine_config del bando corrente
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
+	dedupFilters := map[string]string{}
+	if ecfg.Deduplicazione.Attiva && len(ecfg.Deduplicazione.Chiave) > 0 {
+		var datiJSON string
+		h.DB.QueryRow(`SELECT COALESCE(dati_json,'{}') FROM istruttorie_api_cache WHERE bando_id=? AND pratica_id=?`,
+			bandoID, praticaID).Scan(&datiJSON)
+		var dati map[string]json.RawMessage
+		json.Unmarshal([]byte(datiJSON), &dati)
+		for _, campo := range ecfg.Deduplicazione.Chiave {
+			if raw, ok := dati[campo]; ok {
+				var s string
+				if json.Unmarshal(raw, &s) == nil {
+					dedupFilters[campo] = s
+				}
+			}
+		}
+	}
+
+	pratiche, _ := db.TrovaPraticheStessoCF(h.DB, int(bandoID), praticaID, dedupFilters)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	pid := html.EscapeString(praticaID)
@@ -865,13 +886,12 @@ func (h *IstruttoriaHandler) GetCollegaForm(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	referer := r.Header.Get("Referer")
-	if referer == "" {
-		referer = fmt.Sprintf("/bandi/%d/dati", bandoID)
-	}
+	collegaBtnHTML := fmt.Sprintf(
+		`<button class="btn btn-sm" style="font-size:.7rem;padding:1px 6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" hx-get="/bandi/%d/istruttoria/%s/collega-form" hx-target="#collega-wrap-%s" hx-swap="innerHTML" onclick="event.stopPropagation()">+ Collega</button>`,
+		bandoID, pid, pid)
 
-	fmt.Fprintf(w, `<form method="POST" action="/bandi/%d/istruttoria/%s/collega" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">`,
-		bandoID, pid)
+	fmt.Fprintf(w, `<form hx-post="/bandi/%d/istruttoria/%s/collega" hx-target="#collega-wrap-%s" hx-swap="outerHTML" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">`,
+		bandoID, pid, pid)
 	fmt.Fprintf(w, `<select name="target" class="form-control form-control-sm" style="font-size:.75rem;max-width:300px"><option value="">— scegli pratica —</option>`)
 	for _, p := range pratiche {
 		fmt.Fprintf(w, `<option value="%d:%s">prot. %s — %s</option>`,
@@ -879,9 +899,9 @@ func (h *IstruttoriaHandler) GetCollegaForm(w http.ResponseWriter, r *http.Reque
 			html.EscapeString(p.Protocollo), html.EscapeString(p.BandoNome))
 	}
 	fmt.Fprintf(w, `</select>`)
-	fmt.Fprintf(w, `<input type="hidden" name="redirect_to" value="%s">`, html.EscapeString(referer))
 	fmt.Fprintf(w, `<button type="submit" class="btn btn-sm btn-primary" style="font-size:.75rem;padding:2px 8px">Collega</button>`)
-	fmt.Fprintf(w, `<button type="button" class="btn btn-sm btn-secondary" style="font-size:.75rem;padding:2px 8px" onclick="event.stopPropagation();location.reload()">✕</button>`)
+	fmt.Fprintf(w, `<button type="button" class="btn btn-sm btn-secondary" style="font-size:.75rem;padding:2px 8px" onclick="event.stopPropagation();document.getElementById('collega-wrap-%s').innerHTML=%s">✕</button>`,
+		pid, "`"+collegaBtnHTML+"`")
 	fmt.Fprintf(w, `</form>`)
 }
 
@@ -916,13 +936,28 @@ func (h *IstruttoriaHandler) PostCollega(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	db.AddCollegamento(h.DB, int(bandoID), praticaID, bandoIDB, praticaIDB) //nolint
+	linkID, _ := db.AddCollegamento(h.DB, int(bandoID), praticaID, bandoIDB, praticaIDB)
 
-	redirectTo := r.FormValue("redirect_to")
-	if redirectTo == "" || !strings.HasPrefix(redirectTo, "/") {
-		redirectTo = fmt.Sprintf("/bandi/%d/dati", bandoID)
-	}
-	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+	// Recupera nome bando e protocollo dell'altra pratica per il badge
+	var bandoNome, protocollo string
+	h.DB.QueryRow(`SELECT COALESCE(b.nome,'Bando '||?), COALESCE(json_extract(c.dati_json,'$.protocollo'),'')
+		FROM bandi b
+		LEFT JOIN istruttorie_api_cache c ON c.bando_id=b.id AND c.pratica_id=?
+		WHERE b.id=?`, bandoIDB, praticaIDB, bandoIDB).Scan(&bandoNome, &protocollo)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	pid := html.EscapeString(praticaID)
+
+	// Restituisce: badge collegamento + #collega-wrap ripristinato (sostituisce outerHTML del wrap)
+	fmt.Fprintf(w,
+		`<span id="collegamento-%d" class="badge" style="font-size:10px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">Anche in: %s prot. %s`+
+			`<button hx-post="/bandi/%d/istruttoria/%s/scollega/%d" hx-target="#collegamento-%d" hx-swap="outerHTML" hx-confirm="Rimuovere collegamento?" title="Rimuovi collegamento" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:10px;padding:0 2px;line-height:1" onclick="event.stopPropagation()">✕</button>`+
+			`</span>`+
+			`<span id="collega-wrap-%s" onclick="event.stopPropagation()"><button class="btn btn-sm" style="font-size:.7rem;padding:1px 6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" hx-get="/bandi/%d/istruttoria/%s/collega-form" hx-target="#collega-wrap-%s" hx-swap="innerHTML" onclick="event.stopPropagation()">+ Collega</button></span>`,
+		linkID, html.EscapeString(bandoNome), html.EscapeString(protocollo),
+		bandoID, pid, linkID, linkID,
+		pid, bandoID, pid, pid,
+	)
 }
 
 // PostScollega rimuove un collegamento manuale tra pratiche.
@@ -943,11 +978,7 @@ func (h *IstruttoriaHandler) PostScollega(w http.ResponseWriter, r *http.Request
 	cid, _ := strconv.Atoi(r.PathValue("collegamentoID"))
 	db.RemoveCollegamento(h.DB, cid) //nolint
 
-	redirectTo := r.Header.Get("Referer")
-	if redirectTo == "" {
-		redirectTo = fmt.Sprintf("/bandi/%d/dati", bandoID)
-	}
-	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+	w.WriteHeader(http.StatusOK)
 }
 
 // PraticaConDati aggrega i dati di una singola pratica per la vista "dati locali".
