@@ -161,7 +161,29 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		praticaIDs = append(praticaIDs, ist.PraticaID)
 	}
 	noteAltriBandi, _ := db.GetNoteAltriBandi(h.DB, int(bandoID), praticaIDs)
-	altriBandi, _ := db.GetAltriBandiPerPratiche(h.DB, int(bandoID), praticaIDs)
+	praticaIDSet := map[string]bool{}
+	for _, id := range praticaIDs {
+		praticaIDSet[id] = true
+	}
+	altriBandi := map[string][]string{}
+	if altreRun, err := db.GetLatestRunsAltriBandi(h.DB, bando.ID); err == nil {
+		for _, altroRun := range altreRun {
+			var grad graduatoria.Graduatoria
+			if json.Unmarshal([]byte(altroRun.DatiJSON), &grad) != nil {
+				continue
+			}
+			seen := map[string]bool{}
+			for _, g := range grad.Gruppi {
+				for _, riga := range g.Righe {
+					if riga.Istanza == nil || seen[riga.Istanza.ID] || !praticaIDSet[riga.Istanza.ID] {
+						continue
+					}
+					seen[riga.Istanza.ID] = true
+					altriBandi[riga.Istanza.ID] = append(altriBandi[riga.Istanza.ID], altroRun.BandoNome)
+				}
+			}
+		}
+	}
 
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
