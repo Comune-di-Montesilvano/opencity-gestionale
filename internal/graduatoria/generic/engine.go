@@ -350,9 +350,20 @@ func popolaCampo(rec *graduatoria.Record, nome string, fm graduatoria.FieldMappi
 			return err
 		}
 	}
-	// Se il campo ha VerificaPath, controlla la condizione e salva __cert_{nome}
+	// Se il campo ha VerificaPath, controlla la condizione e salva __cert_{nome}.
+	// VerificaPath supporta ";" come OR-fallback: usa il primo path che ritorna non vuoto.
 	if fm.VerificaPath != "" {
-		sig, _ := extractor.Str(data, fm.VerificaPath)
+		var sig string
+		for _, vpath := range strings.Split(fm.VerificaPath, ";") {
+			vpath = strings.TrimSpace(vpath)
+			if vpath == "" {
+				continue
+			}
+			if s, err := extractor.Str(data, vpath); err == nil && s != "" {
+				sig = s
+				break
+			}
+		}
 		certified := evaluateVerificaCondition(sig, fm.VerificaOp, fm.VerificaVal)
 		if certified {
 			rec.StringMap["__cert_"+nome] = sig
@@ -364,39 +375,61 @@ func popolaCampo(rec *graduatoria.Record, nome string, fm graduatoria.FieldMappi
 }
 
 func popolaCampoRaw(rec *graduatoria.Record, nome string, fm graduatoria.FieldMapping, data json.RawMessage) error {
-	switch fm.Tipo {
-	case "float":
-		v, err := extractor.Float(data, fm.Path)
-		if err != nil {
-			return err
+	paths := strings.Split(fm.Path, ";")
+	var lastErr error
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
 		}
-		rec.FloatMap[nome] = v
-	case "int":
-		v, err := extractor.Float(data, fm.Path)
-		if err != nil {
-			return err
+		switch fm.Tipo {
+		case "float":
+			v, err := extractor.Float(data, path)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			rec.FloatMap[nome] = v
+			return nil
+		case "int":
+			v, err := extractor.Float(data, path)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			rec.IntMap[nome] = int(v)
+			return nil
+		case "count":
+			v, err := extractor.Count(data, path)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			rec.IntMap[nome] = v
+			return nil
+		case "time":
+			v, err := extractor.Time(data, path)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			rec.TimeMap[nome] = v
+			return nil
+		default:
+			v, err := extractor.Str(data, path)
+			if err != nil || v == "" {
+				if err != nil {
+					lastErr = err
+				} else {
+					lastErr = fmt.Errorf("path %q: stringa vuota", path)
+				}
+				continue
+			}
+			rec.StringMap[nome] = v
+			return nil
 		}
-		rec.IntMap[nome] = int(v)
-	case "count":
-		v, err := extractor.Count(data, fm.Path)
-		if err != nil {
-			return err
-		}
-		rec.IntMap[nome] = v
-	case "time":
-		v, err := extractor.Time(data, fm.Path)
-		if err != nil {
-			return err
-		}
-		rec.TimeMap[nome] = v
-	default:
-		v, err := extractor.Str(data, fm.Path)
-		if err != nil {
-			return err
-		}
-		rec.StringMap[nome] = v
 	}
-	return nil
+	return lastErr
 }
 
 func copyRecord(src *graduatoria.Record) *graduatoria.Record {
