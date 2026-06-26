@@ -72,6 +72,10 @@
     {{range $altriBandiList}}
     <span class="badge" style="font-size:10px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" title="Pratica presente anche in: {{.}}">Anche in: {{.}}</span>
     {{end}}
+    {{$duplicatiList := index $.DuplicatiBandi $p.PraticaID}}
+    {{range $duplicatiList}}
+    <span class="badge" style="font-size:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca" title="Duplicato in: {{.}}">Duplicato in: {{.}}</span>
+    {{end}}
     {{if or (eq $p.Badge "non_rientrante") $p.IncludiDufficio}}
     <span id="includi-dufficio-btn-{{$p.PraticaID}}">
       <button hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/includi-dufficio"

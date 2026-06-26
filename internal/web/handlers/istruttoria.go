@@ -166,6 +166,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		praticaIDSet[id] = true
 	}
 	altriBandi := map[string][]string{}
+	duplicatiBandi := map[string][]string{}
 	if altreRun, err := db.GetLatestRunsAltriBandi(h.DB, bando.ID); err == nil {
 		for _, altroRun := range altreRun {
 			var grad graduatoria.Graduatoria
@@ -180,6 +181,14 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 					}
 					seen[riga.Istanza.ID] = true
 					altriBandi[riga.Istanza.ID] = append(altriBandi[riga.Istanza.ID], altroRun.BandoNome)
+				}
+			}
+			for _, riga := range grad.Escluse {
+				if riga.Istanza == nil || !praticaIDSet[riga.Istanza.ID] {
+					continue
+				}
+				if strings.Contains(strings.ToLower(riga.NoteEsclusione), "duplicat") {
+					duplicatiBandi[riga.Istanza.ID] = append(duplicatiBandi[riga.Istanza.ID], altroRun.BandoNome)
 				}
 			}
 		}
@@ -206,6 +215,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"FiglioCF":         figlioCF,
 		"NoteAltriBandi":   noteAltriBandi,
 		"AltriBandi":       altriBandi,
+		"DuplicatiBandi":   duplicatiBandi,
 	})
 }
 
@@ -947,7 +957,8 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 	// la partecipazione reale (passa filtri merito, anche se fuori_fondi).
 	// Non usa istruttorie_api_cache perché bandi con stesso service_id condividono
 	// tutte le pratiche e mostrerebbe badge su tutto.
-	altriBandi := map[string][]string{} // praticaID → []bandoNome
+	altriBandi := map[string][]string{}    // praticaID → []bandoNome (passano filtri merito)
+	duplicatiBandi := map[string][]string{} // praticaID → []bandoNome (escluse per duplicato)
 	if altreRun, err := db.GetLatestRunsAltriBandi(h.DB, bando.ID); err == nil {
 		for _, altroRun := range altreRun {
 			var grad graduatoria.Graduatoria
@@ -962,6 +973,14 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 					}
 					seen[riga.Istanza.ID] = true
 					altriBandi[riga.Istanza.ID] = append(altriBandi[riga.Istanza.ID], altroRun.BandoNome)
+				}
+			}
+			for _, riga := range grad.Escluse {
+				if riga.Istanza == nil {
+					continue
+				}
+				if strings.Contains(strings.ToLower(riga.NoteEsclusione), "duplicat") {
+					duplicatiBandi[riga.Istanza.ID] = append(duplicatiBandi[riga.Istanza.ID], altroRun.BandoNome)
 				}
 			}
 		}
@@ -986,11 +1005,12 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		"TuttiCampi":  tuttiCampi,
 		"Pratiche":    filtered,
 		"TotPratiche": len(pratiche),
-		"BadgeFilter": badgeFilter,
-		"Flash":       flash,
-		"FlashType":   flashType,
-		"BaseURL":     h.BaseURL,
-		"AltriBandi":  altriBandi,
+		"BadgeFilter":    badgeFilter,
+		"Flash":          flash,
+		"FlashType":      flashType,
+		"BaseURL":        h.BaseURL,
+		"AltriBandi":     altriBandi,
+		"DuplicatiBandi": duplicatiBandi,
 	})
 }
 
