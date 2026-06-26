@@ -867,10 +867,6 @@ func (h *IstruttoriaHandler) GetCollegaForm(w http.ResponseWriter, r *http.Reque
 		var dati map[string]json.RawMessage
 		json.Unmarshal([]byte(datiJSON), &dati)
 		for _, campo := range ecfg.Deduplicazione.Chiave {
-			// Salta campi expand (es. annualità) — hanno valori diversi per bando per natura
-			if m, ok := ecfg.Mapping[campo]; ok && m.Expand {
-				continue
-			}
 			if raw, ok := dati[campo]; ok {
 				var s string
 				if json.Unmarshal(raw, &s) == nil {
