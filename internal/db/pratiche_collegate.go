@@ -83,6 +83,33 @@ func GetCollegamenti(db *sql.DB, bandoID int, praticaIDs []string) (map[string][
 	return out, rows.Err()
 }
 
+// GetPraticheCollegabili restituisce il set di pratica_id del bando corrente
+// che hanno almeno una pratica con stesso CF richiedente in un altro bando scansionato.
+func GetPraticheCollegabili(db *sql.DB, bandoID int) (map[string]bool, error) {
+	rows, err := db.Query(`
+		SELECT DISTINCT c1.pratica_id
+		FROM istruttorie_api_cache c1
+		WHERE c1.bando_id = ?
+		  AND COALESCE(json_extract(c1.dati_json, '$.richiedente_cf'), '') != ''
+		  AND EXISTS (
+			SELECT 1 FROM istruttorie_api_cache c2
+			WHERE c2.bando_id != c1.bando_id
+			  AND (json_extract(c2.dati_json, '$.richiedente_cf') = json_extract(c1.dati_json, '$.richiedente_cf')
+			       OR json_extract(c2.dati_json, '$.richiedente') = json_extract(c1.dati_json, '$.richiedente_cf'))
+		  )`, bandoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var pid string
+		rows.Scan(&pid)
+		out[pid] = true
+	}
+	return out, rows.Err()
+}
+
 func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string) ([]CollegamentoInfo, error) {
 	var datiJSON string
 	db.QueryRow(`SELECT COALESCE(dati_json,'{}') FROM istruttorie_api_cache WHERE bando_id=? AND pratica_id=?`,

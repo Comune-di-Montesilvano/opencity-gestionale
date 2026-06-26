@@ -1114,6 +1114,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		tuttiPraticaIDs = append(tuttiPraticaIDs, p.PraticaID)
 	}
 	collegamentiMap, _ := db.GetCollegamenti(h.DB, int(bandoID), tuttiPraticaIDs)
+	collegabili, _ := db.GetPraticheCollegabili(h.DB, int(bandoID))
 
 	badgeFilter := r.URL.Query().Get("badge")
 	filtered := pratiche
@@ -1138,9 +1139,10 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		"Flash":          flash,
 		"FlashType":      flashType,
 		"BaseURL":        h.BaseURL,
-		"AltriBandi":     altriBandi,
-		"DuplicatiBandi": duplicatiBandi,
-		"Collegamenti":   collegamentiMap,
+		"AltriBandi":      altriBandi,
+		"DuplicatiBandi":  duplicatiBandi,
+		"Collegamenti":    collegamentiMap,
+		"Collegabili":     collegabili,
 	})
 }
 

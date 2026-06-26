@@ -93,7 +93,8 @@
       </form>
     </span>
     {{end}}
-    {{/* Pulsante collega — HTMX carica select con pratiche stesso CF */}}
+    {{/* Pulsante collega — visibile solo se esiste altra pratica con stesso CF */}}
+    {{if index $.Collegabili $p.PraticaID}}
     <span id="collega-wrap-{{$p.PraticaID}}" onclick="event.stopPropagation()">
       <button class="btn btn-sm"
               style="font-size:.7rem;padding:1px 6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe"
@@ -102,6 +103,7 @@
               hx-swap="innerHTML"
               onclick="event.stopPropagation()">+ Collega</button>
     </span>
+    {{end}}
     {{if or (eq $p.Badge "non_rientrante") $p.IncludiDufficio}}
     <span id="includi-dufficio-btn-{{$p.PraticaID}}">
       <button hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{$p.PraticaID}}/includi-dufficio"
