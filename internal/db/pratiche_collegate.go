@@ -94,6 +94,7 @@ func GetPraticheCollegabili(db *sql.DB, bandoID int) (map[string]bool, error) {
 		  AND EXISTS (
 			SELECT 1 FROM istruttorie_api_cache c2
 			WHERE c2.bando_id != c1.bando_id
+			  AND c2.pratica_id != c1.pratica_id
 			  AND (json_extract(c2.dati_json, '$.richiedente_cf') = json_extract(c1.dati_json, '$.richiedente_cf')
 			       OR json_extract(c2.dati_json, '$.richiedente') = json_extract(c1.dati_json, '$.richiedente_cf'))
 		  )`, bandoID)
