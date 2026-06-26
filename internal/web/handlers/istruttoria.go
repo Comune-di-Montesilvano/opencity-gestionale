@@ -322,28 +322,30 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 				motiviSet[m] = struct{}{}
 			}
 		}
-		// Built-in: corrispettivo=0 in modalità fondi (sempre, indipendentemente da Verifica.Attiva)
+		// Built-in: corrispettivo=0 in modalità fondi — solo se il campo non è già nel mapping
+		// (se è nel mapping, l'operatore lo vede e corregge direttamente via /dati o istruttoria).
 		if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
-			lordo := ecfg.Rimborso.CampoLordo
-			for _, rec := range passingRecords {
-				val := float64(0)
-				found := false
-				if v, ok := rec.FloatMap[lordo]; ok {
-					val = v
-					found = true
-				} else if sv, ok := rec.StringMap[lordo]; ok {
-					// campo mappato come "string": parsa il valore
-					sv = strings.TrimSpace(sv)
-					if sv == "" || sv == "0" {
-						val = 0
+			if _, alreadyMapped := ecfg.Mapping[ecfg.Rimborso.CampoLordo]; !alreadyMapped {
+				lordo := ecfg.Rimborso.CampoLordo
+				for _, rec := range passingRecords {
+					val := float64(0)
+					found := false
+					if v, ok := rec.FloatMap[lordo]; ok {
+						val = v
 						found = true
-					} else if parsed, err := strconv.ParseFloat(sv, 64); err == nil {
-						val = parsed
-						found = true
+					} else if sv, ok := rec.StringMap[lordo]; ok {
+						sv = strings.TrimSpace(sv)
+						if sv == "" || sv == "0" {
+							val = 0
+							found = true
+						} else if parsed, err := strconv.ParseFloat(sv, 64); err == nil {
+							val = parsed
+							found = true
+						}
 					}
-				}
-				if found && val == 0 {
-					motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+					if found && val == 0 {
+						motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+					}
 				}
 			}
 		}
@@ -685,25 +687,27 @@ func (h *IstruttoriaHandler) salvaEValutaDati(bando *db.Bando, op *middleware.Op
 				motiviSet[m] = struct{}{}
 			}
 		}
-		// Re-valuta check built-in dopo l'override.
+		// Re-valuta check built-in dopo l'override — solo se non già nel mapping.
 		if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
-			lordo := ecfg.Rimborso.CampoLordo
-			for _, rec := range records {
-				val := float64(0)
-				found := false
-				if v, ok := rec.FloatMap[lordo]; ok {
-					val = v
-					found = true
-				} else if sv, ok := rec.StringMap[lordo]; ok {
-					sv = strings.TrimSpace(sv)
-					if sv == "" || sv == "0" {
-						val = 0; found = true
-					} else if parsed, err2 := strconv.ParseFloat(sv, 64); err2 == nil {
-						val = parsed; found = true
+			if _, alreadyMapped := ecfg.Mapping[ecfg.Rimborso.CampoLordo]; !alreadyMapped {
+				lordo := ecfg.Rimborso.CampoLordo
+				for _, rec := range records {
+					val := float64(0)
+					found := false
+					if v, ok := rec.FloatMap[lordo]; ok {
+						val = v
+						found = true
+					} else if sv, ok := rec.StringMap[lordo]; ok {
+						sv = strings.TrimSpace(sv)
+						if sv == "" || sv == "0" {
+							val = 0; found = true
+						} else if parsed, err2 := strconv.ParseFloat(sv, 64); err2 == nil {
+							val = parsed; found = true
+						}
 					}
-				}
-				if found && val == 0 {
-					motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+					if found && val == 0 {
+						motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+					}
 				}
 			}
 		}
