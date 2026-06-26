@@ -322,8 +322,10 @@ document.querySelectorAll('#json-viewer-body tr[data-path]').forEach(function(ro
   if (dot !== -1 && supersetData) {
     const arr = path.slice(0, dot), field = path.slice(dot + 1);
     inSup = !!(supersetData[arr] && supersetData[arr][field] !== undefined);
+    // Scalari (non-array) sono in supersetData[""][fullPath]
+    if (!inSup && supersetData['']) inSup = supersetData[''][path] !== undefined;
   } else if (path && supersetData) {
-    inSup = !!(supersetData[path]);
+    inSup = !!(supersetData[path] || (supersetData[''] && supersetData[''][path] !== undefined));
   }
   row.dataset.inSuperset = inSup ? '1' : '0';
 });
@@ -845,8 +847,9 @@ function addSupersetOnlyRows() {
   // Raccogli tutti path scalari del campione
   const samplePaths = new Set(flatData.map(d => d.Path));
 
-  // Trova array path nel superset non presenti nel campione
-  const extraArrays = Object.entries(supersetData).filter(([k]) => !specialKeys.has(k) && !sampleArrayPaths.has(k));
+  // Trova array path nel superset non presenti nel campione.
+  // Esclude la chiave "" che contiene scalari non-array (gestiti sotto).
+  const extraArrays = Object.entries(supersetData).filter(([k]) => !specialKeys.has(k) && k !== '' && !sampleArrayPaths.has(k));
 
   // Trova sub-chiavi di array già nel campione che non compaiono in ArraySampleKeys del campione
   const extraSubKeys = []; // [{arrayPath, key}]
@@ -859,7 +862,15 @@ function addSupersetOnlyRows() {
     }
   }
 
-  if (extraArrays.length === 0 && extraSubKeys.length === 0) return;
+  // Scalari superset non nel campione (da supersetData[""])
+  const extraScalars = []; // path
+  if (supersetData['']) {
+    for (const fieldPath of Object.keys(supersetData[''])) {
+      if (!samplePaths.has(fieldPath)) extraScalars.push(fieldPath);
+    }
+  }
+
+  if (extraArrays.length === 0 && extraSubKeys.length === 0 && extraScalars.length === 0) return;
 
   const tbody = document.getElementById('json-viewer-body');
 
@@ -893,6 +904,31 @@ function addSupersetOnlyRows() {
         <span style="font-size:10px">${keys.length} campi</span>
       </td>`;
     tr.addEventListener('click', () => openArrayBuilderFromViewer(arrayPath, keys));
+    tbody.appendChild(tr);
+  }
+
+  // Scalari superset non nel campione corrente
+  for (const fieldPath of extraScalars.sort()) {
+    const vals = (supersetData[''][fieldPath] || []).slice(0, 5);
+    const valsStr = vals.join(', ') + (supersetData[''][fieldPath].length > 5 ? '…' : '');
+    const tr = document.createElement('tr');
+    tr.className = 'superset-only';
+    tr.style.cursor = 'pointer';
+    tr.dataset.path = fieldPath;
+    tr.dataset.value = '';
+    tr.dataset.isarray = '0';
+    tr.dataset.supersetOnly = '1';
+    tr.dataset.inSuperset = '1';
+    tr.innerHTML = `
+      <td class="json-path-cell">
+        <code style="font-size:.75em; display:block; word-break:break-all; color:#b45309">
+          ${escapeHTML(fieldPath)} <span style="background:#fef3c7; color:#92400e; border-radius:3px; padding:1px 4px; font-size:.85em">sup</span>
+        </code>
+      </td>
+      <td class="json-value" style="font-size:.82em; color:#92400e; max-width:180px; word-break:break-word">
+        ${escapeHTML(valsStr)}
+      </td>`;
+    tr.addEventListener('click', () => selectPath(fieldPath));
     tbody.appendChild(tr);
   }
 
