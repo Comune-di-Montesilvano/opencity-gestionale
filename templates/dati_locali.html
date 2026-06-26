@@ -63,7 +63,7 @@
     {{else if eq $p.Badge "esclusa"}}
       <span class="badge badge-gray">esclusa</span>
     {{else if eq $p.Badge "duplicato"}}
-      <span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca">duplicato</span>
+      <span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca">duplicato{{if $p.DuplicatoProtocollo}} di prot. {{$p.DuplicatoProtocollo}}{{end}}</span>
     {{else}}
       <span class="badge" style="background:#fefce8;color:#854d0e;border:1px solid #fef08a">non rientrante</span>
     {{end}}

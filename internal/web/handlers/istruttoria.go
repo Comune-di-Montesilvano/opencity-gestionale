@@ -850,14 +850,15 @@ func (h *IstruttoriaHandler) PostToggleIncludiDufficio(w http.ResponseWriter, r 
 
 // PraticaConDati aggrega i dati di una singola pratica per la vista "dati locali".
 type PraticaConDati struct {
-	PraticaID       string
-	Protocollo      string
-	StatusApp       string
-	Badge           string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"duplicato"|"non_rientrante"
-	DatiAPI         map[string]string // valori dichiarati dall'API (dalla cache scan)
-	DatiLocali      map[string]string // override operatore (da istruttorie_dati)
-	NotaLavoro      string
-	IncludiDufficio bool
+	PraticaID           string
+	Protocollo          string
+	StatusApp           string
+	Badge               string // "ammessa"|"fuori_fondi"|"da_verificare"|"approvata"|"esclusa"|"duplicato"|"non_rientrante"
+	DuplicatoProtocollo string // protocollo della pratica "originale" (solo se Badge=="duplicato")
+	DatiAPI             map[string]string // valori dichiarati dall'API (dalla cache scan)
+	DatiLocali          map[string]string // override operatore (da istruttorie_dati)
+	NotaLavoro          string
+	IncludiDufficio     bool
 }
 
 // GetDatiLocali — vista "tutte le domande" con campi API + override operatore per ciascuna.
@@ -900,6 +901,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 	}
 	// Ammesse/fuori fondi/duplicati dall'ultima run.
 	ammesseMap := map[string]string{} // praticaID → "ammessa"|"fuori_fondi"|"duplicato"
+	duplicatoOrigID := map[string]string{} // praticaID duplicata → praticaID originale
 	if run, err := db.GetLatestRun(h.DB, bando.ID); err == nil && run != nil {
 		var grad graduatoria.Graduatoria
 		if json.Unmarshal([]byte(run.DatiJSON), &grad) == nil {
@@ -922,6 +924,9 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 				if strings.Contains(strings.ToLower(riga.NoteEsclusione), "duplicat") {
 					if _, already := ammesseMap[riga.Istanza.ID]; !already {
 						ammesseMap[riga.Istanza.ID] = "duplicato"
+						if riga.OriginalID != "" {
+							duplicatoOrigID[riga.Istanza.ID] = riga.OriginalID
+						}
 					}
 				}
 			}
@@ -944,15 +949,22 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		} else if b, ok := ammesseMap[praticaID]; ok {
 			badge = b
 		}
+		var duplicatoProtocollo string
+		if origID, ok := duplicatoOrigID[praticaID]; ok {
+			if origFields, ok2 := apiCache[origID]; ok2 {
+				duplicatoProtocollo = origFields["protocollo"]
+			}
+		}
 		pratiche = append(pratiche, PraticaConDati{
-			PraticaID:       praticaID,
-			Protocollo:      apiFields["protocollo"],
-			StatusApp:       apiFields["status"],
-			Badge:           badge,
-			DatiAPI:         apiFields,
-			DatiLocali:      datiLocali[praticaID],
-			NotaLavoro:      noteMap[praticaID],
-			IncludiDufficio: inclusiDufficio[praticaID],
+			PraticaID:           praticaID,
+			Protocollo:          apiFields["protocollo"],
+			StatusApp:           apiFields["status"],
+			Badge:               badge,
+			DuplicatoProtocollo: duplicatoProtocollo,
+			DatiAPI:             apiFields,
+			DatiLocali:          datiLocali[praticaID],
+			NotaLavoro:          noteMap[praticaID],
+			IncludiDufficio:     inclusiDufficio[praticaID],
 		})
 	}
 	sort.Slice(pratiche, func(i, j int) bool {
