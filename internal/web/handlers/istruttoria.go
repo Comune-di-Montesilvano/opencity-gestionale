@@ -73,11 +73,14 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 	}
 	var campiBuiltin []CampoBuiltin
 	if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
-		campiBuiltin = append(campiBuiltin, CampoBuiltin{
-			Campo:  ecfg.Rimborso.CampoLordo,
-			Label:  "Importo speso (€)",
-			Motivo: "Corrispettivo dichiarato €0,00",
-		})
+		// Non aggiungere se già presente nel mapping configurato (evita duplicati).
+		if _, alreadyMapped := ecfg.Mapping[ecfg.Rimborso.CampoLordo]; !alreadyMapped {
+			campiBuiltin = append(campiBuiltin, CampoBuiltin{
+				Campo:  ecfg.Rimborso.CampoLordo,
+				Label:  "Importo speso (€)",
+				Motivo: "Corrispettivo dichiarato €0,00",
+			})
+		}
 	}
 
 	// Campi dichiarati e CF da mostrare in istruttoria senza aprire la domanda.
