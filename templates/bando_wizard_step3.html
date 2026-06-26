@@ -101,7 +101,7 @@
                   placeholder="path campo da verificare"
                   oninput="updatePreview(this)">
                 <div style="display:flex; gap:4px; align-items:center">
-                  <select name="p_verifica_op" class="form-control form-control-sm verifica-op-select" onchange="updateVerificaValVisibility(this)" style="width:auto">
+                  <select name="p_verifica_op" class="form-control form-control-sm verifica-op-select" onchange="updateVerificaValVisibility(this); updateVerificaPreview(this.closest('.verifica-section').querySelector('[name=p_verifica_path]'))" style="width:auto">
                     <option value="non_vuoto" {{if or (eq $p.VerificaOp "") (eq $p.VerificaOp "non_vuoto")}}selected{{end}}>non vuoto</option>
                     <option value="==" {{if eq $p.VerificaOp "=="}}selected{{end}}>uguale a</option>
                     <option value="!=" {{if eq $p.VerificaOp "!="}}selected{{end}}>diverso da</option>
@@ -109,6 +109,7 @@
                   <input type="text" name="p_verifica_val" value="{{$p.VerificaVal}}"
                     class="form-control form-control-sm verifica-val-input"
                     placeholder="valore"
+                    oninput="updateVerificaPreview(this.closest('.verifica-section').querySelector('[name=p_verifica_path]'))"
                     style="{{if or (eq $p.VerificaOp "==") (eq $p.VerificaOp "!=")}}display:inline-block{{else}}display:none{{end}}; width:100px">
                 </div>
               </div>
@@ -253,12 +254,12 @@
       <div class="verifica-section" style="display:flex; flex-direction:column; gap:4px">
         <input type="text" name="p_verifica_path" value="" class="form-control form-control-sm json-path-input" placeholder="path campo da verificare" oninput="updatePreview(this)">
         <div style="display:flex; gap:4px; align-items:center">
-          <select name="p_verifica_op" class="form-control form-control-sm verifica-op-select" onchange="updateVerificaValVisibility(this)" style="width:auto">
+          <select name="p_verifica_op" class="form-control form-control-sm verifica-op-select" onchange="updateVerificaValVisibility(this); updateVerificaPreview(this.closest('.verifica-section').querySelector('[name=p_verifica_path]'))" style="width:auto">
             <option value="non_vuoto" selected>non vuoto</option>
             <option value="==">uguale a</option>
             <option value="!=">diverso da</option>
           </select>
-          <input type="text" name="p_verifica_val" value="" class="form-control form-control-sm verifica-val-input" placeholder="valore" style="display:none; width:100px">
+          <input type="text" name="p_verifica_val" value="" class="form-control form-control-sm verifica-val-input" placeholder="valore" oninput="updateVerificaPreview(this.closest('.verifica-section').querySelector('[name=p_verifica_path]'))" style="display:none; width:100px">
         </div>
       </div>
     </td>
@@ -304,6 +305,7 @@ document.addEventListener('focusin', e => {
 
 // Preview iniziale per tutti gli input con valore
 document.querySelectorAll('.json-path-input[name="p_path"]').forEach(inp => updatePreview(inp));
+document.querySelectorAll('.json-path-input[name="p_verifica_path"]').forEach(inp => updateVerificaPreview(inp));
 
 // Viewer: filtro iniziale se viewer_filter è popolato
 if (document.getElementById('viewer-search') && document.getElementById('viewer-search').value) {
@@ -379,9 +381,37 @@ document.getElementById('step3-form').addEventListener('submit', function(e) {
 
 // ── Path preview ─────────────────────────────────────────────────────────────
 
+function resolveSinglePath(path) {
+  // Risolve un singolo path. Ritorna {found: bool, value: string}.
+  if (flatMap[path] !== undefined) return { found: true, value: String(flatMap[path]) };
+  if (rawData && typeof rawData === 'object') {
+    try {
+      const v = resolvePathJS(rawData, path);
+      if (v !== undefined && v !== null && !Array.isArray(v) && typeof v !== 'object') {
+        return { found: true, value: String(v) };
+      }
+    } catch(e) {}
+  }
+  return { found: false, value: '' };
+}
+
+function resolveOrPaths(rawPath) {
+  // Supporta ";" come OR-fallback. Ritorna {found, value, pathIndex (1-based)}.
+  const parts = rawPath.split(';').map(s => s.trim()).filter(Boolean);
+  for (let i = 0; i < parts.length; i++) {
+    const r = resolveSinglePath(parts[i]);
+    if (r.found && r.value !== '') return { found: true, value: r.value, pathIndex: i + 1, total: parts.length };
+  }
+  return { found: false, value: '', pathIndex: 0, total: parts.length };
+}
+
 function updatePreview(input) {
   const previewEl = input.parentElement ? input.parentElement.querySelector('.valore-campione') : null;
-  if (!previewEl) return;
+  if (!previewEl) {
+    // Potrebbe essere il campo verifica_path — aggiorna il suo preview separato
+    if (input.name === 'p_verifica_path') updateVerificaPreview(input);
+    return;
+  }
   const path = input.value.trim();
   if (!path) { previewEl.textContent = ''; return; }
 
@@ -390,24 +420,51 @@ function updatePreview(input) {
     return;
   }
 
-  // 1. Lookup flatMap (scalari)
-  if (flatMap[path] !== undefined) {
-    previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(String(flatMap[path])) + '</strong></span>';
-    return;
+  const r = resolveOrPaths(path);
+  if (r.found) {
+    const label = r.total > 1 && r.pathIndex > 1
+      ? `Valore (path ${r.pathIndex}): `
+      : 'Valore: ';
+    previewEl.innerHTML = '<span style="color:#16a34a">' + label + '<strong>' + escapeHTML(r.value.substring(0, 80)) + '</strong></span>';
+  } else {
+    previewEl.innerHTML = '<span style="color:#dc2626">Non trovato nel campione</span>';
   }
+}
 
-  // 2. Risoluzione contro rawData (per path con notazione array tipo anni[key=val].campo)
-  if (rawData && typeof rawData === 'object') {
-    try {
-      const val = resolvePathJS(rawData, path);
-      if (val !== undefined && val !== null && !Array.isArray(val) && typeof val !== 'object') {
-        previewEl.innerHTML = '<span style="color:#16a34a">Valore: <strong>' + escapeHTML(String(val).substring(0, 80)) + '</strong></span>';
-        return;
-      }
-    } catch(e) {}
+function updateVerificaPreview(pathInput) {
+  const section = pathInput.closest('.verifica-section');
+  if (!section) return;
+  let previewEl = section.querySelector('.verifica-preview');
+  if (!previewEl) {
+    previewEl = document.createElement('div');
+    previewEl.className = 'verifica-preview';
+    previewEl.style.cssText = 'font-size:11px;margin-top:1px;min-height:14px;font-weight:500';
+    section.appendChild(previewEl);
   }
+  const vpath = pathInput.value.trim();
+  if (!vpath) { previewEl.textContent = ''; return; }
 
-  previewEl.innerHTML = '<span style="color:#dc2626">Non trovato nel campione</span>';
+  const opEl  = section.querySelector('[name="p_verifica_op"]');
+  const valEl = section.querySelector('[name="p_verifica_val"]');
+  const op    = opEl  ? opEl.value  : 'non_vuoto';
+  const expected = valEl ? valEl.value.trim() : '';
+
+  const r = resolveOrPaths(vpath);
+  const actualVal = r.found ? r.value : '';
+
+  let passes;
+  if (op === '==')       passes = actualVal === expected;
+  else if (op === '!=')  passes = actualVal !== expected;
+  else                   passes = actualVal !== '';  // non_vuoto
+
+  if (!r.found && op !== 'non_vuoto') {
+    previewEl.innerHTML = '<span style="color:#9ca3af">Path non trovato nel campione</span>';
+  } else if (passes) {
+    previewEl.innerHTML = '<span style="color:#16a34a">✓ passa</span>';
+  } else {
+    const got = actualVal ? ' (trovato: ' + escapeHTML(actualVal.substring(0,40)) + ')' : ' (vuoto)';
+    previewEl.innerHTML = '<span style="color:#dc2626">✗ non passa' + got + '</span>';
+  }
 }
 
 // Risolve dot-notation + [key=val] o [N] contro un oggetto JS
