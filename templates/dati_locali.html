@@ -68,6 +68,10 @@
     {{range $.TuttiCampi}}{{if index $p.DatiLocali .}}{{$hasOverride = true}}{{end}}{{end}}
     {{if $hasOverride}}<span style="font-size:.75rem;color:#7c3aed">● dati locali</span>{{end}}
     {{if $p.NotaLavoro}}<span style="font-size:.75rem;color:#0369a1">📝 nota</span>{{end}}
+    {{$altriBandiList := index $.AltriBandi $p.PraticaID}}
+    {{range $altriBandiList}}
+    <span class="badge" style="font-size:10px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" title="Pratica presente anche in: {{.}}">Anche in: {{.}}</span>
+    {{end}}
     <a href="{{$.BaseURL}}/lang/it/operatori/{{$p.PraticaID}}/detail" target="_blank"
        style="font-size:.75rem;color:#2563eb;text-decoration:none;margin-left:auto" title="Apri nel portale"
        onclick="event.stopPropagation()">↗ Portale</a>

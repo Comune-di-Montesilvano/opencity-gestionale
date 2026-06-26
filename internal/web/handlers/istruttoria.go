@@ -872,6 +872,12 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		return pratiche[i].Protocollo < pratiche[j].Protocollo
 	})
 
+	var allPraticaIDs []string
+	for _, p := range pratiche {
+		allPraticaIDs = append(allPraticaIDs, p.PraticaID)
+	}
+	altriBandi, _ := db.GetAltriBandiPerPratiche(h.DB, int(bandoID), allPraticaIDs)
+
 	badgeFilter := r.URL.Query().Get("badge")
 	filtered := pratiche
 	if badgeFilter != "" {
@@ -895,6 +901,7 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		"Flash":       flash,
 		"FlashType":   flashType,
 		"BaseURL":     h.BaseURL,
+		"AltriBandi":  altriBandi,
 	})
 }
 
