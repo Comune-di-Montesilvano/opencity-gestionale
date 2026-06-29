@@ -532,13 +532,9 @@ func (h *GraduatoriaHandler) PostPubblica(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Graduatoria+pubblicata&flashType=success", bandoID, runID), http.StatusSeeOther)
 }
 
-// PostEliminaRun — elimina una run in stato bozza. Solo admin.
+// PostEliminaRun — elimina una run in stato bozza. Solo admin o l'operatore che l'ha creata.
 func (h *GraduatoriaHandler) PostEliminaRun(w http.ResponseWriter, r *http.Request) {
 	op := middleware.FromContext(r.Context())
-	if !op.IsAdmin() {
-		http.Error(w, "Solo gli amministratori possono eliminare una run", http.StatusForbidden)
-		return
-	}
 	bandoID := bandoIDFromPath(r)
 	runID, _ := strconv.ParseInt(r.PathValue("runID"), 10, 64)
 
@@ -547,6 +543,14 @@ func (h *GraduatoriaHandler) PostEliminaRun(w http.ResponseWriter, r *http.Reque
 		http.NotFound(w, r)
 		return
 	}
+
+	// Gli amministratori possono eliminare qualsiasi run in stato bozza.
+	// Gli operatori possono eliminare solo le run create da loro in stato bozza.
+	if !op.IsAdmin() && run.CalcolataDa != op.Username {
+		http.Error(w, "Non sei autorizzato a eliminare questa run", http.StatusForbidden)
+		return
+	}
+
 	if run.Stato != "bozza" {
 		http.Redirect(w, r, fmt.Sprintf("/bandi/%d/run/%d?flash=Impossibile+eliminare+una+run+pubblicata&flashType=error", bandoID, runID), http.StatusSeeOther)
 		return

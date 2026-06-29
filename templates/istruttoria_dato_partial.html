@@ -1,6 +1,9 @@
 {{define "istruttoria_dato_partial.html"}}
 {{if eq .Stato "approvata"}}
 <span style="color:#16a34a;font-size:.82rem;font-weight:600">✓ Nessun problema rilevato</span>
+{{else if .InclusiDufficio}}
+{{if .Motivi}}<span class="badge badge-gray" style="margin-right:.2rem">istanza aggiunta d'ufficio</span>{{end}}
+{{if not .Motivi}}<span style="color:#16a34a;font-size:.82rem;font-weight:600">✓ Nessun problema rilevato</span>{{end}}
 {{else}}
 {{range .Motivi}}<span class="badge badge-gray" style="margin-right:.2rem">{{.}}</span>{{end}}
 {{if not .Motivi}}<span style="color:#16a34a;font-size:.82rem;font-weight:600">✓ Nessun problema rilevato</span>{{end}}

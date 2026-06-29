@@ -139,7 +139,18 @@
       {{end}}
     </td>
     <td>
-      {{if .MotiviIniziali}}
+      {{if .InclusiDufficio}}
+      <div style="margin-bottom:.35rem">
+        <span style="font-size:.68rem;color:#6b7280;font-weight:500">In istruttoria per:</span>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
+          {{if .Motivi}}
+          <span data-motivo-iniziale="istanza aggiunta d'ufficio" style="font-size:.7rem;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:4px;padding:1px 7px;display:inline-flex;align-items:center;gap:3px">✗ istanza aggiunta d'ufficio</span>
+          {{else}}
+          <span data-motivo-iniziale="istanza aggiunta d'ufficio" style="font-size:.7rem;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:4px;padding:1px 7px;display:inline-flex;align-items:center;gap:3px">✓ istanza aggiunta d'ufficio</span>
+          {{end}}
+        </div>
+      </div>
+      {{else if .MotiviIniziali}}
       <div style="margin-bottom:.35rem">
         <span style="font-size:.68rem;color:#6b7280;font-weight:500">In istruttoria per:</span>
         <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
@@ -173,7 +184,7 @@
       <div style="margin-top:.4rem">
         {{range $.Config.Verifica.FiltriFlag}}
         {{$hasDato := index $riga.Dati .Campo}}
-        {{if or (hasCol $riga.Motivi .Motivo) $hasDato}}
+        {{if or (or (hasCol $riga.Motivi .Motivo) $hasDato) $riga.InclusiDufficio}}
         <div style="margin-bottom:.2rem">
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{.Campo}}:</span>
@@ -206,7 +217,7 @@
         {{range $.CampiVerifica}}
         {{$campo := .}}
         {{$hasDato := index $riga.Dati $campo}}
-        {{if or (isCertFallito $riga.Motivi $campo) $hasDato}}
+        {{if or (or (isCertFallito $riga.Motivi $campo) $hasDato) $riga.InclusiDufficio}}
         {{$statoKey := statoVerificaKey $campo}}
         {{$stato := index $riga.Dati $statoKey}}
         {{$declVal := index (index $.CampiDichiarati $riga.PraticaID) $campo}}
@@ -266,7 +277,7 @@
         {{range $.CampiBuiltin}}
         {{$cb := .}}
         {{$cbDato := index $riga.Dati $cb.Campo}}
-        {{if or (hasMotivoPrefix $riga.Motivi $cb.Motivo) $cbDato}}
+        {{if or (or (hasMotivoPrefix $riga.Motivi $cb.Motivo) $cbDato) $riga.InclusiDufficio}}
         <div style="margin-bottom:.2rem">
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$cb.Label}} ✎:</span>
@@ -295,6 +306,37 @@
         </div>
         {{end}}{{/* fine hasMotivoPrefix OR cbDato */}}
         {{end}}{{/* fine range CampiBuiltin */}}
+      </div>
+      {{end}}
+      {{/* Nuovi campi mappati / filtri per pratiche d'ufficio */}}
+      {{if and $riga.InclusiDufficio $.CampiMappatiAltri}}
+      <div style="margin-top:.4rem">
+        {{range $.CampiMappatiAltri}}
+        {{$campo := .}}
+        {{$hasDato := index $riga.Dati $campo}}
+        <div style="margin-bottom:.2rem">
+          <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
+            <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$campo}}:</span>
+            {{if $hasDato}}
+            <span id="badge-{{$riga.ID}}-{{$campo}}"
+                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
+            {{end}}
+            <button type="button" id="mod-{{$riga.ID}}-{{$campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $hasDato}};display:none{{end}}"
+                    onclick="var b=document.getElementById('badge-{{$riga.ID}}-{{$campo}}');if(b)b.style.display='none';document.getElementById('input-{{$riga.ID}}-{{$campo}}').style.display='inline-block';document.getElementById('btn-{{$riga.ID}}-{{$campo}}').style.display='inline-block';this.style.display='none'">modifica</button>
+            <input type="text"
+                   id="input-{{$riga.ID}}-{{$campo}}"
+                   value="{{$hasDato}}"
+                   placeholder="inserisci valore"
+                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',this,'badge-{{$riga.ID}}-{{$campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{$campo}}','err-{{$riga.ID}}-{{$campo}}','mod-{{$riga.ID}}-{{$campo}}')}"
+                   name="valore">
+            <button type="button" id="btn-{{$riga.ID}}-{{$campo}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $hasDato}}display:none{{end}}"
+                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',document.getElementById('input-{{$riga.ID}}-{{$campo}}'),'badge-{{$riga.ID}}-{{$campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{$campo}}','err-{{$riga.ID}}-{{$campo}}','mod-{{$riga.ID}}-{{$campo}}')">Salva</button>
+            <span id="err-{{$riga.ID}}-{{$campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
+          </div>
+        </div>
+        {{end}}
       </div>
       {{end}}
     </td>
@@ -449,7 +491,12 @@ function aggiornaApprovaBtn(motiviDivID) {
   if (tr) {
     tr.querySelectorAll('[data-motivo-iniziale]').forEach(function(el) {
       var m = el.getAttribute('data-motivo-iniziale');
-      var risolto = motiviRimasti.indexOf(m) === -1;
+      var risolto;
+      if (m === "istanza aggiunta d'ufficio") {
+        risolto = motiviRimasti.length === 0;
+      } else {
+        risolto = motiviRimasti.indexOf(m) === -1;
+      }
       if (risolto) {
         el.style.background = '#f0fdf4'; el.style.color = '#15803d'; el.style.borderColor = '#bbf7d0';
         el.textContent = '✓ ' + m;

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"opencity-gestionale/internal/db"
 	"opencity-gestionale/internal/graduatoria"
@@ -82,6 +83,43 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 			})
 		}
 	}
+
+	// Trova tutti i campi del mapping o filtri che non sono già coperti da CampiVerifica o FiltriFlag o CampiBuiltin
+	campiVerificaSet := map[string]bool{}
+	for _, c := range campiVerifica {
+		campiVerificaSet[c] = true
+	}
+	filtriFlagSet := map[string]bool{}
+	for _, ff := range ecfg.Verifica.FiltriFlag {
+		filtriFlagSet[ff.Campo] = true
+	}
+	builtinSet := map[string]bool{}
+	for _, cb := range campiBuiltin {
+		builtinSet[cb.Campo] = true
+	}
+
+	var campiMappatiAltri []string
+	for nome := range ecfg.Mapping {
+		if !campiVerificaSet[nome] && !filtriFlagSet[nome] && !builtinSet[nome] {
+			campiMappatiAltri = append(campiMappatiAltri, nome)
+		}
+	}
+	for _, f := range ecfg.Filtri {
+		if !campiVerificaSet[f.Campo] && !filtriFlagSet[f.Campo] && !builtinSet[f.Campo] {
+			// Evita duplicati
+			found := false
+			for _, c := range campiMappatiAltri {
+				if c == f.Campo {
+					found = true
+					break
+				}
+			}
+			if !found {
+				campiMappatiAltri = append(campiMappatiAltri, f.Campo)
+			}
+		}
+	}
+	sort.Strings(campiMappatiAltri)
 
 	// Campi dichiarati e CF da mostrare in istruttoria senza aprire la domanda.
 	// Sorgente primaria: cache API aggiornata durante la scan. Fallback: snapshot ultima run.
@@ -200,27 +238,28 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "istruttoria.html", map[string]any{
-		"Op":              op,
-		"Bando":           bando,
-		"Config":          ecfg,
-		"Istruttorie":     istruttorie,
-		"Stats":           stats,
-		"StatoFilter":     statoFilter,
-		"AppStatusFilter": appStatusFilter,
-		"StatiApp":        statiApp,
-		"BaseURL":         h.BaseURL,
-		"Flash":           flash,
-		"FlashType":       flashType,
-		"CampiVerifica":    campiVerifica,
-		"CampiBuiltin":     campiBuiltin,
-		"FuoriFondi":       fuoriFondi,
-		"CampiDichiarati":  campiDichiarati,
-		"RichiedenteCF":    richiedenteCF,
-		"FiglioCF":         figlioCF,
-		"NoteAltriBandi":   noteAltriBandi,
-		"AltriBandi":       altriBandi,
-		"DuplicatiBandi":   duplicatiBandi,
-		"Collegamenti":     collegamentiMap,
+		"Op":                op,
+		"Bando":             bando,
+		"Config":            ecfg,
+		"Istruttorie":       istruttorie,
+		"Stats":             stats,
+		"StatoFilter":       statoFilter,
+		"AppStatusFilter":   appStatusFilter,
+		"StatiApp":          statiApp,
+		"BaseURL":           h.BaseURL,
+		"Flash":             flash,
+		"FlashType":         flashType,
+		"CampiVerifica":     campiVerifica,
+		"CampiBuiltin":      campiBuiltin,
+		"CampiMappatiAltri": campiMappatiAltri,
+		"FuoriFondi":        fuoriFondi,
+		"CampiDichiarati":   campiDichiarati,
+		"RichiedenteCF":     richiedenteCF,
+		"FiglioCF":          figlioCF,
+		"NoteAltriBandi":    noteAltriBandi,
+		"AltriBandi":        altriBandi,
+		"DuplicatiBandi":    duplicatiBandi,
+		"Collegamenti":      collegamentiMap,
 	})
 }
 
@@ -356,6 +395,12 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 
 		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
 		if err != nil || len(records) == 0 {
+			if isDufficio {
+				rawM := []string{"istanza aggiunta d'ufficio"}
+				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
+				nuove++
+				duffficioResolved[app.ID] = true
+			}
 			continue
 		}
 		var passingRecords []*graduatoria.Record
@@ -365,28 +410,28 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 				passingRecords = append(passingRecords, rec)
 			}
 		}
-		if len(passingRecords) == 0 {
-			if isDufficio {
-				motivo := "Dati insufficienti — completare i campi richiesti manualmente"
-				rawM := []string{motivo}
-				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
-				nuove++
-				duffficioResolved[app.ID] = true
-			}
-			continue
-		}
+
+		hasTipologia := true
 		if len(ecfg.Tipologie) > 0 {
-			hasTipologia := false
+			hasTipologia = false
 			for _, rec := range passingRecords {
 				if generic.TipologiaDiRecord(rec, ecfg.Tipologie) != "" {
 					hasTipologia = true
 					break
 				}
 			}
-			if !hasTipologia {
-				continue
-			}
 		}
+
+		if len(passingRecords) == 0 || !hasTipologia {
+			if isDufficio {
+				rawM := []string{"istanza aggiunta d'ufficio"}
+				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
+				nuove++
+				duffficioResolved[app.ID] = true
+			}
+			continue
+		}
+
 		motiviSet := map[string]struct{}{}
 		for _, rec := range passingRecords {
 			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
@@ -433,6 +478,18 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 			rawMotivi = append(rawMotivi, m)
 		}
 
+		if isDufficio {
+			duffficioResolved[app.ID] = true
+			if len(motiviSet) > 0 {
+				rawM := []string{"istanza aggiunta d'ufficio"}
+				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
+				nuove++
+			} else {
+				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, []string{}, []string{}, app.Status) //nolint
+			}
+			continue
+		}
+
 		if len(motiviSet) == 0 {
 			// Nessun motivo corrente (override hanno risolto tutto): aggiorna solo motivi_iniziali su riga esistente.
 			if len(rawMotivi) > 0 {
@@ -447,16 +504,13 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, rawMotivi, app.Status); err == nil {
 			nuove++
 		}
-		if isDufficio {
-			duffficioResolved[app.ID] = true
-		}
 	}
 
 	// App d'ufficio non trovate in rawApps (servizio diverso o pratica non esistente):
 	// generano motivo generico per non mostrare ingiustamente "✓ OK".
 	for pid := range dufficioPIDs {
 		if !duffficioResolved[pid] {
-			motivo := "Dati insufficienti — completare i campi richiesti manualmente"
+			motivo := "istanza aggiunta d'ufficio"
 			rawM := []string{motivo}
 			db.UpsertIstruttoria(dbConn, int(bando.ID), pid, rawM, rawM, "") //nolint
 			nuove++
@@ -648,13 +702,17 @@ func (h *IstruttoriaHandler) PostSaveDato(w http.ResponseWriter, r *http.Request
 		stato = ist.Stato
 	}
 
+	var inclusiDufficio bool
+	h.DB.QueryRow(`SELECT COALESCE(includi_dufficio, 0) FROM istruttorie WHERE bando_id=? AND pratica_id=?`, bandoID, praticaID).Scan(&inclusiDufficio)
+
 	renderTemplate(w, "istruttoria_dato_partial.html", map[string]any{
-		"Motivi":        motivi,
-		"CampiVerifica": campiVerifica,
-		"Dati":          datiPratica,
-		"BandoID":       bandoID,
-		"PraticaID":     praticaID,
-		"Stato":         stato,
+		"Motivi":          motivi,
+		"CampiVerifica":   campiVerifica,
+		"Dati":            datiPratica,
+		"BandoID":         bandoID,
+		"PraticaID":       praticaID,
+		"Stato":           stato,
+		"InclusiDufficio": inclusiDufficio,
 	})
 }
 
@@ -705,19 +763,74 @@ func (h *IstruttoriaHandler) salvaEValutaDati(bando *db.Bando, op *middleware.Op
 	var ecfg graduatoria.EngineConfig
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 
-	// Normalizza i valori modificati
+	// Normalizza e valida i valori modificati rispetto alla configurazione del bando
 	normalized := make(map[string]string)
 	for campo, valore := range overrides {
 		valore = strings.TrimSpace(valore)
-		if fm, ok := ecfg.Mapping[campo]; ok && (fm.Tipo == "float" || fm.Tipo == "int") {
-			valore = strings.ReplaceAll(valore, ",", ".")
+		if valore == "" {
+			normalized[campo] = ""
+			continue
+		}
+
+		if fm, ok := ecfg.Mapping[campo]; ok {
+			switch fm.Tipo {
+			case "float":
+				valore = strings.ReplaceAll(valore, ",", ".")
+				if _, err := strconv.ParseFloat(valore, 64); err != nil {
+					return nil, nil, fmt.Errorf("il valore %q non è un numero decimale valido per il campo %s", valore, campo)
+				}
+			case "int", "count":
+				if _, err := strconv.Atoi(valore); err != nil {
+					return nil, nil, fmt.Errorf("il valore %q non è un numero intero valido per il campo %s", valore, campo)
+				}
+			case "time":
+				parsed := false
+				for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05Z07:00", "2006-01-02"} {
+					if _, err := time.Parse(layout, valore); err == nil {
+						parsed = true
+						break
+					}
+				}
+				if !parsed {
+					return nil, nil, fmt.Errorf("il valore %q non è una data valida per il campo %s (usa formato AAAA-MM-GG)", valore, campo)
+				}
+			}
+		} else {
+			// Se non è nel mapping ma è la chiave corrispettivo, facciamo un controllo base
+			if campo == ecfg.Rimborso.CampoLordo {
+				valore = strings.ReplaceAll(valore, ",", ".")
+				if _, err := strconv.ParseFloat(valore, 64); err != nil {
+					return nil, nil, fmt.Errorf("l'importo speso %q non è un numero decimale valido", valore)
+				}
+			}
 		}
 		normalized[campo] = valore
 	}
 
+	var isDufficio bool
+	_ = h.DB.QueryRow(`SELECT COALESCE(includi_dufficio, 0) FROM istruttorie WHERE bando_id=? AND pratica_id=?`, bandoID, praticaID).Scan(&isDufficio)
+
 	var motivi []string
 	client := opencity.NewClient(h.BaseURL, op.JWT)
 	app, errFetch := client.FetchApplication(praticaID)
+	if errFetch != nil && isDufficio {
+		// Crea app dummy se è d'ufficio ed è assente dall'API
+		prot := praticaID
+		var cachedProt string
+		_ = h.DB.QueryRow(`SELECT json_extract(dati_json, '$.protocollo') FROM istruttorie_api_cache WHERE bando_id=? AND pratica_id=?`, bandoID, praticaID).Scan(&cachedProt)
+		if cachedProt != "" {
+			prot = cachedProt
+		}
+		app = &opencity.Application{
+			ID:             praticaID,
+			ProtocolNumber: prot,
+			Status:         "4000",
+			SubmittedAt:    time.Now().Format(time.RFC3339),
+			Data:           json.RawMessage(`{}`),
+		}
+		errFetch = nil
+	}
+
 	if errFetch == nil {
 		// Salva/aggiorna i valori API dichiarati nella cache (separati dagli override).
 		apiRecs, _ := generic.EstraiRecordsConExtras(*app, ecfg, nil)
@@ -776,45 +889,81 @@ func (h *IstruttoriaHandler) salvaEValutaDati(bando *db.Bando, op *middleware.Op
 		extras := allDati[praticaID]
 
 		records, _ := generic.EstraiRecordsConExtras(*app, ecfg, extras)
-		motiviSet := map[string]struct{}{}
+		var passingRecords []*graduatoria.Record
 		for _, rec := range records {
-			for _, m := range rec.FlagMotivi(ecfg.Verifica) {
-				motiviSet[m] = struct{}{}
+			rec.DerivaCampi(ecfg.Rimborso)
+			if ok, _ := generic.ApplicaFiltri(rec, ecfg.Filtri); ok {
+				passingRecords = append(passingRecords, rec)
 			}
 		}
-		// Re-valuta check built-in dopo l'override — solo se non già nel mapping.
-		if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
-			if _, alreadyMapped := ecfg.Mapping[ecfg.Rimborso.CampoLordo]; !alreadyMapped {
-				lordo := ecfg.Rimborso.CampoLordo
-				for _, rec := range records {
-					val := float64(0)
-					found := false
-					if v, ok := rec.FloatMap[lordo]; ok {
-						val = v
-						found = true
-					} else if sv, ok := rec.StringMap[lordo]; ok {
-						sv = strings.TrimSpace(sv)
-						if sv == "" || sv == "0" {
-							val = 0; found = true
-						} else if parsed, err2 := strconv.ParseFloat(sv, 64); err2 == nil {
-							val = parsed; found = true
-						}
-					}
-					if found && val == 0 {
-						motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
-					}
+
+		hasTipologia := true
+		if len(ecfg.Tipologie) > 0 {
+			hasTipologia = false
+			for _, rec := range passingRecords {
+				if generic.TipologiaDiRecord(rec, ecfg.Tipologie) != "" {
+					hasTipologia = true
+					break
 				}
 			}
 		}
-		for _, rec := range records {
-			hasCF := rec.StringMap["richiedente_cf"] != "" || rec.StringMap["richiedente"] != ""
-			if !hasCF {
-				motiviSet["CF richiedente mancante — verificare identità del richiedente"] = struct{}{}
+
+		motiviSet := map[string]struct{}{}
+		if len(passingRecords) == 0 || !hasTipologia {
+			if isDufficio {
+				motiviSet["istanza aggiunta d'ufficio"] = struct{}{}
+			}
+		} else {
+			for _, rec := range passingRecords {
+				for _, m := range rec.FlagMotivi(ecfg.Verifica) {
+					motiviSet[m] = struct{}{}
+				}
+			}
+			// Re-valuta check built-in dopo l'override — solo se non già nel mapping.
+			if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
+				if _, alreadyMapped := ecfg.Mapping[ecfg.Rimborso.CampoLordo]; !alreadyMapped {
+					lordo := ecfg.Rimborso.CampoLordo
+					for _, rec := range passingRecords {
+						val := float64(0)
+						found := false
+						if v, ok := rec.FloatMap[lordo]; ok {
+							val = v
+							found = true
+						} else if sv, ok := rec.StringMap[lordo]; ok {
+							sv = strings.TrimSpace(sv)
+							if sv == "" || sv == "0" {
+								val = 0; found = true
+							} else if parsed, err2 := strconv.ParseFloat(sv, 64); err2 == nil {
+								val = parsed; found = true
+							}
+						}
+						if found && val == 0 {
+							motiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+						}
+					}
+				}
+			}
+			for _, rec := range passingRecords {
+				hasCF := rec.StringMap["richiedente_cf"] != "" || rec.StringMap["richiedente"] != ""
+				if !hasCF {
+					motiviSet["CF richiedente mancante — verificare identità del richiedente"] = struct{}{}
+				}
 			}
 		}
-		for m := range motiviSet {
-			motivi = append(motivi, m)
+
+		if isDufficio {
+			if len(motiviSet) > 0 {
+				motivi = []string{"istanza aggiunta d'ufficio"}
+			} else {
+				motivi = []string{}
+			}
+		} else {
+			motivi = make([]string, 0, len(motiviSet))
+			for m := range motiviSet {
+				motivi = append(motivi, m)
+			}
 		}
+
 		// Aggiorna motivi_json nel DB.
 		db.UpdateMotiviIstruttoria(h.DB, bandoID, praticaID, motivi)
 		// Se emergono motivi non coperti dall'ultima scan (nuove regole), aggiorna motivi_iniziali_json.
@@ -1283,6 +1432,115 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 	}
 	collegabili, _ := db.GetPraticheCollegabili(h.DB, int(bandoID), dedupCampi)
 
+	type FieldValidation struct {
+		Stato     string `json:"stato"` // "ok", "error", "warning", "missing"
+		Messaggio string `json:"messaggio"`
+	}
+
+	validazioni := make(map[string]map[string]FieldValidation)
+	for _, p := range pratiche {
+		rec := buildRecordFromFlatMaps(p.PraticaID, p.DatiAPI, p.DatiLocali, ecfg)
+		practiceVal := make(map[string]FieldValidation)
+
+		for nome, fm := range ecfg.Mapping {
+			valAPI := p.DatiAPI[nome]
+			valLocal := p.DatiLocali[nome]
+
+			// Se il campo è completamente vuoto, non mostriamo alcun badge (nessun badge "mancante")
+			if valAPI == "" && valLocal == "" {
+				continue
+			}
+
+			// Controlla se il campo ha una condizione di validità nel bando
+			haCondizione := false
+			for _, f := range ecfg.Filtri {
+				if f.Campo == nome {
+					haCondizione = true
+					break
+				}
+			}
+			if !haCondizione {
+				for _, f := range ecfg.Verifica.FiltriFlag {
+					if f.Campo == nome {
+						haCondizione = true
+						break
+					}
+				}
+			}
+			if !haCondizione && fm.VerificaPath != "" {
+				haCondizione = true
+			}
+
+			if !haCondizione {
+				// Nessuna condizione per questo campo: non mostra badge
+				continue
+			}
+
+			// 1. Check if fails merits filters
+			var filterFailed bool
+			var filterMsg string
+			for _, f := range ecfg.Filtri {
+				if f.Campo == nome {
+					if !rec.PassaFiltro(graduatoria.FiltroConfig{Campo: f.Campo, Op: f.Op, Valore: f.Valore}) {
+						filterFailed = true
+						filterMsg = fmt.Sprintf("Filtro di merito non superato: %s %s %v", f.Campo, f.Op, f.Valore)
+						break
+					}
+				}
+			}
+			if filterFailed {
+				practiceVal[nome] = FieldValidation{
+					Stato:     "error",
+					Messaggio: filterMsg,
+				}
+				continue
+			}
+
+			// 2. Check if flagged (anomaly flag filter)
+			var flagFailed bool
+			var flagMsg string
+			for _, f := range ecfg.Verifica.FiltriFlag {
+				if f.Campo == nome {
+					if rec.PassaFiltro(graduatoria.FiltroConfig{Campo: f.Campo, Op: f.Op, Valore: f.Valore}) {
+						flagFailed = true
+						flagMsg = f.Motivo
+						break
+					}
+				}
+			}
+			if flagFailed {
+				practiceVal[nome] = FieldValidation{
+					Stato:     "warning",
+					Messaggio: flagMsg,
+				}
+				continue
+			}
+
+			// 3. Check if verification path failed
+			if fm.VerificaPath != "" {
+				statoVerifica := p.DatiLocali["__stato_verifica_"+nome]
+				isVerificato := statoVerifica == "confermato" || statoVerifica == "sovrascitto"
+				if !isVerificato {
+					certVal := p.DatiAPI["__cert_"+nome]
+					if certVal == "" {
+						practiceVal[nome] = FieldValidation{
+							Stato:     "error",
+							Messaggio: "Certificazione PDND/fonte non verificata",
+						}
+						continue
+					}
+				}
+			}
+
+			// Se tutto ok
+			practiceVal[nome] = FieldValidation{
+				Stato: "ok",
+			}
+		}
+
+		validazioni[p.PraticaID] = practiceVal
+	}
+
 	badgeFilter := r.URL.Query().Get("badge")
 	filtered := pratiche
 	if badgeFilter != "" {
@@ -1296,20 +1554,21 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 
 	flash, flashType := flashFromRequest(r)
 	renderTemplate(w, "dati_locali.html", map[string]any{
-		"Op":          op,
-		"Bando":       bando,
-		"Config":      ecfg,
-		"TuttiCampi":  tuttiCampi,
-		"Pratiche":    filtered,
-		"TotPratiche": len(pratiche),
+		"Op":             op,
+		"Bando":          bando,
+		"Config":         ecfg,
+		"TuttiCampi":     tuttiCampi,
+		"Pratiche":       filtered,
+		"TotPratiche":    len(pratiche),
 		"BadgeFilter":    badgeFilter,
 		"Flash":          flash,
 		"FlashType":      flashType,
 		"BaseURL":        h.BaseURL,
-		"AltriBandi":      altriBandi,
-		"DuplicatiBandi":  duplicatiBandi,
-		"Collegamenti":    collegamentiMap,
-		"Collegabili":     collegabili,
+		"AltriBandi":     altriBandi,
+		"DuplicatiBandi": duplicatiBandi,
+		"Collegamenti":   collegamentiMap,
+		"Collegabili":    collegabili,
+		"Validazioni":    validazioni,
 	})
 }
 
@@ -1338,4 +1597,72 @@ func (h *IstruttoriaHandler) PostSaveNota(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func buildRecordFromFlatMaps(praticaID string, apiVals, localVals map[string]string, ecfg graduatoria.EngineConfig) *graduatoria.Record {
+	rec := &graduatoria.Record{
+		AppID:      praticaID,
+		FloatMap:  make(map[string]float64),
+		StringMap: make(map[string]string),
+		IntMap:    make(map[string]int),
+		TimeMap:   make(map[string]time.Time),
+	}
+
+	campiUniti := make(map[string]string)
+	for k, v := range apiVals {
+		campiUniti[k] = v
+	}
+	for k, v := range localVals {
+		if v != "" {
+			campiUniti[k] = v
+		}
+	}
+
+	for nome, fm := range ecfg.Mapping {
+		val := campiUniti[nome]
+		if val == "" {
+			continue
+		}
+		switch fm.Tipo {
+		case "float":
+			valNormalized := strings.ReplaceAll(val, ",", ".")
+			if f, err := strconv.ParseFloat(valNormalized, 64); err == nil {
+				rec.FloatMap[nome] = f
+			}
+		case "int", "count":
+			if i, err := strconv.Atoi(val); err == nil {
+				rec.IntMap[nome] = i
+			}
+		case "time":
+			for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05Z07:00", "2006-01-02"} {
+				if t, err := time.Parse(layout, val); err == nil {
+					rec.TimeMap[nome] = t
+					break
+				}
+			}
+		default:
+			rec.StringMap[nome] = val
+		}
+	}
+
+	for _, k := range []string{"richiedente_cf", "richiedente"} {
+		if val, ok := campiUniti[k]; ok && val != "" {
+			rec.StringMap["richiedente_cf"] = val
+			rec.StringMap["richiedente"] = val
+		}
+	}
+	if ecfg.Rimborso.CampoLordo != "" {
+		lordo := ecfg.Rimborso.CampoLordo
+		if val, ok := campiUniti[lordo]; ok && val != "" {
+			valNormalized := strings.ReplaceAll(val, ",", ".")
+			if f, err := strconv.ParseFloat(valNormalized, 64); err == nil {
+				rec.FloatMap[lordo] = f
+			} else {
+				rec.StringMap[lordo] = val
+			}
+		}
+	}
+
+	rec.DerivaCampi(ecfg.Rimborso)
+	return rec
 }

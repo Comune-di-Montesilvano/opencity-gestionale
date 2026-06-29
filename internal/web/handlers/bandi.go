@@ -804,7 +804,7 @@ func (h *BandiHandler) GetDettaglio(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Accesso negato", http.StatusForbidden)
 		return
 	}
-	runs, _ := db.ListRuns(h.DB, bando.ID, !op.IsAdmin())
+	runs, _ := db.ListRuns(h.DB, bando.ID, false)
 	var ecfg graduatoria.EngineConfig
 	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
 	istrStats, _ := db.GetIstruttoriaStats(h.DB, int(bando.ID))

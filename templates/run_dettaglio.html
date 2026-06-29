@@ -13,14 +13,18 @@
 
 {{if .Flash}}<div class="alert alert-{{.FlashType}}">{{.Flash}}</div>{{end}}
 
-{{if and .Op.IsAdmin (eq .Run.Stato "bozza")}}
+{{if eq .Run.Stato "bozza"}}
 <div style="display:flex;gap:.5rem;margin-bottom:1rem;align-items:center">
+  {{if .Op.IsAdmin}}
   <form method="POST" action="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/pubblica">
     <button type="submit" class="btn btn-primary" onclick="return confirm('Pubblicare la graduatoria? Gli operatori potranno vederla.')">Pubblica graduatoria</button>
   </form>
+  {{end}}
+  {{if or .Op.IsAdmin (eq .Run.CalcolataDa .Op.Username)}}
   <form method="POST" action="/bandi/{{.Bando.ID}}/run/{{.Run.ID}}/elimina">
     <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Eliminare definitivamente questa run bozza?')">Elimina run</button>
   </form>
+  {{end}}
 </div>
 {{end}}
 

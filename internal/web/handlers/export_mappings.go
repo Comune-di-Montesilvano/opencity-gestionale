@@ -302,7 +302,7 @@ func (h *ExportMappingsHandler) GetExportCSVMapped(w http.ResponseWriter, r *htt
 	pos := 0
 	for _, g := range grad.Gruppi {
 		for _, riga := range g.Righe {
-			if !riga.Ammessa || riga.Istanza == nil {
+			if riga.Istanza == nil {
 				continue
 			}
 			ist := riga.Istanza

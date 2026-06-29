@@ -138,9 +138,21 @@
       {{$localVal := index $p.DatiLocali $campo}}
       {{$fm := index $.Config.Mapping $campo}}
       <tr style="border-top:1px solid #f3f4f6">
-        <td style="padding:.3rem .5rem;color:#374151;font-weight:500">{{$campo}}</td>
-        <td style="padding:.3rem .5rem;font-family:monospace;color:#6b7280">{{if $apiVal}}{{$apiVal}}{{else}}<span style="color:#d1d5db">—</span>{{end}}</td>
-        <td style="padding:.3rem .5rem">
+        <td style="padding:.3rem .5rem;color:#374151;font-weight:500;display:flex;align-items:center;gap:.3rem;border:none">
+          {{$campo}}
+          {{$val := index (index $.Validazioni $p.PraticaID) $campo}}
+          {{if and $val (ne $val.Stato "")}}
+            {{if eq $val.Stato "ok"}}
+              <span class="badge" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;font-size:10px;padding:1px 5px;border-radius:4px" title="Dato valido e conforme">validato ✓</span>
+            {{else if eq $val.Stato "error"}}
+              <span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:10px;padding:1px 5px;border-radius:4px;cursor:help" title="{{$val.Messaggio}}">✗ Errore</span>
+            {{else if eq $val.Stato "warning"}}
+              <span class="badge" style="background:#fffbeb;color:#d97706;border:1px solid #fde68a;font-size:10px;padding:1px 5px;border-radius:4px;cursor:help" title="{{$val.Messaggio}}">⚠ Anomalia</span>
+            {{end}}
+          {{end}}
+        </td>
+        <td style="padding:.3rem .5rem;font-family:monospace;color:#6b7280;vertical-align:middle">{{if $apiVal}}{{$apiVal}}{{else}}<span style="color:#d1d5db">—</span>{{end}}</td>
+        <td style="padding:.3rem .5rem;vertical-align:middle">
           <div style="display:flex;align-items:center;gap:.4rem">
             <span id="dati-status-{{$p.PraticaID}}-{{$campo}}"
                   style="font-size:.8rem;font-family:monospace;{{if $localVal}}color:#16a34a{{else}}color:#9ca3af{{end}}">{{if $localVal}}{{$localVal}} ✓{{else}}—{{end}}</span>
@@ -255,7 +267,10 @@ async function salvaTutto(bandoID, praticaID, btn) {
       ok.textContent = allOk ? '✓ salvato' : '⚠ errore durante il salvataggio';
       ok.style.color = allOk ? '#16a34a' : '#dc2626';
       ok.style.display = '';
-      if (allOk) setTimeout(function() { ok.style.display = 'none'; }, 2500);
+      if (allOk) {
+        setTimeout(function() { ok.style.display = 'none'; }, 2500);
+        setTimeout(function() { window.location.reload(); }, 800);
+      }
     }
   } catch (err) {
     if (btn) btn.disabled = false;
