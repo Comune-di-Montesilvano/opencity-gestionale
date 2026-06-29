@@ -92,8 +92,15 @@ func GetCollegamenti(db *sql.DB, bandoID int, praticaIDs []string) (map[string][
 }
 
 // GetPraticheCollegabili restituisce il set di pratica_id del bando corrente
-// che hanno almeno una pratica con stesso CF richiedente in un altro bando scansionato.
-func GetPraticheCollegabili(db *sql.DB, bandoID int) (map[string]bool, error) {
+// che hanno almeno una pratica collegabile (stesso CF, non già linkata, dedup key matchante)
+// in un altro bando scansionato. dedupCampi: campi non-expand della chiave di deduplicazione.
+func GetPraticheCollegabili(db *sql.DB, bandoID int, dedupCampi []string) (map[string]bool, error) {
+	dedupCond := ""
+	for _, campo := range dedupCampi {
+		safe := strings.ReplaceAll(campo, "'", "")
+		dedupCond += " AND (COALESCE(json_extract(c1.dati_json,'$." + safe + "'),'')=''" +
+			" OR json_extract(c2.dati_json,'$." + safe + "')=json_extract(c1.dati_json,'$." + safe + "'))"
+	}
 	rows, err := db.Query(`
 		SELECT DISTINCT c1.pratica_id
 		FROM istruttorie_api_cache c1
@@ -105,6 +112,13 @@ func GetPraticheCollegabili(db *sql.DB, bandoID int) (map[string]bool, error) {
 			  AND c2.pratica_id != c1.pratica_id
 			  AND (json_extract(c2.dati_json, '$.richiedente_cf') = json_extract(c1.dati_json, '$.richiedente_cf')
 			       OR json_extract(c2.dati_json, '$.richiedente') = json_extract(c1.dati_json, '$.richiedente_cf'))
+			  AND NOT EXISTS (
+				SELECT 1 FROM pratiche_collegate pc
+				WHERE (pc.bando_id_a = c1.bando_id AND pc.pratica_id_a = c1.pratica_id
+				       AND pc.bando_id_b = c2.bando_id AND pc.pratica_id_b = c2.pratica_id)
+				   OR (pc.bando_id_b = c1.bando_id AND pc.pratica_id_b = c1.pratica_id
+				       AND pc.bando_id_a = c2.bando_id AND pc.pratica_id_a = c2.pratica_id)
+			  )`+dedupCond+`
 		  )`, bandoID)
 	if err != nil {
 		return nil, err

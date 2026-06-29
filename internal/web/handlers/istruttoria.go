@@ -1240,7 +1240,13 @@ func (h *IstruttoriaHandler) GetDatiLocali(w http.ResponseWriter, r *http.Reques
 		tuttiPraticaIDs = append(tuttiPraticaIDs, p.PraticaID)
 	}
 	collegamentiMap, _ := db.GetCollegamenti(h.DB, int(bandoID), tuttiPraticaIDs)
-	collegabili, _ := db.GetPraticheCollegabili(h.DB, int(bandoID))
+	var dedupCampi []string
+	for _, k := range ecfg.Deduplicazione.Chiave {
+		if fm, ok := ecfg.Mapping[k]; ok && !fm.Expand {
+			dedupCampi = append(dedupCampi, k)
+		}
+	}
+	collegabili, _ := db.GetPraticheCollegabili(h.DB, int(bandoID), dedupCampi)
 
 	badgeFilter := r.URL.Query().Get("badge")
 	filtered := pratiche
