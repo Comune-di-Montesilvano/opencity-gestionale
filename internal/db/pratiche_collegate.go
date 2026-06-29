@@ -136,9 +136,11 @@ func GetPraticheCollegabili(db *sql.DB, bandoID int, dedupCampi []string) (map[s
 				   OR (pc.bando_id_b = c1.bando_id AND pc.pratica_id_b = c1.pratica_id
 				       AND pc.bando_id_a = c2.bando_id AND pc.pratica_id_a = c2.pratica_id)
 			  )
-			  AND NOT EXISTS (
-				SELECT 1 FROM istruttorie_api_cache c3
-				WHERE c3.pratica_id = c1.pratica_id AND c3.bando_id = c2.bando_id
+			  AND NOT (
+			    EXISTS (SELECT 1 FROM istruttorie_api_cache c3
+			            WHERE c3.pratica_id = c1.pratica_id AND c3.bando_id = c2.bando_id)
+			    AND EXISTS (SELECT 1 FROM istruttorie_api_cache c4
+			                WHERE c4.pratica_id = c2.pratica_id AND c4.bando_id = c1.bando_id)
 			  )`+dedupCond+`
 		  )`, bandoID)
 	if err != nil {
@@ -181,7 +183,7 @@ func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string, dedupFilte
 
 	// Costruisce filtri dedup dinamici e condizione NOT EXISTS per già collegati
 	dedupWhere := ""
-	args := []any{bandoID, praticaID, cf, cf, bandoID, praticaID, bandoID, praticaID, praticaID}
+	args := []any{bandoID, praticaID, cf, cf, bandoID, praticaID, bandoID, praticaID, praticaID, bandoID}
 	for campo, valore := range dedupFilters {
 		if valore == "" {
 			continue
@@ -204,9 +206,11 @@ func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string, dedupFilte
 		    WHERE (pc.bando_id_a=? AND pc.pratica_id_a=? AND pc.bando_id_b=c.bando_id AND pc.pratica_id_b=c.pratica_id)
 		       OR (pc.bando_id_b=? AND pc.pratica_id_b=? AND pc.bando_id_a=c.bando_id AND pc.pratica_id_a=c.pratica_id)
 		  )
-		  AND NOT EXISTS (
-		    SELECT 1 FROM istruttorie_api_cache c3
-		    WHERE c3.pratica_id = ? AND c3.bando_id = c.bando_id
+		  AND NOT (
+		    EXISTS (SELECT 1 FROM istruttorie_api_cache c3
+		            WHERE c3.pratica_id = ? AND c3.bando_id = c.bando_id)
+		    AND EXISTS (SELECT 1 FROM istruttorie_api_cache c4
+		               WHERE c4.pratica_id = c.pratica_id AND c4.bando_id = ?)
 		  )` + dedupWhere + `
 		ORDER BY b.nome, json_extract(c.dati_json, '$.protocollo')`
 
