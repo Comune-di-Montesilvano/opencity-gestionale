@@ -184,25 +184,32 @@
       <div style="margin-top:.4rem">
         {{range $.Config.Verifica.FiltriFlag}}
         {{$hasDato := index $riga.Dati .Campo}}
-        {{if or (or (hasCol $riga.Motivi .Motivo) $hasDato) $riga.InclusiDufficio}}
+        {{$declVal := ""}}
+        {{$pDichiarati := index $.CampiDichiarati $riga.PraticaID}}
+        {{if $pDichiarati}}
+          {{$declVal = index $pDichiarati .Campo}}
+        {{end}}
+        {{$activeVal := $hasDato}}
+        {{if not $activeVal}}{{$activeVal = $declVal}}{{end}}
+        {{if or (or (hasCol $riga.Motivi .Motivo) $activeVal) $riga.InclusiDufficio}}
         <div style="margin-bottom:.2rem">
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{.Campo}}:</span>
-            {{if $hasDato}}
+            {{if $activeVal}}
             <span id="badge-{{$riga.ID}}-{{.Campo}}"
-                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
+                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$activeVal}} ✓</span>
             {{end}}
-            <button type="button" id="mod-{{$riga.ID}}-{{.Campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $hasDato}};display:none{{end}}"
+            <button type="button" id="mod-{{$riga.ID}}-{{.Campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $activeVal}};display:none{{end}}"
                     onclick="var b=document.getElementById('badge-{{$riga.ID}}-{{.Campo}}');if(b)b.style.display='none';document.getElementById('input-{{$riga.ID}}-{{.Campo}}').style.display='inline-block';document.getElementById('btn-{{$riga.ID}}-{{.Campo}}').style.display='inline-block';this.style.display='none'">modifica</button>
             <input type="text"
                    id="input-{{$riga.ID}}-{{.Campo}}"
-                   value="{{$hasDato}}"
+                   value="{{$activeVal}}"
                    placeholder="inserisci valore"
-                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
+                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $activeVal}}display:none{{end}}"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{.Campo}}',this,'badge-{{$riga.ID}}-{{.Campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{.Campo}}','err-{{$riga.ID}}-{{.Campo}}','mod-{{$riga.ID}}-{{.Campo}}')}"
                    name="valore">
             <button type="button" id="btn-{{$riga.ID}}-{{.Campo}}"
-                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $hasDato}}display:none{{end}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $activeVal}}display:none{{end}}"
                     onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{.Campo}}',document.getElementById('input-{{$riga.ID}}-{{.Campo}}'),'badge-{{$riga.ID}}-{{.Campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{.Campo}}','err-{{$riga.ID}}-{{.Campo}}','mod-{{$riga.ID}}-{{.Campo}}')">Salva</button>
             <span id="err-{{$riga.ID}}-{{.Campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
             {{if hasCol $riga.Motivi .Motivo}}<span style="font-size:.72rem;color:#9ca3af">{{.Motivo}}</span>{{end}}
@@ -277,15 +284,22 @@
         {{range $.CampiBuiltin}}
         {{$cb := .}}
         {{$cbDato := index $riga.Dati $cb.Campo}}
-        {{if or (or (hasMotivoPrefix $riga.Motivi $cb.Motivo) $cbDato) $riga.InclusiDufficio}}
+        {{$declVal := ""}}
+        {{$pDichiarati := index $.CampiDichiarati $riga.PraticaID}}
+        {{if $pDichiarati}}
+          {{$declVal = index $pDichiarati $cb.Campo}}
+        {{end}}
+        {{$activeVal := $cbDato}}
+        {{if not $activeVal}}{{$activeVal = $declVal}}{{end}}
+        {{if or (or (hasMotivoPrefix $riga.Motivi $cb.Motivo) $activeVal) $riga.InclusiDufficio}}
         <div style="margin-bottom:.2rem">
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$cb.Label}} ✎:</span>
-            {{if $cbDato}}
+            {{if $activeVal}}
             <span id="badge-{{$riga.ID}}-bi-{{$cb.Campo}}"
-                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$cbDato}} ✓</span>
+                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$activeVal}} ✓</span>
             {{end}}
-            <button type="button" id="mod-{{$riga.ID}}-bi-{{$cb.Campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $cbDato}};display:none{{end}}"
+            <button type="button" id="mod-{{$riga.ID}}-bi-{{$cb.Campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $activeVal}};display:none{{end}}"
                     onclick="var b=document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}');if(b)b.style.display='none';document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='inline-block';document.getElementById('btn-bi-{{$riga.ID}}-{{$cb.Campo}}').style.display='inline-block';this.style.display='none'">modifica</button>
             <input type="text" inputmode="decimal"
                    id="input-{{$riga.ID}}-bi-{{$cb.Campo}}"
@@ -293,18 +307,18 @@
                    data-bando-id="{{$.Bando.ID}}"
                    data-pratica-id="{{$riga.PraticaID}}"
                    data-campo="{{$cb.Campo}}"
-                   value="{{$cbDato}}"
+                   value="{{$activeVal}}"
                    placeholder="{{$cb.Label}}"
-                   class="form-control form-control-sm" style="width:140px;font-size:.8rem;{{if $cbDato}}display:none{{end}}"
+                   class="form-control form-control-sm" style="width:140px;font-size:.8rem;{{if $activeVal}}display:none{{end}}"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',this,'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}','mod-{{$riga.ID}}-bi-{{$cb.Campo}}')}"
                    name="valore">
             <button type="button" id="btn-bi-{{$riga.ID}}-{{$cb.Campo}}"
-                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $cbDato}}display:none{{end}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $activeVal}}display:none{{end}}"
                     onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}'),'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}','mod-{{$riga.ID}}-bi-{{$cb.Campo}}')">Salva</button>
             <span id="err-bi-{{$riga.ID}}-{{$cb.Campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
           </div>
         </div>
-        {{end}}{{/* fine hasMotivoPrefix OR cbDato */}}
+        {{end}}{{/* fine hasMotivoPrefix OR activeVal */}}
         {{end}}{{/* fine range CampiBuiltin */}}
       </div>
       {{end}}
@@ -314,24 +328,31 @@
         {{range $.CampiMappatiAltri}}
         {{$campo := .}}
         {{$hasDato := index $riga.Dati $campo}}
+        {{$declVal := ""}}
+        {{$pDichiarati := index $.CampiDichiarati $riga.PraticaID}}
+        {{if $pDichiarati}}
+          {{$declVal = index $pDichiarati $campo}}
+        {{end}}
+        {{$activeVal := $hasDato}}
+        {{if not $activeVal}}{{$activeVal = $declVal}}{{end}}
         <div style="margin-bottom:.2rem">
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
             <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$campo}}:</span>
-            {{if $hasDato}}
+            {{if $activeVal}}
             <span id="badge-{{$riga.ID}}-{{$campo}}"
-                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
+                  style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$activeVal}} ✓</span>
             {{end}}
-            <button type="button" id="mod-{{$riga.ID}}-{{$campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $hasDato}};display:none{{end}}"
+            <button type="button" id="mod-{{$riga.ID}}-{{$campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $activeVal}};display:none{{end}}"
                     onclick="var b=document.getElementById('badge-{{$riga.ID}}-{{$campo}}');if(b)b.style.display='none';document.getElementById('input-{{$riga.ID}}-{{$campo}}').style.display='inline-block';document.getElementById('btn-{{$riga.ID}}-{{$campo}}').style.display='inline-block';this.style.display='none'">modifica</button>
             <input type="text"
                    id="input-{{$riga.ID}}-{{$campo}}"
-                   value="{{$hasDato}}"
+                   value="{{$activeVal}}"
                    placeholder="inserisci valore"
-                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
+                   class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $activeVal}}display:none{{end}}"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',this,'badge-{{$riga.ID}}-{{$campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{$campo}}','err-{{$riga.ID}}-{{$campo}}','mod-{{$riga.ID}}-{{$campo}}')}"
                    name="valore">
             <button type="button" id="btn-{{$riga.ID}}-{{$campo}}"
-                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $hasDato}}display:none{{end}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $activeVal}}display:none{{end}}"
                     onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',document.getElementById('input-{{$riga.ID}}-{{$campo}}'),'badge-{{$riga.ID}}-{{$campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{$campo}}','err-{{$riga.ID}}-{{$campo}}','mod-{{$riga.ID}}-{{$campo}}')">Salva</button>
             <span id="err-{{$riga.ID}}-{{$campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
           </div>
