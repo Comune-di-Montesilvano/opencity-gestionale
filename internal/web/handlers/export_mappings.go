@@ -259,6 +259,9 @@ func (h *ExportMappingsHandler) GetExportCSVMapped(w http.ResponseWriter, r *htt
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
 	// Re-fetch da OpenCity se ci sono colonne "raw".
 	rawAppData := map[string]json.RawMessage{} // appID → app.Data
 	for _, col := range mapping.Colonne {
@@ -313,7 +316,7 @@ func (h *ExportMappingsHandler) GetExportCSVMapped(w http.ResponseWriter, r *htt
 			pos++
 			row := make([]string, len(mapping.Colonne))
 			for i, col := range mapping.Colonne {
-				row[i] = estraiColonnaExport(col, pos, g.Nome, riga, ist, rawAppData)
+				row[i] = estraiColonnaExport(col, ecfg, pos, g.Nome, riga, ist, rawAppData)
 			}
 			cw.Write(row)
 		}
@@ -322,7 +325,7 @@ func (h *ExportMappingsHandler) GetExportCSVMapped(w http.ResponseWriter, r *htt
 }
 
 // estraiColonnaExport estrae il valore di una colonna in base alla sorgente.
-func estraiColonnaExport(col db.ExportColonna, pos int, gruppo string, riga graduatoria.RigaGraduatoria, ist *graduatoria.Istanza, rawAppData map[string]json.RawMessage) string {
+func estraiColonnaExport(col db.ExportColonna, ecfg graduatoria.EngineConfig, pos int, gruppo string, riga graduatoria.RigaGraduatoria, ist *graduatoria.Istanza, rawAppData map[string]json.RawMessage) string {
 	switch col.Sorgente {
 	case "sistema":
 		switch col.Chiave {
@@ -339,6 +342,21 @@ func estraiColonnaExport(col db.ExportColonna, pos int, gruppo string, riga grad
 		case "tipologia":
 			return gruppo
 		case "importo":
+			if !riga.Ammessa {
+				netto := ist.Corrispettivo - ist.BeneficioRicevuto
+				if ecfg.Rimborso.Tipo == "lordo" && ecfg.Rimborso.CampoLordo != "" {
+					if valStr, ok := ist.CampiMappati[ecfg.Rimborso.CampoLordo]; ok {
+						if f, err := strconv.ParseFloat(strings.ReplaceAll(valStr, ",", "."), 64); err == nil {
+							return fmt.Sprintf("%.2f", f)
+						}
+					}
+					return fmt.Sprintf("%.2f", ist.Corrispettivo)
+				}
+				if netto < 0 {
+					netto = 0
+				}
+				return fmt.Sprintf("%.2f", netto)
+			}
 			return fmt.Sprintf("%.2f", riga.ImportoRimborso)
 		case "annualita":
 			if ist.Annualita != 0 {
