@@ -249,8 +249,10 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 	// Legge dati locali già salvati per override PRIMA del reset (altrimenti la INNER JOIN con istruttorie fallisce per le righe cancellate)
 	datiLocali, _ := db.GetIstruttorieDati(dbConn, int(bando.ID))
 
-	// Pratica_id incluse d'ufficio: bypass filtri_istanza e stati durante scan
+	// Pratica_id incluse d'ufficio: bypass filtri_istanza e stati durante scan.
+	// "resolved" traccia quelle effettivamente elaborate dal loop (appaiono in rawApps).
 	dufficioPIDs := map[string]bool{}
+	duffficioResolved := map[string]bool{}
 	if rows, err2 := dbConn.Query(`SELECT pratica_id FROM istruttorie WHERE bando_id=? AND includi_dufficio=1`, bando.ID); err2 == nil {
 		for rows.Next() {
 			var pid string
@@ -369,6 +371,7 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 				rawM := []string{motivo}
 				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
 				nuove++
+				duffficioResolved[app.ID] = true
 			}
 			continue
 		}
@@ -442,6 +445,20 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 			motivi = append(motivi, m)
 		}
 		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, rawMotivi, app.Status); err == nil {
+			nuove++
+		}
+		if isDufficio {
+			duffficioResolved[app.ID] = true
+		}
+	}
+
+	// App d'ufficio non trovate in rawApps (servizio diverso o pratica non esistente):
+	// generano motivo generico per non mostrare ingiustamente "✓ OK".
+	for pid := range dufficioPIDs {
+		if !duffficioResolved[pid] {
+			motivo := "Dati insufficienti — inserire tipo, anno e importo manualmente"
+			rawM := []string{motivo}
+			db.UpsertIstruttoria(dbConn, int(bando.ID), pid, rawM, rawM, "") //nolint
 			nuove++
 		}
 	}
