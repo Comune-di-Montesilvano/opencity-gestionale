@@ -48,7 +48,16 @@ func GetCollegamenti(db *sql.DB, bandoID int, praticaIDs []string) (map[string][
 	ph := strings.Repeat("?,", len(praticaIDs))
 	ph = ph[:len(ph)-1]
 
+	// 4 arm: bando_a=current, bando_b=current, e stessa pratica_id in bando diverso (duplicati automatici)
 	args := []any{bandoID}
+	for _, id := range praticaIDs {
+		args = append(args, id)
+	}
+	args = append(args, bandoID)
+	for _, id := range praticaIDs {
+		args = append(args, id)
+	}
+	args = append(args, bandoID)
 	for _, id := range praticaIDs {
 		args = append(args, id)
 	}
@@ -69,6 +78,14 @@ func GetCollegamenti(db *sql.DB, bandoID int, praticaIDs []string) (map[string][
 			SELECT pc.id, pc.pratica_id_b, pc.pratica_id_a, pc.bando_id_a
 			FROM pratiche_collegate pc
 			WHERE pc.bando_id_b = ? AND pc.pratica_id_b IN (` + ph + `)
+			UNION ALL
+			SELECT pc.id, pc.pratica_id_a AS local_pid, pc.pratica_id_b AS other_pid, pc.bando_id_b AS other_bid
+			FROM pratiche_collegate pc
+			WHERE pc.bando_id_a != ? AND pc.pratica_id_a IN (` + ph + `)
+			UNION ALL
+			SELECT pc.id, pc.pratica_id_b AS local_pid, pc.pratica_id_a AS other_pid, pc.bando_id_a AS other_bid
+			FROM pratiche_collegate pc
+			WHERE pc.bando_id_b != ? AND pc.pratica_id_b IN (` + ph + `)
 		) u
 		LEFT JOIN bandi b ON b.id = u.other_bid
 		LEFT JOIN istruttorie_api_cache c ON c.pratica_id = u.other_pid AND c.bando_id = u.other_bid`
@@ -118,6 +135,10 @@ func GetPraticheCollegabili(db *sql.DB, bandoID int, dedupCampi []string) (map[s
 				       AND pc.bando_id_b = c2.bando_id AND pc.pratica_id_b = c2.pratica_id)
 				   OR (pc.bando_id_b = c1.bando_id AND pc.pratica_id_b = c1.pratica_id
 				       AND pc.bando_id_a = c2.bando_id AND pc.pratica_id_a = c2.pratica_id)
+			  )
+			  AND NOT EXISTS (
+				SELECT 1 FROM istruttorie_api_cache c3
+				WHERE c3.pratica_id = c1.pratica_id AND c3.bando_id = c2.bando_id
 			  )`+dedupCond+`
 		  )`, bandoID)
 	if err != nil {
@@ -160,7 +181,7 @@ func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string, dedupFilte
 
 	// Costruisce filtri dedup dinamici e condizione NOT EXISTS per già collegati
 	dedupWhere := ""
-	args := []any{bandoID, praticaID, cf, cf, bandoID, praticaID, bandoID, praticaID}
+	args := []any{bandoID, praticaID, cf, cf, bandoID, praticaID, bandoID, praticaID, praticaID}
 	for campo, valore := range dedupFilters {
 		if valore == "" {
 			continue
@@ -182,6 +203,10 @@ func TrovaPraticheStessoCF(db *sql.DB, bandoID int, praticaID string, dedupFilte
 		    SELECT 1 FROM pratiche_collegate pc
 		    WHERE (pc.bando_id_a=? AND pc.pratica_id_a=? AND pc.bando_id_b=c.bando_id AND pc.pratica_id_b=c.pratica_id)
 		       OR (pc.bando_id_b=? AND pc.pratica_id_b=? AND pc.bando_id_a=c.bando_id AND pc.pratica_id_a=c.pratica_id)
+		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM istruttorie_api_cache c3
+		    WHERE c3.pratica_id = ? AND c3.bando_id = c.bando_id
 		  )` + dedupWhere + `
 		ORDER BY b.nome, json_extract(c.dati_json, '$.protocollo')`
 
