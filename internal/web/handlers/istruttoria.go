@@ -249,6 +249,17 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 	// Legge dati locali già salvati per override PRIMA del reset (altrimenti la INNER JOIN con istruttorie fallisce per le righe cancellate)
 	datiLocali, _ := db.GetIstruttorieDati(dbConn, int(bando.ID))
 
+	// Pratica_id incluse d'ufficio: bypass filtri_istanza e stati durante scan
+	dufficioPIDs := map[string]bool{}
+	if rows, err2 := dbConn.Query(`SELECT pratica_id FROM istruttorie WHERE bando_id=? AND includi_dufficio=1`, bando.ID); err2 == nil {
+		for rows.Next() {
+			var pid string
+			rows.Scan(&pid)
+			dufficioPIDs[pid] = true
+		}
+		rows.Close()
+	}
+
 	// Pulisce i record da_verificare (preservando quelli con note o dati locali)
 	if err := db.ResetDaVerificare(dbConn, int(bando.ID)); err != nil {
 		return 0, fmt.Errorf("reset da_verificare: %w", err)
@@ -265,10 +276,11 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		if json.Unmarshal(raw, &app) != nil {
 			continue
 		}
-		if len(statiSet) > 0 && !statiSet[app.Status] {
+		isDufficio := dufficioPIDs[app.ID]
+		if len(statiSet) > 0 && !statiSet[app.Status] && !isDufficio {
 			continue
 		}
-		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) {
+		if !generic.PassaFiltriIstanza(app, ecfg.Istanza) && !isDufficio {
 			continue
 		}
 
@@ -352,6 +364,12 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 			}
 		}
 		if len(passingRecords) == 0 {
+			if isDufficio {
+				motivo := "Dati insufficienti — inserire tipo, anno e importo manualmente"
+				rawM := []string{motivo}
+				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
+				nuove++
+			}
 			continue
 		}
 		if len(ecfg.Tipologie) > 0 {
