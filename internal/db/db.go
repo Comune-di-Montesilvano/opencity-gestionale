@@ -32,6 +32,7 @@ func Open(path string) (*sql.DB, error) {
 	migrateIstruttorieDati(db)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN nota_lavoro TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN includi_dufficio INTEGER NOT NULL DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE istruttorie ADD COLUMN motivi_iniziali_json TEXT NOT NULL DEFAULT '[]'`)
 	_, _ = db.Exec(`ALTER TABLE bandi ADD COLUMN iban_config TEXT NOT NULL DEFAULT '{}'`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS export_mappings (
 		id           INTEGER PRIMARY KEY,

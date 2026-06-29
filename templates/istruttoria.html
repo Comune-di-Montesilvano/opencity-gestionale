@@ -107,8 +107,9 @@
   <tr>
     <td><input type="checkbox" name="ids" value="{{.ID}}" class="row-check"></td>
     <td style="font-size:.8em;white-space:nowrap">
+      {{$prot := index (index $.CampiDichiarati .PraticaID) "protocollo"}}
       <a href="{{$.BaseURL}}/lang/it/operatori/{{.PraticaID}}/detail" target="_blank"
-         style="font-family:monospace;color:#1d4ed8" title="{{.PraticaID}}">{{.PraticaID | printf "%.8s"}}…</a>
+         style="font-family:monospace;color:#1d4ed8" title="{{.PraticaID}}">{{if $prot}}{{$prot}}{{else}}{{.PraticaID | printf "%.8s"}}…{{end}}</a>
       {{if .AppStatus}}<br><span style="font-size:.75rem;color:#9ca3af">stato: {{.AppStatus}}</span>{{end}}
       {{$rcf := index $.RichiedenteCF .PraticaID}}{{if $rcf}}<br><span style="font-family:monospace;font-size:.75rem;color:#374151" title="CF richiedente">{{cfOscurato $rcf}}</span> <button type="button" title="Copia CF richiedente" onclick="copyCF(this,'{{$rcf}}')" style="font-size:.7rem;padding:1px 5px;border:1px solid #d1d5db;border-radius:3px;background:#f9fafb;cursor:pointer;color:#374151">📋</button>{{end}}
       {{$altriBandiList := index $.AltriBandi .PraticaID}}
@@ -123,16 +124,51 @@
         <br><span class="badge" style="font-size:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;display:inline-block;margin-top:2px" title="Duplicato in: {{.}}">Duplicato in: {{.}}</span>
         {{end}}
       {{end}}
+      {{$coll := index $.Collegamenti .PraticaID}}
+      {{if $coll}}
+        {{range $coll}}
+        <br><span style="display:inline-flex;align-items:center;gap:3px;margin-top:3px;flex-wrap:wrap">
+          <span style="font-size:.65rem;color:#7c3aed;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Link manuale</span>
+          <a href="{{$.BaseURL}}/lang/it/operatori/{{.PraticaID}}/detail" target="_blank"
+             style="font-size:.7rem;display:inline-flex;align-items:center;gap:2px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:4px;padding:1px 7px;text-decoration:none;font-weight:500"
+             title="Apri istanza collegata — {{.BandoNome}} prot. {{.Protocollo}}">
+            {{.BandoNome}}{{if .Protocollo}} · {{.Protocollo | protocolloBreve}}{{end}} ↗
+          </a>
+        </span>
+        {{end}}
+      {{end}}
     </td>
     <td>
-      <div id="motivi-{{.ID}}">
+      {{if .MotiviIniziali}}
+      <div style="margin-bottom:.35rem">
+        <span style="font-size:.68rem;color:#6b7280;font-weight:500">In istruttoria per:</span>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
+          {{range .MotiviIniziali}}
+          {{if motivoRisolto $riga.Motivi .}}
+          <span data-motivo-iniziale="{{.}}" style="font-size:.7rem;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:4px;padding:1px 7px;display:inline-flex;align-items:center;gap:3px">✓ {{.}}</span>
+          {{else}}
+          <span data-motivo-iniziale="{{.}}" style="font-size:.7rem;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:4px;padding:1px 7px;display:inline-flex;align-items:center;gap:3px">✗ {{.}}</span>
+          {{end}}
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+      {{if .MotiviIniziali}}
+      {{/* div nascosta: target HTMX per aggiornaApprovaBtn, non visibile (smart badges sopra già mostrano lo stato) */}}
+      <div id="motivi-{{.ID}}" style="display:none">
+        {{range .Motivi}}<span class="badge-gray">{{.}}</span>{{end}}
+      </div>
+      {{else}}
+      <div id="motivi-{{.ID}}" style="font-size:.78rem">
         {{if eq .Stato "approvata"}}
-          <span style="color:#16a34a;font-size:.82rem">✓ OK</span>
+          <span style="color:#16a34a">✓ OK</span>
+        {{else if .Motivi}}
+          {{range .Motivi}}<span class="badge badge-gray" style="margin-right:.2rem;font-size:.68rem">{{.}}</span>{{end}}
         {{else}}
-          {{range .Motivi}}<span class="badge badge-gray" style="margin-right:.2rem">{{.}}</span>{{end}}
-          {{if not .Motivi}}<span style="color:#16a34a;font-size:.82rem">✓ OK</span>{{end}}
+          <span style="color:#16a34a;font-size:.75rem">✓ OK</span>
         {{end}}
       </div>
+      {{end}}
       {{if $.Config.Verifica.FiltriFlag}}
       <div style="margin-top:.4rem">
         {{range $.Config.Verifica.FiltriFlag}}
@@ -144,21 +180,21 @@
             {{if $hasDato}}
             <span id="badge-{{$riga.ID}}-{{.Campo}}"
                   style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
-            <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
-                    onclick="document.getElementById('badge-{{$riga.ID}}-{{.Campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-{{.Campo}}').style.display='inline-block';document.getElementById('btn-{{$riga.ID}}-{{.Campo}}').style.display='inline-block'">modifica</button>
             {{end}}
+            <button type="button" id="mod-{{$riga.ID}}-{{.Campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $hasDato}};display:none{{end}}"
+                    onclick="var b=document.getElementById('badge-{{$riga.ID}}-{{.Campo}}');if(b)b.style.display='none';document.getElementById('input-{{$riga.ID}}-{{.Campo}}').style.display='inline-block';document.getElementById('btn-{{$riga.ID}}-{{.Campo}}').style.display='inline-block';this.style.display='none'">modifica</button>
             <input type="text"
                    id="input-{{$riga.ID}}-{{.Campo}}"
                    value="{{$hasDato}}"
                    placeholder="inserisci valore"
                    class="form-control form-control-sm" style="width:160px;font-size:.8rem;{{if $hasDato}}display:none{{end}}"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{.Campo}}',this,'badge-{{$riga.ID}}-{{.Campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{.Campo}}','err-{{$riga.ID}}-{{.Campo}}')}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{.Campo}}',this,'badge-{{$riga.ID}}-{{.Campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{.Campo}}','err-{{$riga.ID}}-{{.Campo}}','mod-{{$riga.ID}}-{{.Campo}}')}"
                    name="valore">
             <button type="button" id="btn-{{$riga.ID}}-{{.Campo}}"
                     class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $hasDato}}display:none{{end}}"
-                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{.Campo}}',document.getElementById('input-{{$riga.ID}}-{{.Campo}}'),'badge-{{$riga.ID}}-{{.Campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{.Campo}}','err-{{$riga.ID}}-{{.Campo}}')">Salva</button>
+                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{.Campo}}',document.getElementById('input-{{$riga.ID}}-{{.Campo}}'),'badge-{{$riga.ID}}-{{.Campo}}','motivi-{{$riga.ID}}','btn-{{$riga.ID}}-{{.Campo}}','err-{{$riga.ID}}-{{.Campo}}','mod-{{$riga.ID}}-{{.Campo}}')">Salva</button>
             <span id="err-{{$riga.ID}}-{{.Campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
-            <span style="font-size:.72rem;color:#9ca3af">{{.Motivo}}</span>
+            {{if hasCol $riga.Motivi .Motivo}}<span style="font-size:.72rem;color:#9ca3af">{{.Motivo}}</span>{{end}}
           </div>
         </div>
         {{end}}
@@ -174,23 +210,34 @@
         {{$statoKey := statoVerificaKey $campo}}
         {{$stato := index $riga.Dati $statoKey}}
         {{$declVal := index (index $.CampiDichiarati $riga.PraticaID) $campo}}
-        <div style="margin-bottom:.2rem">
+        {{$isConfermato := or (eq $stato "confermato") (and (not $hasDato) (eq $riga.Stato "approvata"))}}
+        <div style="margin-bottom:.3rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px">
+          <div style="font-size:.72rem;color:#6b7280;font-weight:500;margin-bottom:3px">{{$campo}}</div>
+          {{if $declVal}}
+          <div style="font-size:.75rem;color:#374151;margin-bottom:4px">Dichiarato: <strong style="font-family:monospace">{{$declVal}}</strong></div>
+          {{end}}
           <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap">
-            <span style="font-size:.75rem;color:#6b7280;min-width:80px">{{$campo}} ✎:</span>
-            {{$isConfermato := and (not $hasDato) (eq $riga.Stato "approvata")}}
             {{if or $hasDato $isConfermato}}
-              {{if and $isConfermato $declVal}}
+              {{if $isConfermato}}
               <span id="badge-{{$riga.ID}}-verifica-{{$campo}}"
-                    style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$declVal}} (confermato) ✓</span>
+                    style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:2px 8px;border-radius:4px;border:1px solid #bbf7d0">{{if $hasDato}}{{$hasDato}}{{else}}{{$declVal}}{{end}} ✓ confermato</span>
               {{else if eq $stato "sovrascitto"}}
               <span id="badge-{{$riga.ID}}-verifica-{{$campo}}"
-                    style="font-family:monospace;font-size:.8rem;background:#fffbeb;color:#92400e;padding:1px 6px;border-radius:4px;border:1px solid #fde68a">{{$hasDato}} (sovr.)</span>
+                    style="font-family:monospace;font-size:.8rem;background:#fffbeb;color:#92400e;padding:2px 8px;border-radius:4px;border:1px solid #fde68a">{{$hasDato}} ✎ corretto</span>
               {{else}}
               <span id="badge-{{$riga.ID}}-verifica-{{$campo}}"
-                    style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
+                    style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:2px 8px;border-radius:4px;border:1px solid #bbf7d0">{{$hasDato}} ✓</span>
               {{end}}
-              <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
+              <button type="button" style="font-size:.7rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline"
                       onclick="document.getElementById('badge-{{$riga.ID}}-verifica-{{$campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}').style.display='inline-block';document.getElementById('btn-verifica-{{$riga.ID}}-{{$campo}}').style.display='inline-block'">modifica</button>
+            {{else if $declVal}}
+              {{/* Ha valore dichiarato ma non ancora confermato/corretto: mostra Conferma o input corretto */}}
+              <button type="button" id="btn-conferma-{{$riga.ID}}-{{$campo}}"
+                      style="font-size:.78rem;font-weight:600;padding:2px 10px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:5px;cursor:pointer"
+                      onclick="confermaDichiarato({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',this.getAttribute('data-val'),'badge-{{$riga.ID}}-verifica-{{$campo}}','motivi-{{$riga.ID}}','btn-conferma-{{$riga.ID}}-{{$campo}}','err-verifica-{{$riga.ID}}-{{$campo}}')"
+                      data-val="{{$declVal}}">✓ Conferma valore</button>
+              <button type="button" style="font-size:.7rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline"
+                      onclick="document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}').style.display='inline-block';document.getElementById('btn-verifica-{{$riga.ID}}-{{$campo}}').style.display='inline-block';this.style.display='none';document.getElementById('btn-conferma-{{$riga.ID}}-{{$campo}}').style.display='none'">inserisci valore diverso</button>
             {{end}}
             <input type="text"
                    id="input-{{$riga.ID}}-verifica-{{$campo}}"
@@ -199,19 +246,14 @@
                    data-pratica-id="{{$riga.PraticaID}}"
                    data-campo="{{$campo}}"
                    value="{{$hasDato}}"
-                   placeholder="valore verificato"
-                   class="form-control form-control-sm" style="width:140px;font-size:.8rem;{{if or $hasDato $isConfermato}}display:none{{end}}"
+                   placeholder="inserisci valore verificato"
+                   class="form-control form-control-sm" style="width:140px;font-size:.8rem;display:none"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',this,'badge-{{$riga.ID}}-verifica-{{$campo}}','motivi-{{$riga.ID}}','btn-verifica-{{$riga.ID}}-{{$campo}}','err-verifica-{{$riga.ID}}-{{$campo}}')}"
                    name="valore">
             <button type="button" id="btn-verifica-{{$riga.ID}}-{{$campo}}"
-                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if or $hasDato $isConfermato}}display:none{{end}}"
+                    class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;display:none"
                     onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$campo}}',document.getElementById('input-{{$riga.ID}}-verifica-{{$campo}}'),'badge-{{$riga.ID}}-verifica-{{$campo}}','motivi-{{$riga.ID}}','btn-verifica-{{$riga.ID}}-{{$campo}}','err-verifica-{{$riga.ID}}-{{$campo}}')">Salva</button>
             <span id="err-verifica-{{$riga.ID}}-{{$campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
-            {{if $declVal}}
-              <span style="font-size:.72rem;color:#9ca3af">dichiarato: <strong>{{$declVal}}</strong></span>
-            {{else if not $hasDato}}
-              <span style="font-size:.72rem;color:#9ca3af">verifica operatore</span>
-            {{end}}
           </div>
         </div>
         {{end}}{{/* fine if isCertFallito */}}
@@ -231,9 +273,9 @@
             {{if $cbDato}}
             <span id="badge-{{$riga.ID}}-bi-{{$cb.Campo}}"
                   style="font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:1px 6px;border-radius:4px;border:1px solid #bbf7d0">{{$cbDato}} ✓</span>
-            <button type="button" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0"
-                    onclick="document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='none';document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='inline-block';document.getElementById('btn-bi-{{$riga.ID}}-{{$cb.Campo}}').style.display='inline-block'">modifica</button>
             {{end}}
+            <button type="button" id="mod-{{$riga.ID}}-bi-{{$cb.Campo}}" style="font-size:.72rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0{{if not $cbDato}};display:none{{end}}"
+                    onclick="var b=document.getElementById('badge-{{$riga.ID}}-bi-{{$cb.Campo}}');if(b)b.style.display='none';document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}').style.display='inline-block';document.getElementById('btn-bi-{{$riga.ID}}-{{$cb.Campo}}').style.display='inline-block';this.style.display='none'">modifica</button>
             <input type="text" inputmode="decimal"
                    id="input-{{$riga.ID}}-bi-{{$cb.Campo}}"
                    data-istr-id="{{$riga.ID}}"
@@ -243,11 +285,11 @@
                    value="{{$cbDato}}"
                    placeholder="{{$cb.Label}}"
                    class="form-control form-control-sm" style="width:140px;font-size:.8rem;{{if $cbDato}}display:none{{end}}"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',this,'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}')}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',this,'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}','mod-{{$riga.ID}}-bi-{{$cb.Campo}}')}"
                    name="valore">
             <button type="button" id="btn-bi-{{$riga.ID}}-{{$cb.Campo}}"
                     class="btn btn-sm btn-primary" style="font-size:.8rem;padding:1px 10px;{{if $cbDato}}display:none{{end}}"
-                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}'),'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}')">Salva</button>
+                    onclick="salvaBuiltin({{$.Bando.ID}},'{{$riga.PraticaID}}','{{$cb.Campo}}',document.getElementById('input-{{$riga.ID}}-bi-{{$cb.Campo}}'),'badge-{{$riga.ID}}-bi-{{$cb.Campo}}','motivi-{{$riga.ID}}','btn-bi-{{$riga.ID}}-{{$cb.Campo}}','err-bi-{{$riga.ID}}-{{$cb.Campo}}','mod-{{$riga.ID}}-bi-{{$cb.Campo}}')">Salva</button>
             <span id="err-bi-{{$riga.ID}}-{{$cb.Campo}}" style="color:#dc2626;font-size:.72rem;display:none"></span>
           </div>
         </div>
@@ -257,14 +299,24 @@
       {{end}}
     </td>
     <td>
-      {{if eq .Stato "da_verificare"}}<span class="badge" style="background:#fef2f2;color:#dc2626">Da verificare</span>
-      {{else if eq .Stato "approvata"}}<span class="badge badge-green">Approvata</span>
-      {{else}}<span class="badge badge-gray">Esclusa</span>{{end}}
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+        {{if eq .Stato "da_verificare"}}
+          <span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-weight:600">⚠ Da verificare</span>
+        {{else if eq .Stato "approvata"}}
+          <span class="badge" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;font-weight:600">✓ Approvata</span>
+        {{else}}
+          <span class="badge" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-weight:600">— Esclusa</span>
+        {{end}}
+        {{if .InclusiDufficio}}
+          <span class="badge" style="font-size:.7rem;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;letter-spacing:.01em">d'ufficio</span>
+        {{end}}
+      </div>
     </td>
     <td style="font-size:.85em">{{.Operatore}}</td>
     <td>
-      <textarea rows="2"
-                class="form-control form-control-sm" style="font-size:.8rem;width:160px;resize:vertical"
+      <textarea
+                id="nota-{{.ID}}"
+                class="form-control form-control-sm nota-auto" style="font-size:.8rem;width:160px;resize:vertical;min-height:2.4rem;overflow:hidden"
                 placeholder="nota…"
                 {{if ne .Stato "da_verificare"}}disabled{{end}}
                 hx-post="/bandi/{{$.Bando.ID}}/istruttoria/{{.PraticaID}}/nota"
@@ -274,6 +326,10 @@
                 hx-on:htmx:before-request="this.style.opacity='.5'"
                 hx-on:htmx:after-request="this.style.opacity='';if(event.detail.successful){this.style.outline='2px solid #16a34a';setTimeout(()=>this.style.outline='',2000)}else{this.style.outline='2px solid #dc2626';setTimeout(()=>this.style.outline='',2000)}"
                 name="nota">{{.NotaLavoro}}</textarea>
+      {{if eq .Stato "da_verificare"}}
+      <button type="button" style="margin-top:3px;font-size:.72rem;padding:1px 8px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;width:100%"
+              onclick="document.getElementById('nota-{{.ID}}').dispatchEvent(new Event('change'))">Salva</button>
+      {{end}}
       {{$altriBandi := index $.NoteAltriBandi .PraticaID}}
       {{if $altriBandi}}
       <div style="margin-top:.3rem">
@@ -287,12 +343,25 @@
     </td>
     <td style="white-space:nowrap">
       {{if eq .Stato "da_verificare"}}
-      <button type="button" class="btn btn-sm btn-secondary"
-        onclick="azioneRapida({{.ID}}, 'approvata')">✓ Approva</button>
-      <button type="button" class="btn btn-sm btn-danger"
-        onclick="azioneRapida({{.ID}}, 'esclusa')">✗ Escludi</button>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        {{if .Motivi}}
+        <button type="button" disabled
+          id="approva-btn-{{.ID}}"
+          style="padding:3px 12px;font-size:.8rem;font-weight:600;background:#86efac;color:#fff;border:none;border-radius:5px;cursor:not-allowed;opacity:.6;letter-spacing:.01em"
+          title="Risolvere tutti i motivi prima di approvare">✓ Approva</button>
+        {{else}}
+        <button type="button"
+          id="approva-btn-{{.ID}}"
+          style="padding:3px 12px;font-size:.8rem;font-weight:600;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer;letter-spacing:.01em"
+          onclick="azioneRapida({{.ID}}, 'approvata')">✓ Approva</button>
+        {{end}}
+        <button type="button"
+          style="padding:3px 12px;font-size:.8rem;font-weight:600;background:#dc2626;color:#fff;border:none;border-radius:5px;cursor:pointer;letter-spacing:.01em"
+          onclick="azioneRapida({{.ID}}, 'esclusa')">✗ Escludi</button>
+      </div>
       {{else}}
-      <button type="submit" class="btn btn-sm btn-secondary"
+      <button type="submit"
+        style="padding:3px 12px;font-size:.8rem;font-weight:500;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;cursor:pointer"
         formaction="/bandi/{{$.Bando.ID}}/istruttoria/{{.PraticaID}}/riapri">↩ Riapri</button>
       {{end}}
     </td>
@@ -309,8 +378,10 @@
       <textarea name="nota" class="form-control form-control-sm" rows="2" placeholder="Motivazione della decisione…"></textarea>
     </div>
     <div style="display:flex;gap:.5rem">
-      <button type="submit" name="stato" value="approvata" class="btn btn-secondary">✓ Approva selezionate</button>
-      <button type="submit" name="stato" value="esclusa" class="btn btn-danger"
+      <button type="submit" name="stato" value="approvata"
+        style="padding:5px 16px;font-size:.85rem;font-weight:600;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer">✓ Approva selezionate</button>
+      <button type="submit" name="stato" value="esclusa"
+        style="padding:5px 16px;font-size:.85rem;font-weight:600;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer"
         onclick="return confirm('Escludere le domande selezionate dalla graduatoria?')">✗ Escludi selezionate</button>
     </div>
   </div>
@@ -333,6 +404,86 @@
   </div>
 </div>
 <script>
+function confermaDichiarato(bandoID, praticaID, campo, valDichiarato, badgeID, motiviID, btnConfID, errID) {
+  var errSpan = document.getElementById(errID);
+  if (errSpan) { errSpan.textContent = ''; errSpan.style.display = 'none'; }
+  fetch('/bandi/' + bandoID + '/istruttoria/' + praticaID + '/dato', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'campo=' + encodeURIComponent(campo) + '&valore=' + encodeURIComponent(valDichiarato)
+  }).then(function(r) {
+    if (r.ok) {
+      r.text().then(function(html) {
+        var m = document.getElementById(motiviID);
+        if (m) {
+          m.innerHTML = html;
+          aggiornaApprovaBtn(motiviID);
+        }
+      });
+      var b = document.getElementById(badgeID);
+      if (!b) {
+        b = document.createElement('span');
+        b.id = badgeID;
+        b.style.cssText = 'font-family:monospace;font-size:.8rem;background:#f0fdf4;color:#15803d;padding:2px 8px;border-radius:4px;border:1px solid #bbf7d0';
+        var btn = document.getElementById(btnConfID);
+        if (btn) btn.parentNode.insertBefore(b, btn);
+      }
+      b.textContent = valDichiarato + ' ✓ confermato';
+      b.style.display = '';
+      var btn = document.getElementById(btnConfID);
+      if (btn) btn.style.display = 'none';
+    } else {
+      r.text().then(function(t) {
+        if (errSpan) { errSpan.textContent = 'Errore: ' + t; errSpan.style.display = ''; }
+      });
+    }
+  });
+}
+function aggiornaApprovaBtn(motiviDivID) {
+  var mDiv = document.getElementById(motiviDivID);
+  if (!mDiv) return;
+  var istrID = motiviDivID.replace('motivi-', '');
+  var approvaBtn = document.getElementById('approva-btn-' + istrID);
+  var motiviRimasti = Array.from(mDiv.querySelectorAll('.badge-gray')).map(function(b) { return b.textContent.trim(); });
+  var tr = mDiv.closest('tr');
+  if (tr) {
+    tr.querySelectorAll('[data-motivo-iniziale]').forEach(function(el) {
+      var m = el.getAttribute('data-motivo-iniziale');
+      var risolto = motiviRimasti.indexOf(m) === -1;
+      if (risolto) {
+        el.style.background = '#f0fdf4'; el.style.color = '#15803d'; el.style.borderColor = '#bbf7d0';
+        el.textContent = '✓ ' + m;
+      } else {
+        el.style.background = '#fef2f2'; el.style.color = '#dc2626'; el.style.borderColor = '#fecaca';
+        el.textContent = '✗ ' + m;
+      }
+    });
+  }
+  if (!approvaBtn) return;
+  if (motiviRimasti.length === 0) {
+    approvaBtn.disabled = false;
+    approvaBtn.style.background = '#16a34a';
+    approvaBtn.style.opacity = '1';
+    approvaBtn.style.cursor = 'pointer';
+    approvaBtn.title = '';
+    approvaBtn.onclick = function() { azioneRapida(parseInt(istrID), 'approvata'); };
+  } else {
+    approvaBtn.disabled = true;
+    approvaBtn.style.background = '#86efac';
+    approvaBtn.style.opacity = '.6';
+    approvaBtn.style.cursor = 'not-allowed';
+    approvaBtn.title = 'Risolvere tutti i motivi prima di approvare';
+    approvaBtn.onclick = null;
+  }
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+document.querySelectorAll('.nota-auto').forEach(function(ta) {
+  autoResize(ta);
+  ta.addEventListener('input', function() { autoResize(this); });
+});
 function copyCF(btn, cf) {
   navigator.clipboard.writeText(cf).then(() => {
     const orig = btn.textContent;
@@ -362,7 +513,7 @@ function azioneRapida(id, stato) {
 document.getElementById('batch-form')?.addEventListener('submit', function() {
   document.getElementById('rescan-overlay').style.display = 'flex';
 });
-function salvaBuiltin(bandoID, praticaID, campo, input, badgeID, motiviID, btnID, errID) {
+function salvaBuiltin(bandoID, praticaID, campo, input, badgeID, motiviID, btnID, errID, modificaBtnID) {
   var valore = input.value.trim().replace(',', '.');
   var cleared = valore === '';
   input.disabled = true;
@@ -380,13 +531,15 @@ function salvaBuiltin(bandoID, praticaID, campo, input, badgeID, motiviID, btnID
     if (r.ok) {
       r.text().then(function(html) {
         var m = document.getElementById(motiviID);
-        if (m) m.innerHTML = html;
+        if (m) { m.innerHTML = html; aggiornaApprovaBtn(motiviID); }
       });
       var b = document.getElementById(badgeID);
+      var modBtn = modificaBtnID ? document.getElementById(modificaBtnID) : null;
       if (cleared) {
         if (b) b.style.display = 'none';
         input.style.display = '';
         if (btn) btn.style.display = '';
+        if (modBtn) modBtn.style.display = 'none';
       } else {
         if (!b) {
           b = document.createElement('span');
@@ -398,6 +551,7 @@ function salvaBuiltin(bandoID, praticaID, campo, input, badgeID, motiviID, btnID
         b.style.display = '';
         input.style.display = 'none';
         if (btn) btn.style.display = 'none';
+        if (modBtn) modBtn.style.display = '';
       }
     } else {
       r.text().then(function(t) {

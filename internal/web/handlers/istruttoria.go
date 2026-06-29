@@ -164,6 +164,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		praticaIDs = append(praticaIDs, ist.PraticaID)
 	}
 	noteAltriBandi, _ := db.GetNoteAltriBandi(h.DB, int(bandoID), praticaIDs)
+	collegamentiMap, _ := db.GetCollegamenti(h.DB, int(bandoID), praticaIDs)
 	praticaIDSet := map[string]bool{}
 	for _, id := range praticaIDs {
 		praticaIDSet[id] = true
@@ -219,6 +220,7 @@ func (h *IstruttoriaHandler) GetIstruttoria(w http.ResponseWriter, r *http.Reque
 		"NoteAltriBandi":   noteAltriBandi,
 		"AltriBandi":       altriBandi,
 		"DuplicatiBandi":   duplicatiBandi,
+		"Collegamenti":     collegamentiMap,
 	})
 }
 
@@ -295,6 +297,49 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 			}
 		}
 
+		// Calcola motivi RAW (senza override) — snapshot scan puro per motivi_iniziali_json.
+		rawMotiviSet := map[string]struct{}{}
+		if rawRecs, err2 := generic.EstraiRecordsConExtras(app, ecfg, nil); err2 == nil {
+			var rawPassing []*graduatoria.Record
+			for _, rec := range rawRecs {
+				rec.DerivaCampi(ecfg.Rimborso)
+				if ok, _ := generic.ApplicaFiltri(rec, ecfg.Filtri); ok {
+					rawPassing = append(rawPassing, rec)
+				}
+			}
+			for _, rec := range rawPassing {
+				for _, m := range rec.FlagMotivi(ecfg.Verifica) {
+					rawMotiviSet[m] = struct{}{}
+				}
+			}
+			if ecfg.Modalita == "fondi" && ecfg.Rimborso.CampoLordo != "" {
+				if _, alreadyMapped := ecfg.Mapping[ecfg.Rimborso.CampoLordo]; !alreadyMapped {
+					lordo := ecfg.Rimborso.CampoLordo
+					for _, rec := range rawPassing {
+						val, found := float64(0), false
+						if v, ok := rec.FloatMap[lordo]; ok {
+							val, found = v, true
+						} else if sv, ok := rec.StringMap[lordo]; ok {
+							sv = strings.TrimSpace(sv)
+							if sv == "" || sv == "0" {
+								val, found = 0, true
+							} else if parsed, err3 := strconv.ParseFloat(sv, 64); err3 == nil {
+								val, found = parsed, true
+							}
+						}
+						if found && val == 0 {
+							rawMotiviSet["Corrispettivo dichiarato €0,00 — inserire importo speso come dato locale"] = struct{}{}
+						}
+					}
+				}
+			}
+			for _, rec := range rawPassing {
+				if rec.StringMap["richiedente_cf"] == "" && rec.StringMap["richiedente"] == "" {
+					rawMotiviSet["CF richiedente mancante — verificare identità del richiedente"] = struct{}{}
+				}
+			}
+		}
+
 		records, err := generic.EstraiRecordsConExtras(app, ecfg, datiLocali[app.ID])
 		if err != nil || len(records) == 0 {
 			continue
@@ -361,14 +406,24 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 				motiviSet["CF richiedente mancante — verificare identità del richiedente"] = struct{}{}
 			}
 		}
+
+		rawMotivi := make([]string, 0, len(rawMotiviSet))
+		for m := range rawMotiviSet {
+			rawMotivi = append(rawMotivi, m)
+		}
+
 		if len(motiviSet) == 0 {
+			// Nessun motivo corrente (override hanno risolto tutto): aggiorna solo motivi_iniziali su riga esistente.
+			if len(rawMotivi) > 0 {
+				db.UpdateMotiviIniziali(dbConn, int(bando.ID), app.ID, rawMotivi) //nolint
+			}
 			continue
 		}
 		motivi := make([]string, 0, len(motiviSet))
 		for m := range motiviSet {
 			motivi = append(motivi, m)
 		}
-		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, app.Status); err == nil {
+		if err := db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, motivi, rawMotivi, app.Status); err == nil {
 			nuove++
 		}
 	}
@@ -727,6 +782,37 @@ func (h *IstruttoriaHandler) salvaEValutaDati(bando *db.Bando, op *middleware.Op
 		}
 		// Aggiorna motivi_json nel DB.
 		db.UpdateMotiviIstruttoria(h.DB, bandoID, praticaID, motivi)
+		// Se emergono motivi non coperti dall'ultima scan (nuove regole), aggiorna motivi_iniziali_json.
+		if len(motivi) > 0 {
+			if ist, err2 := db.GetIstruttoriaByPratica(h.DB, bandoID, praticaID); err2 == nil {
+				initSet := make(map[string]struct{}, len(ist.MotiviIniziali))
+				for _, m := range ist.MotiviIniziali {
+					initSet[m] = struct{}{}
+				}
+				hasNew := false
+				for _, m := range motivi {
+					if _, ok := initSet[m]; !ok {
+						hasNew = true
+						break
+					}
+				}
+				if hasNew {
+					seen := make(map[string]struct{})
+					merged := make([]string, 0, len(ist.MotiviIniziali)+len(motivi))
+					for _, m := range ist.MotiviIniziali {
+						seen[m] = struct{}{}
+						merged = append(merged, m)
+					}
+					for _, m := range motivi {
+						if _, ok := seen[m]; !ok {
+							seen[m] = struct{}{}
+							merged = append(merged, m)
+						}
+					}
+					_ = db.UpdateMotiviIniziali(h.DB, bandoID, praticaID, merged)
+				}
+			}
+		}
 	} else {
 		// Fallback: legge motivi dal DB senza ri-valutare.
 		if ist, err := db.GetIstruttoriaByPratica(h.DB, bandoID, praticaID); err == nil {
@@ -765,7 +851,11 @@ func (h *IstruttoriaHandler) PostRiapri(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/bandi/%d/istruttoria", bandoID), http.StatusSeeOther)
+	ref := r.Header.Get("Referer")
+	if ref == "" {
+		ref = fmt.Sprintf("/bandi/%d/istruttoria", bandoID)
+	}
+	http.Redirect(w, r, ref, http.StatusSeeOther)
 }
 
 // PostEscludiDati — imposta stato=esclusa (o da_verificare se già esclusa) per pratica.

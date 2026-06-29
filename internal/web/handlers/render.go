@@ -101,6 +101,14 @@ var funcMap = template.FuncMap{
 		}
 		return false
 	},
+	"motivoRisolto": func(motiviCorrenti []string, motivo string) bool {
+		for _, m := range motiviCorrenti {
+			if m == motivo {
+				return false
+			}
+		}
+		return true
+	},
 	"primoNonVuoto": func(vals ...string) string {
 		for _, v := range vals {
 			if v != "" {

@@ -130,7 +130,7 @@ Operatori senza valore (`vuoto`, `non_vuoto`, `vero`, `falso`, `cf_valido`) igno
 ### Istruttoria — comportamento scan
 
 `PostScansiona` (`POST /bandi/{id}/istruttoria/scansiona`):
-1. **Reset `da_verificare`** (`db.ResetDaVerificare`) — ogni scan ricomincia; `approvata`/`esclusa` preservati; app con note/dati locali mantengono la riga ma con `motivi_json=[]`
+1. **Reset `da_verificare`** (`db.ResetDaVerificare`) — ogni scan ricomincia; `approvata`/`esclusa` preservati; app con dati locali reali in `istruttorie_dati` (campi non-`__`) o `includi_dufficio=1` mantengono la riga con `motivi_json=[]`; la nota in `note_lavoro` **non** è condizione sufficiente (tabella separata, sopravvive indipendentemente)
 2. Per ogni app che passa `filtri_istanza` (data+stato): estrae campi con nil extras → salva in `istruttorie_api_cache` (valori dichiarati puri)
 3. Poi estrae con override locali applicati → valuta motivi e filtri ammissibilità
 4. Auto-flag built-in (anche senza `Verifica.Attiva` se modalità fondi): corrispettivo=0 e CF richiedente mancante
@@ -423,8 +423,8 @@ Form dinamico: ogni campo da `EngineConfig.Mapping` ha input con `type="text" in
 |---------|-------------|
 | `bandi` | Configurazione bando: service_id, budget, ISEE max, engine_config, stato_bando |
 | `graduatorie_run` | Snapshot `Graduatoria` JSON in `dati_json`; `stato` (`bozza`\|`pubblicata`) |
-| `istruttorie` | Flag per-bando per-pratica: stato (`da_verificare`\|`approvata`\|`esclusa`), motivi, app_status, nota_lavoro |
-| `istruttorie_dati` | Override operatore cross-bando: `pratica_id PK`, JSON `{campo: valore}` — solo campi sovrascritti dall'operatore |
+| `istruttorie` | Flag per-bando per-pratica: stato (`da_verificare`\|`approvata`\|`esclusa`), `motivi_json`, `motivi_iniziali_json` (snapshot scan, mai sovrascritto da override), `app_status`, `includi_dufficio` |
+| `istruttorie_dati` | Override operatore: `(pratica_id, bando_id) PK`, JSON `{campo: valore}` — solo campi sovrascritti dall'operatore |
 | `istruttorie_api_cache` | Valori dichiarati API: `(pratica_id, bando_id) PK`, JSON campi estratti durante scan — mai mescolati con override |
 | `note_lavoro` | Note operatore per-bando per-pratica: `(bando_id, pratica_id) PK`, `nota` — tabella separata da `istruttorie` per evitare row `da_verificare` fantasma |
 | `pratiche_collegate` | Link manuale cross-bando: `(bando_id_a, pratica_id_a, bando_id_b, pratica_id_b)` normalizzato (bando_id minore in posizione A) con UNIQUE constraint |

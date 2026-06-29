@@ -8,32 +8,59 @@ import (
 )
 
 type Istruttoria struct {
-	ID           int
-	BandoID      int
-	PraticaID    string
-	Motivi       []string
-	Stato        string // "da_verificare" | "approvata" | "esclusa"
-	Nota         string // nota di approvazione/esclusione (per-bando)
-	Operatore    string
-	AggiornatoIl time.Time
-	AppStatus    string
-	Dati         map[string]string // override campi mancanti (cross-bando, da istruttorie_dati)
-	NotaLavoro   string            // nota di lavoro operatore (cross-bando, da istruttorie_dati)
+	ID              int
+	BandoID         int
+	PraticaID       string
+	Motivi          []string
+	MotiviIniziali  []string // motivi al momento della scan, mai sovrascritti da override
+	Stato           string   // "da_verificare" | "approvata" | "esclusa"
+	Nota            string   // nota di approvazione/esclusione (per-bando)
+	Operatore       string
+	AggiornatoIl    time.Time
+	AppStatus       string
+	Dati            map[string]string // override campi mancanti (cross-bando, da istruttorie_dati)
+	NotaLavoro      string            // nota di lavoro operatore (cross-bando, da istruttorie_dati)
+	InclusiDufficio bool
 }
 
 // UpsertIstruttoria inserisce o aggiorna il record di istruttoria per una pratica.
-// Se la pratica è già stata smarcata (approvata/esclusa), preserva lo stato esistente ma aggiorna motivi e app_status.
-func UpsertIstruttoria(db *sql.DB, bandoID int, praticaID string, motivi []string, appStatus string) error {
+// motiviIniziali = motivi calcolati senza override (snapshot scan puro); aggiornati sempre, anche per approvata/esclusa.
+// motivi = motivi calcolati con override applicati; aggiornati solo per righe da_verificare.
+func UpsertIstruttoria(db *sql.DB, bandoID int, praticaID string, motivi, motiviIniziali []string, appStatus string) error {
 	mjson, _ := json.Marshal(motivi)
-	_, err := db.Exec(`
-		INSERT INTO istruttorie (bando_id, pratica_id, motivi_json, stato, app_status, aggiornato_il)
-		VALUES (?, ?, ?, 'da_verificare', ?, ?)
+	mijson, _ := json.Marshal(motiviIniziali)
+	now := time.Now().Format(time.RFC3339)
+	// INSERT o aggiorna solo righe da_verificare.
+	if _, err := db.Exec(`
+		INSERT INTO istruttorie (bando_id, pratica_id, motivi_json, motivi_iniziali_json, stato, app_status, aggiornato_il)
+		VALUES (?, ?, ?, ?, 'da_verificare', ?, ?)
 		ON CONFLICT(bando_id, pratica_id) DO UPDATE SET
-			motivi_json   = excluded.motivi_json,
-			app_status    = excluded.app_status,
-			aggiornato_il = excluded.aggiornato_il
+			motivi_json          = excluded.motivi_json,
+			motivi_iniziali_json = excluded.motivi_iniziali_json,
+			app_status           = excluded.app_status,
+			aggiornato_il        = excluded.aggiornato_il
 		WHERE stato = 'da_verificare'`,
-		bandoID, praticaID, string(mjson), appStatus, time.Now().Format(time.RFC3339),
+		bandoID, praticaID, string(mjson), string(mijson), appStatus, now,
+	); err != nil {
+		return err
+	}
+	// Aggiorna motivi_iniziali_json anche per righe approvata/esclusa (senza toccare stato).
+	_, err := db.Exec(`
+		UPDATE istruttorie SET motivi_iniziali_json=?, aggiornato_il=?
+		WHERE bando_id=? AND pratica_id=? AND stato != 'da_verificare'`,
+		string(mijson), now, bandoID, praticaID,
+	)
+	return err
+}
+
+// UpdateMotiviIniziali aggiorna solo motivi_iniziali_json per righe esistenti (qualsiasi stato).
+// Usato durante scan per domande che gli override hanno reso pulite ma che avevano motivi raw.
+func UpdateMotiviIniziali(db *sql.DB, bandoID int, praticaID string, motiviIniziali []string) error {
+	mijson, _ := json.Marshal(motiviIniziali)
+	_, err := db.Exec(`
+		UPDATE istruttorie SET motivi_iniziali_json=?, aggiornato_il=?
+		WHERE bando_id=? AND pratica_id=?`,
+		string(mijson), time.Now().Format(time.RFC3339), bandoID, praticaID,
 	)
 	return err
 }
@@ -156,7 +183,8 @@ func GetIstruttoriaByPratica(db *sql.DB, bandoID int, praticaID string) (*Istrut
 func ListIstruttorie(db *sql.DB, bandoID int, statoFilter, appStatusFilter string) ([]Istruttoria, error) {
 	q := `SELECT i.id, i.bando_id, i.pratica_id, i.motivi_json, i.stato,
 	             COALESCE(i.nota,''), COALESCE(i.operatore,''), COALESCE(i.aggiornato_il,''),
-	             COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(nl.nota,'')
+	             COALESCE(i.app_status,''), COALESCE(id.dati_json,'{}'), COALESCE(nl.nota,''),
+	             COALESCE(i.includi_dufficio,0), COALESCE(i.motivi_iniziali_json,'[]')
 	      FROM istruttorie i
 	      LEFT JOIN istruttorie_dati id ON id.pratica_id = i.pratica_id AND id.bando_id = i.bando_id
 	      LEFT JOIN note_lavoro nl ON nl.pratica_id = i.pratica_id AND nl.bando_id = i.bando_id
@@ -181,12 +209,15 @@ func ListIstruttorie(db *sql.DB, bandoID int, statoFilter, appStatusFilter strin
 	var out []Istruttoria
 	for rows.Next() {
 		var ist Istruttoria
-		var mj, dj, agAt string
+		var mj, mij, dj, agAt string
+		var includi int
 		if err := rows.Scan(&ist.ID, &ist.BandoID, &ist.PraticaID, &mj, &ist.Stato,
-			&ist.Nota, &ist.Operatore, &agAt, &ist.AppStatus, &dj, &ist.NotaLavoro); err != nil {
+			&ist.Nota, &ist.Operatore, &agAt, &ist.AppStatus, &dj, &ist.NotaLavoro, &includi, &mij); err != nil {
 			return nil, err
 		}
+		ist.InclusiDufficio = includi == 1
 		json.Unmarshal([]byte(mj), &ist.Motivi)
+		json.Unmarshal([]byte(mij), &ist.MotiviIniziali)
 		ist.Dati = map[string]string{}
 		json.Unmarshal([]byte(dj), &ist.Dati)
 		if agAt != "" {
@@ -217,16 +248,16 @@ func ListStatiApp(db *sql.DB, bandoID int) ([]string, error) {
 }
 
 // ResetDaVerificare resetta o cancella i record "da_verificare" per un bando.
-// Preserva i record che hanno note di lavoro (nota_lavoro) o dati locali reali (istruttorie_dati).
+// Preserva solo i record con dati locali reali (istruttorie_dati) o flag includi_dufficio.
+// Le note in note_lavoro sono tabella separata e sopravvivono indipendentemente.
 // I campi sistema con prefisso __ (es. __richiedente_cf) non contano come dati reali.
 func ResetDaVerificare(dbConn *sql.DB, bandoID int) error {
-	// 0. Pulisce campi sistema (__*) da istruttorie_dati per pratiche da_verificare senza note.
+	// 0. Pulisce campi sistema (__*) da istruttorie_dati per pratiche da_verificare.
 	//    Rimuove residui salvati dal scan precedente che bloccano il delete.
 	rows, err := dbConn.Query(`
 		SELECT id.pratica_id, id.dati_json FROM istruttorie_dati id
 		JOIN istruttorie i ON i.pratica_id = id.pratica_id AND i.bando_id = id.bando_id
 		WHERE id.bando_id = ? AND i.stato = 'da_verificare'
-		AND NOT EXISTS (SELECT 1 FROM note_lavoro nl WHERE nl.bando_id=id.bando_id AND nl.pratica_id=id.pratica_id AND nl.nota != '')
 		AND id.dati_json NOT IN ('{}','')`, bandoID)
 	if err == nil {
 		defer rows.Close()
@@ -257,27 +288,24 @@ func ResetDaVerificare(dbConn *sql.DB, bandoID int) error {
 		}
 	}
 
-	// 1. Resetta i motivi per le pratiche 'da_verificare' che hanno note o dati locali reali
+	// 1. Resetta i motivi per le pratiche 'da_verificare' che hanno dati locali reali
 	_, err = dbConn.Exec(`
 		UPDATE istruttorie
 		SET motivi_json = '[]'
-		WHERE bando_id = ? AND stato = 'da_verificare' AND (
-			EXISTS (SELECT 1 FROM note_lavoro nl WHERE nl.bando_id=istruttorie.bando_id AND nl.pratica_id=istruttorie.pratica_id AND nl.nota != '')
-			OR EXISTS (
-				SELECT 1 FROM istruttorie_dati id
-				WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
-			)
+		WHERE bando_id = ? AND stato = 'da_verificare'
+		AND EXISTS (
+			SELECT 1 FROM istruttorie_dati id
+			WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
 		)`, bandoID)
 	if err != nil {
 		return err
 	}
 
-	// 2. Rimuove le pratiche 'da_verificare' che NON hanno note né dati locali reali né flag includi_dufficio
+	// 2. Rimuove le pratiche 'da_verificare' che NON hanno dati locali reali né flag includi_dufficio
 	_, err = dbConn.Exec(`
 		DELETE FROM istruttorie
 		WHERE bando_id = ? AND stato = 'da_verificare'
 		AND includi_dufficio = 0
-		AND NOT EXISTS (SELECT 1 FROM note_lavoro nl WHERE nl.bando_id=istruttorie.bando_id AND nl.pratica_id=istruttorie.pratica_id AND nl.nota != '')
 		AND NOT EXISTS (
 			SELECT 1 FROM istruttorie_dati id
 			WHERE id.pratica_id = istruttorie.pratica_id AND id.bando_id = istruttorie.bando_id AND id.dati_json NOT IN ('{}', '')
