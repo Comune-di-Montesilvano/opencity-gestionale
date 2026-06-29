@@ -343,15 +343,30 @@ func estraiColonnaExport(col db.ExportColonna, ecfg graduatoria.EngineConfig, po
 			return gruppo
 		case "importo":
 			if !riga.Ammessa {
-				netto := ist.Corrispettivo - ist.BeneficioRicevuto
-				if ecfg.Rimborso.Tipo == "lordo" && ecfg.Rimborso.CampoLordo != "" {
+				var lordo float64
+				var deduzione float64
+
+				if ecfg.Rimborso.CampoLordo != "" {
 					if valStr, ok := ist.CampiMappati[ecfg.Rimborso.CampoLordo]; ok {
-						if f, err := strconv.ParseFloat(strings.ReplaceAll(valStr, ",", "."), 64); err == nil {
-							return fmt.Sprintf("%.2f", f)
+						valStr = strings.TrimSpace(strings.ReplaceAll(valStr, ",", "."))
+						if f, err := strconv.ParseFloat(valStr, 64); err == nil {
+							lordo = f
 						}
 					}
-					return fmt.Sprintf("%.2f", ist.Corrispettivo)
 				}
+				if ecfg.Rimborso.CampoDeduzione != "" {
+					if valStr, ok := ist.CampiMappati[ecfg.Rimborso.CampoDeduzione]; ok {
+						valStr = strings.TrimSpace(strings.ReplaceAll(valStr, ",", "."))
+						if f, err := strconv.ParseFloat(valStr, 64); err == nil {
+							deduzione = f
+						}
+					}
+				}
+
+				if ecfg.Rimborso.Tipo == "lordo" {
+					return fmt.Sprintf("%.2f", lordo)
+				}
+				netto := lordo - deduzione
 				if netto < 0 {
 					netto = 0
 				}
