@@ -367,7 +367,7 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 		}
 		if len(passingRecords) == 0 {
 			if isDufficio {
-				motivo := "Dati insufficienti — inserire tipo, anno e importo manualmente"
+				motivo := "Dati insufficienti — completare i campi richiesti manualmente"
 				rawM := []string{motivo}
 				db.UpsertIstruttoria(dbConn, int(bando.ID), app.ID, rawM, rawM, app.Status) //nolint
 				nuove++
@@ -456,7 +456,7 @@ func EseguiScansioneIstruttoria(dbConn *sql.DB, baseURL string, bando *db.Bando,
 	// generano motivo generico per non mostrare ingiustamente "✓ OK".
 	for pid := range dufficioPIDs {
 		if !duffficioResolved[pid] {
-			motivo := "Dati insufficienti — inserire tipo, anno e importo manualmente"
+			motivo := "Dati insufficienti — completare i campi richiesti manualmente"
 			rawM := []string{motivo}
 			db.UpsertIstruttoria(dbConn, int(bando.ID), pid, rawM, rawM, "") //nolint
 			nuove++
