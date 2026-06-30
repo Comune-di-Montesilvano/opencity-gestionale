@@ -367,15 +367,15 @@ func estraiColonnaExport(col db.ExportColonna, ecfg graduatoria.EngineConfig, po
 				}
 
 				if ecfg.Rimborso.Tipo == "lordo" {
-					return fmt.Sprintf("%.2f", lordo)
+					return graduatoria.FormatValutaIT(lordo)
 				}
 				netto := lordo - deduzione
 				if netto < 0 {
 					netto = 0
 				}
-				return fmt.Sprintf("%.2f", netto)
+				return graduatoria.FormatValutaIT(netto)
 			}
-			return fmt.Sprintf("%.2f", riga.ImportoRimborso)
+			return graduatoria.FormatValutaIT(riga.ImportoRimborso)
 		case "annualita":
 			if ist.Annualita != 0 {
 				return fmt.Sprintf("%d", ist.Annualita)
@@ -388,13 +388,29 @@ func estraiColonnaExport(col db.ExportColonna, ecfg graduatoria.EngineConfig, po
 			return ist.Status
 		}
 	case "mappato":
-		return ist.CampiMappati[col.Chiave]
+		val := ist.CampiMappati[col.Chiave]
+		isEuro := strings.Contains(col.Label, "€")
+		if fm, ok := ecfg.Mapping[col.Chiave]; ok && fm.Tipo == "float" {
+			isEuro = true
+		}
+		if isEuro {
+			if f, err := strconv.ParseFloat(val, 64); err == nil {
+				return graduatoria.FormatValutaIT(f)
+			}
+		}
+		return val
 	case "raw":
 		if col.Path == "" {
 			return ""
 		}
 		if data, ok := rawAppData[ist.ID]; ok {
 			v, _ := extractor.Str(data, col.Path)
+			if strings.Contains(col.Label, "€") {
+				vClean := strings.TrimSpace(strings.ReplaceAll(v, ",", "."))
+				if f, err := strconv.ParseFloat(vClean, 64); err == nil {
+					return graduatoria.FormatValutaIT(f)
+				}
+			}
 			return v
 		}
 	}

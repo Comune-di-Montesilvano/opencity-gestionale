@@ -33,8 +33,8 @@
 <div id="dettaglio-parametri" style="margin-bottom: 2rem;">
   <div class="detail-grid">
     <div><strong>Service ID</strong><br><code style="font-size:.8em">{{.Bando.ServiceID}}</code></div>
-    <div><strong>Budget totale</strong><br>€{{printf "%.2f" .Bando.BudgetTotale}}</div>
-    <div><strong>ISEE massimo</strong><br>€{{printf "%.2f" .Bando.ISEEMassimo}}</div>
+    <div><strong>Budget totale</strong><br>{{formattaEuro .Bando.BudgetTotale}}</div>
+    <div><strong>ISEE massimo</strong><br>{{formattaEuro .Bando.ISEEMassimo}}</div>
     <div><strong>Scadenza</strong><br>{{.Bando.ScadenzaPresentazione}}</div>
     <div><strong>Creato</strong><br>{{.Bando.CreatedAt.Format "02/01/2006"}}</div>
   </div>
@@ -90,7 +90,7 @@ function avviaCalcolo(form) {
     <td>{{.CalcolataAt.Format "02/01/2006 15:04"}}</td>
     <td>{{.NumAmmesse}}</td>
     <td>{{.NumEscluse}}</td>
-    <td>€{{printf "%.2f" .BudgetUsato}}</td>
+    <td>{{formattaEuro .BudgetUsato}}</td>
     <td><a href="/bandi/{{$.Bando.ID}}/run/{{.ID}}" class="btn btn-sm">Visualizza</a></td>
   </tr>
   {{end}}

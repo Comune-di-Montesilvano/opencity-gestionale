@@ -50,8 +50,8 @@
   {{range .Bandi}}
   <tr>
     <td><a href="/bandi/{{.ID}}">{{.Nome}}</a></td>
-    <td>{{if .BudgetTotale}}€{{printf "%.2f" .BudgetTotale}}{{else}}—{{end}}</td>
-    <td>{{if .ISEEMassimo}}€{{printf "%.2f" .ISEEMassimo}}{{else}}—{{end}}</td>
+    <td>{{if .BudgetTotale}}{{formattaEuro .BudgetTotale}}{{else}}—{{end}}</td>
+    <td>{{if .ISEEMassimo}}{{formattaEuro .ISEEMassimo}}{{else}}—{{end}}</td>
     <td>{{if .ScadenzaPresentazione}}{{.ScadenzaPresentazione}}{{else}}—{{end}}</td>
     <td>
       {{if eq .StatoBando "attivo"}}<span class="badge badge-green">Attivo</span>

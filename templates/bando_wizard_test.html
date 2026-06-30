@@ -8,7 +8,7 @@
     {{if gt (.Grad.TotaleConRiserva) 0}}<div class="stat"><span class="stat-value" style="color:#e67e22">{{.Grad.TotaleConRiserva}}</span><span class="stat-label">Con riserva verifica</span></div>{{end}}
     {{if gt (.Grad.TotaleFuoriFondi) 0}}<div class="stat"><span class="stat-value" style="color:#c2410c">{{.Grad.TotaleFuoriFondi}}</span><span class="stat-label">Fuori fondi</span></div>{{end}}
     <div class="stat"><span class="stat-value">{{len .Grad.Escluse}}</span><span class="stat-label">Escluse (filtri)</span></div>
-    <div class="stat"><span class="stat-value">€{{printf "%.2f" .Grad.TotaleBudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
+    <div class="stat"><span class="stat-value">{{formattaEuro .Grad.TotaleBudgetUsato}}</span><span class="stat-label">Budget usato</span></div>
   </div>
 
   {{if .Grad.Gruppi}}
@@ -20,7 +20,7 @@
     <tr>
       <td>{{.Nome}}</td>
       <td>{{len .Righe}}</td>
-      <td>€{{printf "%.2f" .BudgetUsato}}</td>
+      <td>{{formattaEuro .BudgetUsato}}</td>
     </tr>
     {{end}}
     </tbody>

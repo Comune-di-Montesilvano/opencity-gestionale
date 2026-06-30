@@ -62,16 +62,16 @@
         {{$override := index (index $.DatiLocali $riga.Istanza.ID) .}}
         {{if $override}}
           <div style="position:relative">
-            <div>{{if $v}}{{$v}}{{else}}{{$override}}{{end}}</div>
+            <div>{{if $v}}{{formattaMappato $v . $.Bando}}{{else}}{{formattaMappato $override . $.Bando}}{{end}}</div>
             <span class="badge" style="font-size:9px;background:#fffbeb;color:#c2410c;border:1px solid #fed7aa;padding:0px 4px;display:inline-block;margin-top:2px" title="Valore sovrascritto localmente: {{$override}}">sovr.</span>
           </div>
         {{else}}
-          {{$v}}
+          {{formattaMappato $v . $.Bando}}
         {{end}}
       {{end}}
     </td>
     {{end}}
-    <td>{{if .Ammessa}}€{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>
+    <td>{{if .Ammessa}}{{formattaEuro .ImportoRimborso}}{{else}}—{{end}}</td>
     <td>
       {{if .Ammessa}}<span class="badge badge-green">Ammessa</span>{{else}}<span class="badge badge-red">Esclusa</span>{{end}}
       {{if .Istanza}}{{$statoIst := index $.IstruttoriaStato .Istanza.ID}}

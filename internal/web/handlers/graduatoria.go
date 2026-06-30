@@ -33,7 +33,7 @@ func csvHeadersDynamic(dinamiche []string) []string {
 	return append(headers, dinamiche...)
 }
 
-func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL string, dinamiche []string) []string {
+func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL string, dinamiche []string, mapping map[string]graduatoria.FieldMapping) []string {
 	ist := r.Istanza
 	link := ""
 	if ist != nil && baseURL != "" && ist.ID != "" {
@@ -41,7 +41,7 @@ func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL s
 	}
 	importo := ""
 	if r.Ammessa {
-		importo = fmt.Sprintf("%.2f", r.ImportoRimborso)
+		importo = graduatoria.FormatValutaIT(r.ImportoRimborso)
 	}
 	protocollo := ""
 	dataInvio := ""
@@ -77,6 +77,11 @@ func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL s
 		val := ""
 		if ist != nil {
 			val = ist.CampiMappati[col]
+			if fm, ok := mapping[col]; ok && fm.Tipo == "float" {
+				if f, err := strconv.ParseFloat(val, 64); err == nil {
+					val = graduatoria.FormatValutaIT(f)
+				}
+			}
 		}
 		row = append(row, val)
 	}
@@ -327,6 +332,9 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 	var exportColonne []string
 	json.Unmarshal([]byte(bando.ExportColonne), &exportColonne)
 
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
 	filename := fmt.Sprintf("run%d_%d_%s.csv", runID, anno, tipo)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
@@ -340,7 +348,7 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 		if !riga.Ammessa && riga.NoteEsclusione != "fondi esauriti" {
 			cat = "esclusa"
 		}
-		_ = cw.Write(csvRecordDynamic(cat, riga, h.BaseURL, exportColonne))
+		_ = cw.Write(csvRecordDynamic(cat, riga, h.BaseURL, exportColonne, ecfg.Mapping))
 	}
 	cw.Flush()
 }
@@ -496,6 +504,9 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 	var exportColonne []string
 	json.Unmarshal([]byte(bando.ExportColonne), &exportColonne)
 
+	var ecfg graduatoria.EngineConfig
+	json.Unmarshal([]byte(bando.EngineConfig), &ecfg)
+
 	filename := fmt.Sprintf("run%d_%s.csv", runID, nome)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
@@ -509,7 +520,7 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 		if !riga.Ammessa {
 			cat = "fuori_fondi"
 		}
-		_ = cw.Write(csvRecordDynamic(cat, riga, h.BaseURL, exportColonne))
+		_ = cw.Write(csvRecordDynamic(cat, riga, h.BaseURL, exportColonne, ecfg.Mapping))
 	}
 	cw.Flush()
 }

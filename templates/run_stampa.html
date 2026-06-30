@@ -86,7 +86,7 @@
     </div>
     <div class="stampa-riepilogo-item">
       <div class="stampa-riepilogo-label">Budget assegnato</div>
-      <div class="stampa-riepilogo-val">€ {{printf "%.2f" .Run.BudgetUsato}}</div>
+      <div class="stampa-riepilogo-val">{{formattaEuro .Run.BudgetUsato}}</div>
     </div>
     <div class="stampa-riepilogo-item">
       <div class="stampa-riepilogo-label">Data stampa</div>
@@ -99,7 +99,7 @@
   <div class="stampa-sezione">
     <div class="stampa-sezione-header">
       <div class="stampa-sezione-title">{{.Nome}}</div>
-      <div class="stampa-sezione-stats">{{len .Righe}} istanze &nbsp;·&nbsp; budget usato: € {{printf "%.2f" .BudgetUsato}}</div>
+      <div class="stampa-sezione-stats">{{len .Righe}} istanze &nbsp;·&nbsp; budget usato: {{formattaEuro .BudgetUsato}}</div>
     </div>
     <table class="stampa-table">
       <thead>
@@ -121,11 +121,11 @@
         {{if hasCol $.Colonne "protocollo"}}<td class="col-proto">{{if .Istanza}}{{protocolloBreve .Istanza.ProtocolNumber}}{{end}}</td>{{end}}
         {{if hasCol $.Colonne "cf"}}<td class="col-cf">{{if .Istanza}}{{cfOscurato (primoNonVuoto .Istanza.RichiedenteCF (index .Istanza.CampiMappati "richiedente_cf") (index .Istanza.CampiMappati "richiedente"))}}{{end}}</td>{{end}}
         {{if hasCol $.Colonne "cf_figlio"}}<td class="col-cf">{{if .Istanza}}{{cfOscurato (primoNonVuoto .Istanza.FiglioSelezionatoCF (index .Istanza.CampiMappati "figlio_cf") (index .Istanza.CampiMappati "figlio"))}}{{end}}</td>{{end}}
-        {{if hasCol $.Colonne "importo"}}<td class="col-num">{{if .Ammessa}}{{printf "%.2f" .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
+        {{if hasCol $.Colonne "importo"}}<td class="col-num">{{if .Ammessa}}{{formattaEuro .ImportoRimborso}}{{else}}—{{end}}</td>{{end}}
         {{if hasCol $.Colonne "ammessa"}}<td class="col-stato">{{if .Ammessa}}<span class="stampa-badge-ok">Ammessa</span>{{else}}<span class="stampa-badge-no">Esclusa</span>{{end}}</td>{{end}}
         {{if hasCol $.Colonne "note"}}<td class="col-note">{{.NoteEsclusione}}</td>{{end}}
         {{$ist := .Istanza}}
-        {{range $.ExportColonne}}<td>{{if $ist}}{{index $ist.CampiMappati .}}{{end}}</td>{{end}}
+        {{range $.ExportColonne}}<td>{{if $ist}}{{formattaMappato (index $ist.CampiMappati .) . $.Bando}}{{end}}</td>{{end}}
       </tr>
       {{end}}
       </tbody>

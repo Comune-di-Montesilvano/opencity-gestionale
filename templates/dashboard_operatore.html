@@ -25,10 +25,10 @@
     {{end}}
   </div>
   <div class="card-body">
-    <p>Budget: €{{printf "%.2f" .Bando.BudgetTotale}} | ISEE max: €{{printf "%.2f" .Bando.ISEEMassimo}}</p>
+    <p>Budget: {{formattaEuro .Bando.BudgetTotale}} | ISEE max: {{formattaEuro .Bando.ISEEMassimo}}</p>
     {{if .UltimaRun}}
     <p>Ultima run: <a href="/bandi/{{.Bando.ID}}/run/{{.UltimaRun.ID}}">{{.UltimaRun.CalcolataDa}} — {{.UltimaRun.CalcolataAt.Format "02/01/2006 15:04"}}</a></p>
-    <p>Ammesse: {{.UltimaRun.NumAmmesse}} | Escluse: {{.UltimaRun.NumEscluse}} | Budget: €{{printf "%.2f" .UltimaRun.BudgetUsato}}</p>
+    <p>Ammesse: {{.UltimaRun.NumAmmesse}} | Escluse: {{.UltimaRun.NumEscluse}} | Budget: {{formattaEuro .UltimaRun.BudgetUsato}}</p>
     {{else}}
     <p class="text-muted">Nessuna run calcolata</p>
     {{end}}

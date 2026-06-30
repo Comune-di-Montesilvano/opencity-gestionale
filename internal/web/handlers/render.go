@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
+	"opencity-gestionale/internal/db"
+	"opencity-gestionale/internal/graduatoria"
 	"opencity-gestionale/internal/opencity"
 	"opencity-gestionale/internal/web/middleware"
 )
@@ -35,6 +38,24 @@ func SetVersion(v string) {
 }
 
 var funcMap = template.FuncMap{
+	"formattaEuro": func(val float64) string {
+		return graduatoria.FormatValutaIT(val)
+	},
+	"formattaMappato": func(val string, key string, bando *db.Bando) string {
+		if bando == nil {
+			return val
+		}
+		var ecfg graduatoria.EngineConfig
+		if json.Unmarshal([]byte(bando.EngineConfig), &ecfg) != nil {
+			return val
+		}
+		if fm, ok := ecfg.Mapping[key]; ok && fm.Tipo == "float" {
+			if f, err := strconv.ParseFloat(val, 64); err == nil {
+				return graduatoria.FormatValutaIT(f)
+			}
+		}
+		return val
+	},
 	"add":  func(a, b int) int { return a + b },
 	"sub":  func(a, b int) int { return a - b },
 	"inc":  func(i int) int { return i + 1 },

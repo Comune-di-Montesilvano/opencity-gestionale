@@ -30,7 +30,7 @@
       <div class="detail-grid">
         <div><strong>Servizio</strong><br><code style="font-size:.8em">{{.Bando.ServiceID}}</code></div>
         <div><strong>Modalità</strong><br><span class="badge badge-gray">{{if .Config.Modalita}}{{.Config.Modalita}}{{else}}fondi{{end}}</span></div>
-        <div><strong>Budget</strong><br>€{{printf "%.2f" .Bando.BudgetTotale}}</div>
+        <div><strong>Budget</strong><br>{{formattaEuro .Bando.BudgetTotale}}</div>
         <div><strong>Scadenza</strong><br>{{.Bando.ScadenzaPresentazione}}</div>
       </div>
 
