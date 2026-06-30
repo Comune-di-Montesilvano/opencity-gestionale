@@ -267,3 +267,88 @@ func TestEngineDeduplicazione(t *testing.T) {
 		t.Errorf("Escluse: got %d, want 1 (duplicato)", len(grad.Escluse))
 	}
 }
+
+func TestEngineDefaultExtraction(t *testing.T) {
+	e := &generic.Engine{}
+	appJSON := `{
+		"applicant": {
+			"completename": {
+				"name": "Mario",
+				"surname": "Rossi"
+			},
+			"fiscal_code": {
+				"fiscal_code": "RSSMRA80A01H501U"
+			},
+			"email_address": "mario.rossi@example.com",
+			"cell_number": "1234567890",
+			"address": {
+				"address": "Via Roma",
+				"house_number": "10",
+				"municipality": "Montesilvano",
+				"postal_code": "65015",
+				"county": "PE"
+			}
+		},
+		"ordinary_economic_situation_indicator": {
+			"isee": 15000,
+			"valid_until": "31/12/2026",
+			"dsu_protocol_number": "INPS-DSU-2026-123456"
+		}
+	}`
+	apps := []opencity.Application{
+		makeApp(1, appJSON),
+	}
+	cfg := graduatoria.BandoConfig{
+		ExtraJSON: configJSON(graduatoria.EngineConfig{
+			Mapping:  map[string]graduatoria.FieldMapping{},
+			Modalita: "ammissione",
+		}),
+	}
+	grad, err := e.Calcola(apps, cfg)
+	if err != nil {
+		t.Fatalf("Calcola: %v", err)
+	}
+	if len(grad.Gruppi) != 1 || len(grad.Gruppi[0].Righe) != 1 {
+		t.Fatalf("Expected 1 row, got %v", grad)
+	}
+	ist := grad.Gruppi[0].Righe[0].Istanza
+	if ist == nil {
+		t.Fatalf("Expected Istanza to be populated")
+	}
+	if ist.RichiedenteNome != "Mario" {
+		t.Errorf("Expected RichiedenteNome = Mario, got %q", ist.RichiedenteNome)
+	}
+	if ist.RichiedenteCognome != "Rossi" {
+		t.Errorf("Expected RichiedenteCognome = Rossi, got %q", ist.RichiedenteCognome)
+	}
+	if ist.RichiedenteCF != "RSSMRA80A01H501U" {
+		t.Errorf("Expected RichiedenteCF = RSSMRA80A01H501U, got %q", ist.RichiedenteCF)
+	}
+	if ist.RichiedenteEmail != "mario.rossi@example.com" {
+		t.Errorf("Expected RichiedenteEmail = mario.rossi@example.com, got %q", ist.RichiedenteEmail)
+	}
+	if ist.RichiedenteTel != "1234567890" {
+		t.Errorf("Expected RichiedenteTel = 1234567890, got %q", ist.RichiedenteTel)
+	}
+	if ist.Indirizzo != "Via Roma" {
+		t.Errorf("Expected Indirizzo = Via Roma, got %q", ist.Indirizzo)
+	}
+	if ist.Civico != "10" {
+		t.Errorf("Expected Civico = 10, got %q", ist.Civico)
+	}
+	if ist.Comune != "Montesilvano" {
+		t.Errorf("Expected Comune = Montesilvano, got %q", ist.Comune)
+	}
+	if ist.CAP != "65015" {
+		t.Errorf("Expected CAP = 65015, got %q", ist.CAP)
+	}
+	if ist.Provincia != "PE" {
+		t.Errorf("Expected Provincia = PE, got %q", ist.Provincia)
+	}
+	if ist.ISEEValidoFino != "31/12/2026" {
+		t.Errorf("Expected ISEEValidoFino = 31/12/2026, got %q", ist.ISEEValidoFino)
+	}
+	if ist.ISEEDSUProtocollo != "INPS-DSU-2026-123456" {
+		t.Errorf("Expected ISEEDSUProtocollo = INPS-DSU-2026-123456, got %q", ist.ISEEDSUProtocollo)
+	}
+}

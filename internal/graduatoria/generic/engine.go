@@ -265,6 +265,61 @@ func estraiRecord(app opencity.Application, cfg graduatoria.EngineConfig, extras
 			base.StringMap["richiedente_cf"] = cf
 		}
 	}
+	if base.StringMap["richiedente_nome"] == "" {
+		if nome, _ := extractor.Str(app.Data, "applicant.completename.name"); nome != "" {
+			base.StringMap["richiedente_nome"] = nome
+		}
+	}
+	if base.StringMap["richiedente_cognome"] == "" {
+		if cognome, _ := extractor.Str(app.Data, "applicant.completename.surname"); cognome != "" {
+			base.StringMap["richiedente_cognome"] = cognome
+		}
+	}
+	if base.StringMap["richiedente_email"] == "" {
+		if email, _ := extractor.Str(app.Data, "applicant.email_address"); email != "" {
+			base.StringMap["richiedente_email"] = email
+		}
+	}
+	if base.StringMap["richiedente_tel"] == "" {
+		if tel, _ := extractor.Str(app.Data, "applicant.cell_number"); tel != "" {
+			base.StringMap["richiedente_tel"] = tel
+		}
+	}
+	if base.StringMap["indirizzo"] == "" {
+		if val, _ := extractor.Str(app.Data, "applicant.address.address"); val != "" {
+			base.StringMap["indirizzo"] = val
+		}
+	}
+	if base.StringMap["civico"] == "" {
+		if val, _ := extractor.Str(app.Data, "applicant.address.house_number"); val != "" {
+			base.StringMap["civico"] = val
+		}
+	}
+	if base.StringMap["comune"] == "" {
+		if val, _ := extractor.Str(app.Data, "applicant.address.municipality"); val != "" {
+			base.StringMap["comune"] = val
+		}
+	}
+	if base.StringMap["cap"] == "" {
+		if val, _ := extractor.Str(app.Data, "applicant.address.postal_code"); val != "" {
+			base.StringMap["cap"] = val
+		}
+	}
+	if base.StringMap["provincia"] == "" {
+		if val, _ := extractor.Str(app.Data, "applicant.address.county"); val != "" {
+			base.StringMap["provincia"] = val
+		}
+	}
+	if base.StringMap["isee_valido_fino"] == "" {
+		if val, _ := extractor.Str(app.Data, "ordinary_economic_situation_indicator.valid_until"); val != "" {
+			base.StringMap["isee_valido_fino"] = val
+		}
+	}
+	if base.StringMap["isee_dsu_protocollo"] == "" {
+		if val, _ := extractor.Str(app.Data, "ordinary_economic_situation_indicator.dsu_protocol_number"); val != "" {
+			base.StringMap["isee_dsu_protocollo"] = val
+		}
+	}
 
 	if cfg.Espansione == "" || len(expandMapping) == 0 {
 		return []*graduatoria.Record{base}, nil

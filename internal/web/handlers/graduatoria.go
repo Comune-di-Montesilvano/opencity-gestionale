@@ -23,7 +23,7 @@ type GraduatoriaHandler struct {
 
 // csvSistemaCols sono le colonne sistema sempre presenti nell'export CSV.
 var csvSistemaCols = []string{
-	"Posizione", "Categoria", "Protocollo", "Data Invio",
+	"Posizione", "Categoria", "Protocollo", "Cognome", "Nome", "CF Richiedente", "Data Invio",
 	"Stato", "Importo Rimborso", "Note Esclusione", "Link",
 }
 
@@ -46,6 +46,9 @@ func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL s
 	protocollo := ""
 	dataInvio := ""
 	stato := ""
+	cognome := ""
+	nome := ""
+	cfRichiedente := ""
 	if ist != nil {
 		protocollo = ist.ProtocolNumber
 		dataInvio = ist.SubmittedAt
@@ -53,11 +56,17 @@ func csvRecordDynamic(categoria string, r graduatoria.RigaGraduatoria, baseURL s
 			dataInvio = t.Format("02/01/2006")
 		}
 		stato = ist.Status
+		cognome = ist.RichiedenteCognome
+		nome = ist.RichiedenteNome
+		cfRichiedente = ist.RichiedenteCF
 	}
 	row := []string{
 		fmt.Sprintf("%d", r.Posizione),
 		categoria,
 		protocollo,
+		cognome,
+		nome,
+		cfRichiedente,
 		dataInvio,
 		stato,
 		importo,
@@ -308,6 +317,8 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
+	cacheData := recuperaDatiCache(h.DB, bandoID)
+
 	var righe []graduatoria.RigaGraduatoria
 	if tipo == "escluse" {
 		righe = grad.Escluse
@@ -324,6 +335,7 @@ func (h *GraduatoriaHandler) GetExportCSV(w http.ResponseWriter, r *http.Request
 	cw.Comma = ';'
 	_ = cw.Write(csvHeadersDynamic(exportColonne))
 	for _, riga := range righe {
+		applicaFallbackCache(riga.Istanza, cacheData)
 		cat := tipo
 		if !riga.Ammessa && riga.NoteEsclusione != "fondi esauriti" {
 			cat = "esclusa"
@@ -471,6 +483,8 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
+	cacheData := recuperaDatiCache(h.DB, bandoID)
+
 	var righe []graduatoria.RigaGraduatoria
 	for _, g := range grad.Gruppi {
 		if g.Nome == nome {
@@ -490,6 +504,7 @@ func (h *GraduatoriaHandler) GetExportCSVGruppo(w http.ResponseWriter, r *http.R
 	cw.Comma = ';'
 	_ = cw.Write(csvHeadersDynamic(exportColonne))
 	for _, riga := range righe {
+		applicaFallbackCache(riga.Istanza, cacheData)
 		cat := nome
 		if !riga.Ammessa {
 			cat = "fuori_fondi"
@@ -595,6 +610,8 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 	var grad graduatoria.Graduatoria
 	json.Unmarshal([]byte(run.DatiJSON), &grad)
 
+	cacheData := recuperaDatiCache(h.DB, bandoID)
+
 	filename := fmt.Sprintf("run%d_iban_bonifici.csv", runID)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
@@ -614,6 +631,7 @@ func (h *GraduatoriaHandler) GetExportIBAN(w http.ResponseWriter, r *http.Reques
 			}
 			pos++
 			ist := riga.Istanza
+			applicaFallbackCache(ist, cacheData)
 			annualita := ""
 			if ist.Annualita != 0 {
 				annualita = fmt.Sprintf("%d", ist.Annualita)

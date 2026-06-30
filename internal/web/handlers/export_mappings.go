@@ -288,6 +288,8 @@ func (h *ExportMappingsHandler) GetExportCSVMapped(w http.ResponseWriter, r *htt
 		filtroSet[s] = true
 	}
 
+	cacheData := recuperaDatiCache(h.DB, bandoID)
+
 	filename := fmt.Sprintf("run%d_%s.csv", runID, sanitizeFilename(mapping.Nome))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
@@ -309,6 +311,7 @@ func (h *ExportMappingsHandler) GetExportCSVMapped(w http.ResponseWriter, r *htt
 				continue
 			}
 			ist := riga.Istanza
+			applicaFallbackCache(ist, cacheData)
 			// Applica filtro stato se configurato
 			if len(filtroSet) > 0 && !filtroSet[ist.Status] {
 				continue
